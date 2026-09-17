@@ -424,6 +424,10 @@ live in `docs/decisions.md` under the same identifier.
   A before/after comparison across an event date cannot separate the event
   from season, weekday mix and other events. The seed tests neutralise one
   effect, regenerate from the same seed, and compare.
+- **2026-09-17 — Row security on, no policies (D39).** The app reads as the
+  `postgres` role, which bypasses it; Supabase's public REST API returns no
+  rows and refuses writes. Measured before and after on the live project.
+  A table added without `.enableRLS()` fails `tests/queries/schema.test.ts`.
 - **2026-09-17 — Light by default, warm palette (D7).** Warm paper palette
   measured from the marketing site. The `vercel:shadcn` skill's "dark by
   default for dashboards" guidance is overridden on purpose. Corrected
