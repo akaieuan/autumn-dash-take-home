@@ -48,6 +48,11 @@ describe("chart atoms", () => {
     expect(screen.getByRole("row", { name: /Sep 2/ })).toHaveTextContent("$1,000$0—$0");     // no previous → no change
     const total = screen.getAllByRole("row").at(-1)!;
     expect(total).toHaveTextContent("Total$1,000$900+11%$200");                            // 100000 vs 90000 → +11%
+    const box = screen.getByRole("table").parentElement!.parentElement!; // outside shadcn's own wrapper
+    expect(box.style.maxHeight).toBe("");                 // fills the chart's box; the old cap left dead space under it
+    expect(box.className).toContain("flex-1");
+    const bar = screen.getByRole("row", { name: /Sep 2/ }).querySelector("[style*='width']") as HTMLElement;
+    expect(bar.style.width).toBe("100%");                 // $1,000 is the largest bucket
   });
   it("TrendChart renders an accessible figure, a legend and the table twin", () => {
     render(<TrendChart metric={metric} granularity={granularity} points={points} prevLabel="Previous 10 days" lastYearLabel="Same days last year" />);
