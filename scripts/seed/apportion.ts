@@ -21,3 +21,23 @@ export function apportion(total: number, weights: number[], caps?: number[]): nu
   }
   return out;
 }
+
+/**
+ * For small integer totals (a day's clicks or bookings), assign each unit to a
+ * part by weighted draw. Largest-remainder always hands a lone unit to the
+ * heaviest weight, so over a month the light parts never appear; a draw
+ * spreads them in proportion. Sums are exact by construction; caps are respected.
+ */
+export function apportionByDraw(total: number, weights: number[], next: () => number, caps?: number[]): number[] {
+  const n = weights.length;
+  const out = new Array<number>(n).fill(0);
+  if (total <= 0 || n === 0) return out;
+  for (let u = 0; u < total; u++) {
+    const w = weights.map((x, i) => (x > 0 && (!caps || out[i] < caps[i]) ? x : 0));
+    const sum = w.reduce((s, x) => s + x, 0);
+    if (sum <= 0) break;
+    let r = next() * sum;
+    for (let i = 0; i < n; i++) { r -= w[i]; if (r <= 0) { out[i]++; break; } }
+  }
+  return out;
+}
