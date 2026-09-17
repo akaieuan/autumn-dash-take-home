@@ -14,6 +14,10 @@ export interface PeriodTotals {
   /** What Autumn spent on ads in the window. Autumn funds it; shown for the cost-vs-return story. */
   spendCents: number;
   ctr: number; conversion: number; avgBookingValueCents: number | null;
+  /** Every direct booking the property took in the window, from any source. Autumn's `bookings` is a subset. */
+  allDirectBookings: number;
+  /** bookings / allDirectBookings, from the same rows; null when the property recorded none. */
+  shareOfDirectBookings: number | null;
 }
 
 export interface OverviewDto {
@@ -34,12 +38,12 @@ export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRa
       coalesce(sum(website_visits), 0) as visits, coalesce(sum(bookings), 0) as bookings,
       coalesce(sum(booking_value), 0)::float8 as value, coalesce(sum(new_visitors), 0) as new_visitors,
       coalesce(sum(site_sessions), 0) as site_sessions, coalesce(sum(pageviews), 0) as pageviews,
-      coalesce(sum(spend), 0)::float8 as spend
+      coalesce(sum(spend), 0)::float8 as spend, coalesce(sum(all_direct_bookings), 0) as all_direct
     from daily_metrics where date between ${from} and ${to}`));
   const bookingValueCents = toCents(r.value);
   const feeCents = Math.round((bookingValueCents * feeRateBps) / 10000);
   const clicks = n(r.clicks), impressions = n(r.impressions), bookings = n(r.bookings);
-  const siteSessions = n(r.site_sessions), pageviews = n(r.pageviews);
+  const siteSessions = n(r.site_sessions), pageviews = n(r.pageviews), allDirectBookings = n(r.all_direct);
   return {
     from, to, days: n(r.days), impressions, clicks, websiteVisits: n(r.visits), bookings,
     bookingValueCents, feeCents, netCents: bookingValueCents - feeCents,
@@ -49,6 +53,8 @@ export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRa
     ctr: impressions ? clicks / impressions : 0,
     conversion: clicks ? bookings / clicks : 0,
     avgBookingValueCents: bookings ? Math.round(bookingValueCents / bookings) : null,
+    allDirectBookings,
+    shareOfDirectBookings: allDirectBookings ? bookings / allDirectBookings : null,
   };
 }
 

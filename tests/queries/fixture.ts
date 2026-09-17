@@ -28,8 +28,8 @@ export const SEGMENT_RANGE = {
 };
 
 /** `pagesPerSession` is derived here, so the stored daily rate can never disagree with its own denominators. */
-const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, siteSessions: number, pageviews: number, spend = 0) =>
-  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, siteSessions, pageviews, pagesPerSession: Math.round((pageviews / siteSessions) * 100) / 100, spend });
+const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, siteSessions: number, pageviews: number, spend = 0, allDirectBookings = bookings) =>
+  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, siteSessions, pageviews, pagesPerSession: Math.round((pageviews / siteSessions) * 100) / 100, spend, allDirectBookings });
 const bd = (date: string, dimension: "campaign" | "device" | "feeder_market", dimensionValue: string, impressions: number, clicks: number, bookings: number, bookingValue: number, spend = 0) =>
   ({ date, dimension, dimensionValue, impressions, clicks, bookings, bookingValue, spend });
 
@@ -46,14 +46,14 @@ export async function loadFixture(db: TestDb) {
     { id: 3, date: "2026-07-09", campaignName: "Discovery & Competitors", kind: "bid_change", title: "Chicago weekend bids", note: "Raised." },
   ]);
   await db.insert(dailyMetrics).values([
-    // current: imp 5000, clk 600, visits 582, bookings 3, value 1250.50, new 2700,
+    // current: imp 5000, clk 600, visits 582, bookings 3 of 10 direct bookings in all (5 + 3 + 2), value 1250.50, new 2700,
     // sessions 3600, pageviews 13250 → 3.68 pages per visit. Daily rates 3.0 / 4.0 / 3.5 average to 3.5,
     // so a test that reads 3.5 is reading an average of averages.
-    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 700, 2100, 10.0),
-    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 2000, 8000, 30.0),
-    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 900, 3150, 5.0),
-    // previous
-    day("2026-08-25", 500, 50, 50, 1, 300.0, 200, 300, 960),
+    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 700, 2100, 10.0, 5),
+    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 2000, 8000, 30.0, 3),
+    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 900, 3150, 5.0, 2),
+    // previous: 1 of 4 direct bookings in all
+    day("2026-08-25", 500, 50, 50, 1, 300.0, 200, 300, 960, 0, 4),
     // last year
     day("2025-09-03", 400, 40, 40, 2, 500.0, 150, 200, 620),
     // outside every window

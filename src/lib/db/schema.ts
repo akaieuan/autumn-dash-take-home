@@ -33,7 +33,15 @@ export const dailyMetrics = pgTable("daily_metrics", {
   pagesPerSession: numeric("pages_per_session", { precision: 4, scale: 2, mode: "number" }).notNull(),
   /** What Autumn spent on ads that day, in dollars. Autumn funds it; the owner sees it for the cost-vs-return story. */
   spend: numeric("spend", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),
-}).enableRLS();
+  /**
+   * Every direct booking the property took that day, from any source; `bookings` (Autumn's) is a subset.
+   * Added 2026-09-17 so the headline can say "41 of your 120 direct bookings" instead of "41". The check
+   * below is the invariant; db:verify re-measures it over the whole table.
+   */
+  allDirectBookings: integer("all_direct_bookings").notNull().default(0),
+}, (t) => [
+  check("daily_metrics_all_direct_bookings_check", sql`${t.allDirectBookings} >= ${t.bookings}`),
+]).enableRLS();
 
 export const DIMENSIONS = ["campaign", "device", "feeder_market"] as const;
 export type Dimension = (typeof DIMENSIONS)[number];

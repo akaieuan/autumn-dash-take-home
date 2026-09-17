@@ -42,7 +42,7 @@ const totals: PeriodTotals = {
   pagesPerSession: 3.6,
   ctr: 1020 / 6400,
   conversion: 41 / 1020,
-  avgBookingValueCents: 44488, spendCents: 0, };
+  avgBookingValueCents: 44488, spendCents: 0, allDirectBookings: 120, shareOfDirectBookings: 41 / 120 };
 const overview: OverviewDto = {
   current: totals,
   previous: { ...totals, bookings: 35, bookingValueCents: 1508000 },
@@ -83,13 +83,17 @@ describe("Headline", () => {
     wrap(<Headline overview={overview} range={range} />);
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1).toHaveTextContent(
-      "Autumn brought you 41 direct bookings worth $18,240. You kept $15,504 after Autumn's 15% fee.",
+      "Autumn brought you 41 of your 120 direct bookings, worth $18,240. You kept $15,504 after Autumn's 15% fee.",
     );
     // 1824000 vs 1508000 = +21%; 1824000 vs 1471000 = +24%.
     expect(screen.getByText("+21% vs the previous 30 days")).toBeInTheDocument();
     expect(screen.getByText("+24% vs this time last year")).toBeInTheDocument();
     expect(screen.getByText(/Autumn's fee this period/).textContent).toContain("$2,736");
     expect(screen.getByText("Last 30 days · Aug 18 – Sep 16, 2026")).toBeInTheDocument();
+  });
+  it("falls back to Autumn's count alone when the property recorded no direct bookings in all", () => {
+    wrap(<Headline overview={{ ...overview, current: { ...totals, allDirectBookings: 0, shareOfDirectBookings: null } }} range={range} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Autumn brought you 41 direct bookings worth $18,240.");
   });
   it("drops the comparison lines for the all-time range", () => {
     wrap(

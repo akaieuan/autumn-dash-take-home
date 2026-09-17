@@ -31,6 +31,16 @@ export function growth(iso: string): number {
   return Math.pow(1.22, (daysBetween(WINDOW.start, iso) - 1) / 365);
 }
 
+/**
+ * Direct bookings Autumn had nothing to do with: guests who typed the inn's name, phoned, or came back on their
+ * own. They follow the season and a slow drift, not the ramp, the program's growth or any campaign event, so
+ * Autumn's share of all direct bookings rises over the two years through Autumn's own bookings alone.
+ */
+export const ORGANIC_BOOKINGS_PER_DAY = 1.1; // at a July weekday
+export function organicGrowth(iso: string): number {
+  return Math.pow(1.05, (daysBetween(WINDOW.start, iso) - 1) / 365);
+}
+
 /** Average value of one booking (ADR × typical stay), in cents, by season; weekends stay longer. */
 export function avgBookingValueCents(iso: string): number {
   const s = SEASON[month(iso)];

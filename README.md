@@ -136,7 +136,7 @@ Wipes all four tables and inserts a deterministic two-year dataset. It prints on
 line that a partial or wrong run could not produce:
 
 ```
-Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 918 bookings, $408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events
+Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 918 bookings, $408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events, 1503 direct bookings in all
 ```
 
 Running it again produces byte-identical rows; the generator is seeded with a
@@ -212,7 +212,7 @@ reasoning is in [docs/decisions.md](docs/decisions.md) (D21–D28).
 
 | Table | Grain | Columns |
 |---|---|---|
-| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `site_sessions`, `pageviews`, `pages_per_session numeric(4,2)`, `spend numeric(10,2)` |
+| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `site_sessions`, `pageviews`, `pages_per_session numeric(4,2)`, `spend numeric(10,2)`, `all_direct_bookings` (every direct booking the property took, Autumn's included; check constraint `all_direct_bookings >= bookings`) |
 | `breakdowns` | one row per day per dimension value | `date` (FK), `dimension` ∈ `campaign` \| `device` \| `feeder_market` (check constraint), `dimension_value`, `impressions`, `clicks`, `bookings`, `booking_value`, `spend`; index on `(date, dimension)` |
 | `campaigns` | one row per campaign | `name` (matches `dimension_value`), `objective`, `focus`, `launched_on`, `status`, `monthly_budget` |
 | `campaign_events` | one row per thing Autumn did | `date`, `campaign_name` (FK, null = whole program), `kind` ∈ launched \| budget_change \| copy_refresh \| bid_change \| seasonal_push, `title`, `note` |

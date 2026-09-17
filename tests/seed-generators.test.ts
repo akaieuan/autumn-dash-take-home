@@ -110,6 +110,26 @@ describe("seed generators", () => {
     expect(impressions(data, "Brand Protection", "2025-02-10", "2025-03-09") / impressions(noBidRaise, "Brand Protection", "2025-02-10", "2025-03-09")).toBeGreaterThan(1.05);
   });
 
+  it("records all direct bookings every day, never fewer than Autumn's, and Autumn's share grows over the two years", () => {
+    // The Overview headline says "41 of your 120 direct bookings". Without this column it can only say "41".
+    for (const d of data.daily) expect(d.allDirectBookings).toBeGreaterThanOrEqual(d.bookings);
+    const share = (rows: typeof data.daily) => sum(rows, (d) => d.bookings) / sum(rows, (d) => d.allDirectBookings);
+    const first = share(data.daily.filter((d) => d.date >= "2024-11-12" && d.date <= "2025-02-09")); // after the ramp
+    const last = share(data.daily.filter((d) => d.date >= "2026-06-19"));
+    expect(first).toBeGreaterThan(0.2);
+    expect(last).toBeGreaterThan(first + 0.08);
+    expect(last).toBeLessThan(0.85); // the inn still takes bookings Autumn had nothing to do with
+  });
+  it("organic direct bookings do not respond to campaign events, so the share moves only through Autumn's own bookings", () => {
+    // Neutralising an event changes Autumn's bookings from its date. The bookings Autumn did not touch must be identical.
+    const noBudget = generateWithout(9, "impressions");
+    const organic = (d: typeof data) => d.daily.map((x) => x.allDirectBookings - x.bookings);
+    // Guard against a missing column: NaN equals NaN under toEqual, so the values must be real counts first.
+    expect(organic(data).every((n) => Number.isInteger(n) && n >= 0)).toBe(true);
+    expect(sum(organic(data), (n) => n)).toBeGreaterThan(0);
+    expect(organic(noBudget)).toEqual(organic(data));
+    expect(noBudget.daily.map((x) => x.bookings)).not.toEqual(data.daily.map((x) => x.bookings));
+  });
   it("never has more clicks than impressions or more bookings than clicks in any row", () => {
     for (const r of [...data.daily, ...data.breakdowns]) { expect(r.clicks).toBeLessThanOrEqual(r.impressions); expect(r.bookings).toBeLessThanOrEqual(r.clicks); }
     for (const r of data.daily) expect(r.websiteVisits).toBeLessThanOrEqual(r.clicks);

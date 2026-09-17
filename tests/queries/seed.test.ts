@@ -16,6 +16,8 @@ describe("seed round-trip through a real Postgres", () => {
     expect(acceptance.campaigns).toBe(4);
     expect(acceptance.events).toBeGreaterThanOrEqual(20);
     expect(acceptance.spend).toBeGreaterThan(0);
+    expect(acceptance.allDirectBookings).toBeGreaterThan(acceptance.bookings);
+    expect(acceptanceLine(acceptance)).toMatch(new RegExp(`${acceptance.allDirectBookings} direct bookings in all`));
     expect(reconciled).toEqual({ campaign: true, device: true, feeder_market: true });
     await close();
   }, 120_000);

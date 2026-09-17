@@ -222,7 +222,7 @@ prediction, never a README's claim, never your own earlier summary.
 props — never assume a field exists. **Prefer a derived acceptance line** that
 a wrong or missing input could not produce (`Seeded 730 days
 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 918 bookings,
-$408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events`; re-measure
+$408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events, 1503 direct bookings in all`; re-measure
 after any generator change)
 over a boolean "ok". **A fixture built to match the code cannot falsify the
 code.** **Run `typecheck` before `test`:** Vitest does not typecheck, and on
@@ -267,7 +267,7 @@ voice, with the date. No emojis; absolute dates, never "last week".
 | `npm run lint` | `eslint .` exits 0 |
 | `npm test` | Vitest: `Test Files  N passed` and `Tests  M passed`, exit 0; N and M re-measured from the run |
 | `npm run build` | `next build` exits 0; both routes listed; no unintended dynamic-usage warnings |
-| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events` with days ≥ 720 |
+| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events, <n> direct bookings in all` with days ≥ 720 (the last segment added 2026-09-17, D40) |
 | `npm run db:verify` | reads the live database and prints the same line from `count(*)`/`MIN`/`MAX`/`SUM`, then `campaign|device|feeder_market reconciles with daily totals: yes` ×3; exit 1 otherwise |
 | deployed URL | `/` and `/website-traffic` render with data; the headline value equals the value a one-off query computes for the same window |
 
@@ -439,3 +439,17 @@ live in `docs/decisions.md` under the same identifier.
   the device or an explicit toggle was added the same day, on the same tokens,
   and `tests/architecture.test.ts` requires the dark block. Light remains the
   default.
+- **2026-09-17 — All direct bookings are stored beside Autumn's (D40).**
+  `daily_metrics.all_direct_bookings` is every direct booking the property
+  took that day; `bookings` (Autumn's) is a subset, enforced by a check
+  constraint and re-measured by `db:verify`. The headline reads "80 of your
+  112 direct bookings" instead of "80". The seed draws the organic part from
+  its own random stream, so every column seeded before it kept its bytes and
+  no event effect can reach it; `tests/seed-generators.test.ts` proves both.
+  Measured 2026-09-17: 918 of 1,503 over 730 days; Autumn's share 48% in the
+  first winter, 69% over the last 90 days.
+- **2026-09-17 — Two more things the dashboard will warn about (D41).**
+  Ad spend per booking up 30% or more against the previous period, and a
+  feeder market that sent three or more bookings and now sends none. Both
+  are Watch insights in `src/lib/insights.ts`, the first paired with what
+  Autumn does about it. Hand-built fixtures in `tests/insights.test.ts`.
