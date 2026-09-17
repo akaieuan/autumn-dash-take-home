@@ -15,8 +15,10 @@ hotel-marketing data.
 - **[The decision log](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/decisions.md)** —
   every decision in this repo, the alternative it was chosen over, the reason
   argued from the hotel owner and the data, and the test that would fail if it
-  were silently reversed. Product decisions D1 through D10; engineering and
-  data decisions D11 onward. This is the document to read for "why".
+  were silently reversed. Grouped by theme: what the owner sees, the data
+  and how it is generated, and how the code is put together, with superseded
+  rulings and rejected approaches kept at the end with the number that
+  decided each. This is the document to read for "why".
 - **[The operating contract](https://github.com/akaieuan/autumn-dash-take-home/blob/main/CLAUDE.md)** —
   how work was done: what a change must prove before it is called done, and
   the invariants the codebase keeps.
@@ -81,7 +83,7 @@ two foreign keys, two check constraints).
 npm run db:seed
 ```
 
-Wipes both tables and inserts a deterministic two-year dataset. It prints one
+Wipes all four tables and inserts a deterministic two-year dataset. It prints one
 line that a partial or wrong run could not produce:
 
 ```
@@ -289,6 +291,61 @@ sense on the traffic screen.
 | Overview artboard | Website traffic artboard |
 |---|---|
 | ![Overview design artboard](public/screenshots/design-artboard.png) | ![Website traffic design artboard](public/screenshots/design-artboard-traffic.png) |
+
+## What I learned, and what I would do next
+
+The full record is in [docs/decisions.md](docs/decisions.md); these are the
+parts I would bring up first.
+
+**What I learned**
+
+- **A before-and-after comparison is not proof of cause.** The first
+  causality test compared the weeks either side of an ad-copy refresh. An
+  untouched control campaign moved 2.8% across the same date while the
+  campaign with the real effect moved 0.6%: the test was reading season and
+  weekday mix, and it broke the moment the random stream shifted. The fix
+  was to regenerate the dataset with one effect switched off and compare the
+  two runs (D30). Every "what Autumn did" card on the traffic screen rests on
+  that.
+- **Small counts break the obvious sampling.** With about one booking a day,
+  a coin-flip per day hid a 22% annual trend behind noise (D25), and
+  largest-remainder rounding handed every single booking to the biggest
+  market, leaving eight of ten at zero over a month (D22). Both were caught
+  by tests that pin a shape ("July beats January", "no market is empty")
+  rather than a number.
+- **A rate stored without its denominator cannot be re-aggregated.** Pages
+  per visit was an average of daily averages until a test showed 3.5 where
+  the true figure was 3.68 (D29). The daily table now stores both counts.
+- **Derived facts belong in code, not in tables.** The spec started with
+  eight tables including a stored insights table. Two metric tables at two
+  grains, with insights computed at render time, removed every way the
+  numbers could disagree with the sentence beside them (D21, D24).
+- **A seed that prints a derived line is worth more than a green check.**
+  The acceptance line the seed prints and the verify script recomputes from
+  the live database caught a partial insert on the first hosted run.
+
+**What I would do next, with more time**
+
+- **A per-booking grain.** The two-table model gave up lead time, booking
+  hour and a recent-bookings list (D21). Those are the owner's "who booked
+  last night?" questions and would be the first table added.
+- **Real traffic sources.** Channels, page paths and time of day are on the
+  reference product but not in this data, and were not faked (D31). With a
+  real analytics feed the traffic screen gains a "where visits come from"
+  section without changing its shape.
+- **Ask Autumn as a working assistant.** The popover is an honest preview
+  of the interaction, wired to nothing. The next step is a model that
+  answers over the same query layer the screens use, so it can never quote
+  a number the page does not show.
+- **Measured performance on the deployed URL.** Query timings are recorded
+  (32 to 69 ms warm); Lighthouse scores and time to first byte are not yet,
+  and the operating contract asks for both.
+- **Negative controls for every decision.** Nine decisions are marked
+  "tested" rather than "verified": the proving test exists but has not been
+  deliberately broken once. Finishing that pass is a morning's work and would
+  make the log fully falsified.
+- **The fee rate as a per-property setting** (D6), the first step toward the
+  multi-property switching the contract keeps out of scope.
 
 ## Docs
 
