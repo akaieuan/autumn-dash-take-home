@@ -69,10 +69,11 @@
   --border: rgba(28, 27, 25, 0.1);
   --input: rgba(28, 27, 25, 0.14);
   --ring: #6f8b7a;
-  --chart-1: #6f8b7a;
-  --chart-2: #a9bfb2;
-  --chart-3: #d9c7a3;
-  --chart-4: #6f7e92;
+  /* Chart marks, re-stepped 2026-09-17 for contrast on the paper surface (dataviz validator: this period + greys = emphasis form; D26) */
+  --chart-1: #3f6b55; /* this period */
+  --chart-2: #a9a8a2; /* previous period */
+  --chart-3: #cfcdc6; /* same period last year */
+  --chart-4: #a0661e; /* second series, campaigns only */
   --chart-5: #95938c;
   --positive: #6f8b7a;
   --watch: #c48a3a;
@@ -86,6 +87,29 @@
   --sidebar-accent-foreground: #1c1b19;
   --sidebar-border: rgba(28, 27, 25, 0.1);
   --sidebar-ring: #6f8b7a;
+}
+
+/* Layout rhythm (D27) and concentric corners (D28). Components reference these; they never carry a literal gutter, padding or radius. */
+:root {
+  --page-gutter: 1rem;
+  --stack-gap: 1rem;
+  --plot-height: 200px;
+  --radius-panel: 1.5rem;   /* outer cards, popovers */
+  --panel-pad: 1rem;        /* inset of anything directly inside a panel */
+  --radius-min: 4px;
+  --r-in: max(var(--radius-min), calc(var(--radius-panel) - var(--panel-pad)));   /* 8px: rows, chips, empty states inside a panel */
+  --radius-float: 1rem;     /* chart tooltips */
+  --float-pad: 0.75rem;
+  --r-float-in: max(var(--radius-min), calc(var(--radius-float) - var(--float-pad)));
+}
+@media (min-width: 640px) {
+  :root { --page-gutter: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  :root { --page-gutter: 2rem; --stack-gap: 1.25rem; --plot-height: 260px; --radius-panel: 1.75rem; --panel-pad: 1.25rem; }  /* 28 − 20 keeps --r-in at 8px */
+}
+@media (min-width: 1536px) {
+  :root { --page-gutter: 3rem; }
 }
 
 
