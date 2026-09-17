@@ -2,7 +2,7 @@
 
 A calm, plain-language marketing dashboard for an independent-hotel owner,
 answering one question: **is Autumn helping my hotel get more direct bookings
-and revenue?** Two connected screens, an Overview and a Bookings detail, read
+and revenue?** Two connected screens, an Overview and a Website Traffic detail, read
 live from a hosted Postgres database seeded with two years of believable
 hotel-marketing data.
 
