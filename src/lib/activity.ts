@@ -151,16 +151,25 @@ export function weekContext<T extends DayLike>(days: T[], date: string | null): 
   return date === null ? [] : weekOf(days, date);
 }
 
-/** One tile per month for narrow calendars: the month's total and its busiest day, newest last. */
-export interface MonthTile { key: string; total: number; busiest: string | null }
-export function monthTiles(days: DayLike[], count: number): MonthTile[] {
-  const months = monthTotals(days).slice(-count);
-  return months.map((m) => {
-    let busiest: DayLike | null = null;
-    for (const d of days) {
-      if (d.date.slice(0, 7) !== m.key || d.value === null) continue;
+/**
+ * For a narrow calendar: the last `cells × size` days folded into `cells` buckets of `size` days each,
+ * so a span always draws the same 7 × 13 grid and only the meaning of a square changes (a day, two
+ * days, four days). A bucket carries its busiest day so tapping it can keep that day open.
+ */
+export interface DayBucket { from: string; to: string; total: number | null; busiest: string | null }
+export function bucketGrid<T extends DayLike>(days: T[], cells: number, size: number): DayBucket[] {
+  const slice = days.slice(-cells * size);
+  const out: DayBucket[] = [];
+  for (let i = 0; i < slice.length; i += size) {
+    const group = slice.slice(i, i + size);
+    let total: number | null = null;
+    let busiest: T | null = null;
+    for (const d of group) {
+      if (d.value === null) continue;
+      total = (total ?? 0) + d.value;
       if (busiest === null || d.value > (busiest.value as number)) busiest = d;
     }
-    return { key: m.key, total: m.total, busiest: busiest?.date ?? null };
-  });
+    out.push({ from: group[0].date, to: group[group.length - 1].date, total, busiest: busiest?.date ?? null });
+  }
+  return out;
 }

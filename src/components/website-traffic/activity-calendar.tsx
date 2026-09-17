@@ -1,8 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
-import { count, longDate, monthShort, weekdayDate, weekdayShort } from "@/lib/format";
-import { dayRank, heatLevel, monthColumns, monthContext, monthTiles, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
+import { count, longDate, shortDate, weekdayDate, weekdayShort } from "@/lib/format";
+import { dayRank, heatLevel, monthColumns, monthContext, bucketGrid, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -62,17 +62,26 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const rank = shown === null ? null : dayRank(days, shown.date);
   const month = monthContext(days, pinnedDate);
 
-  // Under 28rem a year or six months of day tiles is a field of dots, so those spans become month tiles
-  // there (owner, 2026-09-17): six or twelve squares, each with its name and total. Tapping one keeps
-  // its busiest day open, so the card, the week and the month below all follow. 13 weeks stays a day grid.
-  const months = span === "quarter" ? [] : monthTiles(days, span === "year" ? 12 : 6);
-  const monthMax = Math.max(0, ...months.map((m) => m.total));
+  // Under 28rem a year or six months of day tiles is a field of dots, and month tiles broke the look
+  // (owner, 2026-09-17). So every span keeps the 13-week geometry there, 7 rows by 13 columns of the
+  // same squares, and only what a square means changes: a day, two days, four days. Same size, same
+  // card height, nothing moves when the span changes. A tap keeps the square's busiest day open.
+  const daysPerSquare = span === "year" ? 4 : span === "half" ? 2 : 1;
+  // The same line at every span, so the three states are the same height on a phone (13 weeks kept the note too).
+  const squareNote = daysPerSquare === 1 ? "Each square is a day." : daysPerSquare === 2 ? "Each square is two days." : "Each square is four days.";
+  const buckets = daysPerSquare === 1 ? [] : bucketGrid(days, 91, daysPerSquare);
+  const bucketMax = Math.max(0, ...buckets.map((b) => b.total ?? 0));
+  const bucketColumns = buckets.length > 0 ? monthColumns(buckets.map((b) => ({ date: b.from }))) : [];
   // One cell per week for the month row: the label sits on the week its month starts in, blank otherwise.
   const monthByColumn = new Map(monthColumns(visible).map((m, i) => [m.column, { label: m.label, odd: i % 2 === 1 }]));
   const weekCells = Array.from({ length: weeks }, (_, i) => ({ column: i + 1, back: weeks - 1 - i, month: monthByColumn.get(i + 1) ?? null }));
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
 
-  const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => (e.target as HTMLElement).closest<HTMLElement>("[data-date]")?.dataset.date ?? null;
+  // A day tile carries data-date; a narrow-screen square carries data-bucket (its busiest day). Either pins that day.
+  const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-date],[data-bucket]");
+    return el?.dataset.date ?? el?.dataset.bucket ?? null;
+  };
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => setHover(dateUnder(e));
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const date = dateUnder(e);
@@ -157,33 +166,50 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:grid-rows-[auto_auto]">
           {/* This column is its own container: the weeks it shows depend on the width the tiles actually get. */}
           <div className="@container flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
-            {months.length > 0 ? (
-              <div className="grid grid-cols-6 gap-1.5 @md:hidden">
-                {months.map((m) => {
-                  const level = heatLevel(m.total, monthMax) ?? 0;
-                  const isPinned = pinnedDate !== null && pinnedDate.slice(0, 7) === m.key;
-                  return (
-                    <button
-                      key={m.key}
-                      type="button"
-                      aria-label={`${monthShort(`${m.key}-01`)} ${m.key.slice(0, 4)}: ${count(m.total)} ${unit}`}
-                      aria-pressed={isPinned}
-                      disabled={m.busiest === null}
-                      onClick={() => { if (m.busiest) pick(m.busiest); }}
-                      className={cn(
-                        "flex aspect-square w-full flex-col justify-between rounded-(--r-in) p-1.5 text-left transition-transform motion-safe:hover:scale-105 disabled:opacity-40",
-                        LEVEL[level],
-                        isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
-                      )}
-                    >
-                      <span className={cn("text-[11px] font-medium leading-none", level === 4 ? "text-card" : "text-foreground")}>{monthShort(`${m.key}-01`)}</span>
-                      <span className={cn("self-end text-[11px] leading-none tabular-nums", level === 4 ? "text-card/80" : "text-muted-foreground")}>{count(m.total)}</span>
-                    </button>
-                  );
-                })}
+            {buckets.length > 0 ? (
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 @md:hidden">
+                <div aria-hidden="true" />
+                <div aria-hidden="true" className="grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] gap-[3px] text-[10px] leading-4 text-muted-foreground">
+                  {Array.from({ length: 13 }, (_, c) => {
+                    const m = bucketColumns.find((x) => x.column === c + 1);
+                    return <span key={c} className="min-w-0 overflow-visible whitespace-nowrap">{m ? m.label : null}</span>;
+                  })}
+                </div>
+                <div aria-hidden="true" />
+                <div
+                  role="group"
+                  aria-label={`Each square is ${daysPerSquare} days: ${count(total)} ${unit} in the last year`}
+                  onPointerMove={onMove}
+                  onPointerDown={onDown}
+                  onPointerLeave={() => setHover(null)}
+                  onClick={onClick}
+                  className="grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)] gap-[3px]"
+                >
+                  {buckets.map((b) => {
+                    const level = heatLevel(b.total, bucketMax);
+                    const isPinned = pinnedDate !== null && b.from <= pinnedDate && pinnedDate <= b.to;
+                    return (
+                      <button
+                        key={b.from}
+                        type="button"
+                        data-bucket={b.busiest ?? undefined}
+                        data-level={level ?? undefined}
+                        aria-label={`${shortDate(b.from)} – ${shortDate(b.to)}: ${b.total === null ? "no data" : `${count(b.total)} ${unit}`}`}
+                        aria-pressed={isPinned}
+                        disabled={b.busiest === null}
+                        tabIndex={-1}
+                        className={cn(
+                          "aspect-square w-full rounded-(--radius-min) transition-transform motion-safe:hover:scale-110",
+                          level === null ? EMPTY : LEVEL[level],
+                          isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
+                        )}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             ) : null}
-            <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1", months.length > 0 && "hidden @md:grid")}>
+            <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1", buckets.length > 0 && "hidden @md:grid")}>
               <div aria-hidden="true" />
               <div aria-hidden="true" className={cn("col-start-2 row-start-1 grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground", span === "year" ? "gap-[2px]" : "gap-[3px]")}>
                 {weekCells.map((w) => (
@@ -251,6 +277,7 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                   </>
                 ) : null}
               </span>
+              <span className="@md:hidden">{squareNote}</span>
               <span aria-hidden="true" className="inline-flex items-center gap-1">
                 Fewer
                 {LEVEL.map((c) => (

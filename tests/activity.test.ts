@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns,
-  visibleWindow, dayRank, monthContext, weekContext, monthTiles, type DayLike,
+  visibleWindow, dayRank, monthContext, weekContext, bucketGrid, type DayLike,
 } from "@/lib/activity";
 
 /** A local date walker, so the fixtures below never borrow the helper under test. */
@@ -181,17 +181,14 @@ describe("weekContext", () => {
   });
 });
 
-describe("monthTiles", () => {
-  it("takes the last N months with their totals and busiest day", () => {
-    const days = [
-      { date: "2026-07-30", value: 10 }, { date: "2026-07-31", value: 40 },
-      { date: "2026-08-01", value: 5 }, { date: "2026-08-15", value: 50 }, { date: "2026-08-31", value: 20 },
-      { date: "2026-09-01", value: null }, { date: "2026-09-02", value: 7 },
-    ];
-    expect(monthTiles(days, 2)).toEqual([
-      { key: "2026-08", total: 75, busiest: "2026-08-15" },
-      { key: "2026-09", total: 7, busiest: "2026-09-02" },
-    ]);
-    expect(monthTiles(days, 12)).toHaveLength(3);
+describe("bucketGrid", () => {
+  it("folds the last cells × size days into buckets that know their total and busiest day", () => {
+    const days = Array.from({ length: 10 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, value: i === 0 ? null : i * 10 }));
+    const b = bucketGrid(days, 4, 2); // the last 8 days: 09-03..09-10 in pairs
+    expect(b).toHaveLength(4);
+    expect(b[0]).toEqual({ from: "2026-09-03", to: "2026-09-04", total: 50, busiest: "2026-09-04" });
+    expect(b[3]).toEqual({ from: "2026-09-09", to: "2026-09-10", total: 170, busiest: "2026-09-10" });
+    const all = bucketGrid(days, 5, 2); // covers 09-01, which has no data
+    expect(all[0]).toEqual({ from: "2026-09-01", to: "2026-09-02", total: 10, busiest: "2026-09-02" });
   });
 });

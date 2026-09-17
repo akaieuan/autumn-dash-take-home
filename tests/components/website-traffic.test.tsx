@@ -89,19 +89,24 @@ describe("DayCard height", () => {
 });
 
 describe("ActivityCalendar", () => {
-  it("turns six months and a year into month tiles under 28rem, and keeps 13 weeks as days", () => {
+  it("keeps the 13-week geometry under 28rem for every span: 91 squares, each a day, two days or four days", () => {
     const half = render(<ActivityCalendar activity={activity} initialSpan="half" />);
-    const monthButtons = () => [...half.container.querySelectorAll("button")].filter((b) => /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}:/.test(b.getAttribute("aria-label") ?? ""));
-    expect(monthButtons()).toHaveLength(6);
-    expect(monthButtons()[0].parentElement?.className).toContain("@md:hidden");
-    expect(half.container.querySelector("#activity [role=group]")?.parentElement?.className).toContain("hidden @md:grid");
-    fireEvent.click(monthButtons()[0]); // tapping a month keeps its busiest day open
-    const pinned = half.container.querySelector("[data-date][aria-pressed='true']") as HTMLElement;
-    expect(pinned.dataset.date?.slice(0, 7)).toBe(monthButtons()[0].getAttribute("aria-label")?.match(/(\w{3}) (\d{4})/) ? pinned.dataset.date?.slice(0, 7) : "");
+    const squares = (c: HTMLElement) => [...c.querySelectorAll("button")].filter((b) => /–/.test(b.getAttribute("aria-label") ?? ""));
+    expect(squares(half.container)).toHaveLength(91);
+    expect(squares(half.container)[0].getAttribute("aria-label")).toMatch(/^\w{3} \d{1,2} – \w{3} \d{1,2}: [\d,]+ visits$/);
+    expect(squares(half.container)[0].parentElement?.parentElement?.className).toContain("@md:hidden");
+    expect(screen.getByText("Each square is two days.")).toBeInTheDocument();
+    expect(half.container.querySelector("#activity [role=group]:not([aria-label^='Each square'])")?.parentElement?.className).toContain("hidden @md:grid");
+    fireEvent.click(squares(half.container)[10]); // tapping a square keeps its busiest day open
+    expect(squares(half.container)[10].getAttribute("aria-pressed")).toBe("true");
+    expect(half.container.querySelector("[data-date][aria-pressed='true']")?.getAttribute("data-date")).toBe(squares(half.container)[10].getAttribute("data-bucket"));
     half.unmount();
+    const year = render(<ActivityCalendar activity={activity} initialSpan="year" />);
+    expect(squares(year.container)).toHaveLength(91);
+    expect(screen.getByText("Each square is four days.")).toBeInTheDocument();
+    year.unmount();
     const quarter = render(<ActivityCalendar activity={activity} initialSpan="quarter" />);
-    expect([...quarter.container.querySelectorAll("button")].filter((b) => /\d{4}:/.test(b.getAttribute("aria-label") ?? "")).length).toBe(0);
-    expect(quarter.container.querySelector("#activity [role=group]")?.parentElement?.className).not.toContain("hidden");
+    expect(squares(quarter.container)).toHaveLength(0);
   });
 
   it("keeps the header readout at one width so the span toggle never moves while hovering", () => {
