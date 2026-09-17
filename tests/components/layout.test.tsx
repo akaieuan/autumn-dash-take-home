@@ -24,6 +24,8 @@ describe("layout atoms", () => {
     expect(screen.getByText("Ranked by bookings.")).toBeInTheDocument();
     expect(document.getElementById("markets")?.className).toContain("p-(--panel-pad)");
     expect(document.getElementById("markets")?.className).toContain("rounded-(--radius-panel)");
+    expect(document.getElementById("markets")?.className).not.toContain("rounded-xl"); // cn must drop the Card's base radius
+    expect(document.getElementById("markets")?.className).toContain("overflow-visible"); // chart tooltips must not clip at the panel edge
   });
   it("EmptyState says something rather than rendering a blank card", () => {
     render(<EmptyState title="Nothing needs your attention this period" description="Autumn will flag anything that changes." />);

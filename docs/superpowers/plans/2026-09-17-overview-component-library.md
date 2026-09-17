@@ -119,7 +119,7 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     for (const f of walk("src").filter((p) => !p.endsWith("src/lib/format.ts"))) expect(read(f), f).not.toMatch(/Intl\.NumberFormat/);
   });
   it("pages import barrels, never a file inside a component folder", () => {
-    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|assistant)\/[a-z]/);
+    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|bookings|assistant)\/[a-z]/);
   });
   it("globals.css carries the layout tokens and no dark block", () => {
     const css = read("src/app/globals.css");
@@ -128,10 +128,12 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     expect(css).toMatch(/--chart-1:\s*#3f6b55/);
   });
   it("components set no outer margins (parents own spacing with gap)", () => {
-    for (const f of components()) expect(read(f), f).not.toMatch(/className=["'][^"']*(?<![\w-])m[tb]-\d/);
+    // Any margin utility (m-, mt-, mx-, ml-…) anywhere in a component file, whether in className="…" or inside cn("…").
+    for (const f of components()) expect(read(f), f).not.toMatch(/(?<![\w-])m[tblrxy]?-[\w(\[]/);
   });
   it("corners are concentric: only radius tokens or pills, never rounded-md/lg/xl literals", () => {
-    for (const f of components()) expect(read(f), f).not.toMatch(/\brounded-(xs|sm|md|lg|xl|2xl|3xl|4xl)\b/);
+    // Includes directional forms such as rounded-t-xl and rounded-tl-md.
+    for (const f of components()) expect(read(f), f).not.toMatch(/\brounded-(?:[trblse]{1,2}-)?(xs|sm|md|lg|xl|2xl|3xl|4xl)\b/);
   });
 });
 ```
@@ -207,6 +209,8 @@ describe("layout atoms", () => {
     expect(screen.getByText("Ranked by bookings.")).toBeInTheDocument();
     expect(document.getElementById("markets")?.className).toContain("p-(--panel-pad)");
     expect(document.getElementById("markets")?.className).toContain("rounded-(--radius-panel)");
+    expect(document.getElementById("markets")?.className).not.toContain("rounded-xl"); // cn must drop the Card's base radius
+    expect(document.getElementById("markets")?.className).toContain("overflow-visible"); // chart tooltips must not clip at the panel edge
   });
   it("EmptyState says something rather than rendering a blank card", () => {
     render(<EmptyState title="Nothing needs your attention this period" description="Autumn will flag anything that changes." />);
@@ -277,7 +281,7 @@ import { Card } from "@/components/ui/card";
 /** A titled card. Radius and padding come from tokens so an inset child using rounded-(--r-in) is concentric with it (D28). */
 export function Panel({ id, className, children }: { id?: string; className?: string; children: React.ReactNode }) {
   return (
-    <Card id={id} className={cn("gap-4 rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", className)}>
+    <Card id={id} className={cn("gap-4 overflow-visible rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", className)}>
       {children}
     </Card>
   );
@@ -2157,7 +2161,7 @@ import { QuickStat } from "./quick-stat";
 /** Four numbers in one panel. Hairlines come from a 1px gap over the border colour, so any column count divides correctly. */
 export function QuickAnalytics({ data }: { data: QuickAnalyticsDto }) {
   return (
-    <Panel className="@container p-0">
+    <Panel className="@container overflow-hidden p-0">
       <section aria-label="Quick analytics" className="grid grid-cols-2 gap-px bg-border @3xl:grid-cols-4">
         {data.stats.map((s) => <QuickStat key={s.key} stat={s} />)}
       </section>
@@ -2253,7 +2257,7 @@ export function OverviewPageSkeleton() {
   return (
     <Stack>
       <div className="flex flex-col gap-2"><Skeleton className="h-4 w-56 rounded-(--r-in)" /><Skeleton className="h-9 w-full max-w-3xl rounded-(--r-in)" /><Skeleton className="h-4 w-80 rounded-(--r-in)" /></div>
-      <Panel className="p-0"><div className="grid grid-cols-2 gap-px bg-border @3xl:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <div key={i} className="flex h-28 flex-col gap-2 bg-card p-(--panel-pad)"><Skeleton className="h-3 w-24 rounded-(--r-in)" /><Skeleton className="h-8 w-20 rounded-(--r-in)" /></div>)}</div></Panel>
+      <Panel className="overflow-hidden p-0"><div className="grid grid-cols-2 gap-px bg-border @3xl:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <div key={i} className="flex h-28 flex-col gap-2 bg-card p-(--panel-pad)"><Skeleton className="h-3 w-24 rounded-(--r-in)" /><Skeleton className="h-8 w-20 rounded-(--r-in)" /></div>)}</div></Panel>
       <OverviewBodySkeleton />
     </Stack>
   );

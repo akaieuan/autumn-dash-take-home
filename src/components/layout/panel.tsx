@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 /** A titled card. Radius and padding come from tokens so an inset child using rounded-(--r-in) is concentric with it (D28). */
 export function Panel({ id, className, children }: { id?: string; className?: string; children: React.ReactNode }) {
   return (
-    <Card id={id} className={cn("gap-4 rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", className)}>
+    <Card id={id} className={cn("gap-4 overflow-visible rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", className)}>
       {children}
     </Card>
   );

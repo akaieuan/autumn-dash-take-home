@@ -23,7 +23,7 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     for (const f of walk("src").filter((p) => !p.endsWith("src/lib/format.ts"))) expect(read(f), f).not.toMatch(/Intl\.NumberFormat/);
   });
   it("pages import barrels, never a file inside a component folder", () => {
-    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|assistant)\/[a-z]/);
+    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|bookings|assistant)\/[a-z]/);
   });
   it("globals.css carries the layout tokens and no dark block", () => {
     const css = read("src/app/globals.css");
@@ -32,9 +32,11 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     expect(css).toMatch(/--chart-1:\s*#3f6b55/);
   });
   it("components set no outer margins (parents own spacing with gap)", () => {
-    for (const f of components()) expect(read(f), f).not.toMatch(/className=["'][^"']*(?<![\w-])m[tb]-\d/);
+    // Any margin utility (m-, mt-, mx-, ml-…) anywhere in a component file, whether in className="…" or inside cn("…").
+    for (const f of components()) expect(read(f), f).not.toMatch(/(?<![\w-])m[tblrxy]?-[\w(\[]/);
   });
   it("corners are concentric: only radius tokens or pills, never rounded-md/lg/xl literals", () => {
-    for (const f of components()) expect(read(f), f).not.toMatch(/\brounded-(xs|sm|md|lg|xl|2xl|3xl|4xl)\b/);
+    // Includes directional forms such as rounded-t-xl and rounded-tl-md.
+    for (const f of components()) expect(read(f), f).not.toMatch(/\brounded-(?:[trblse]{1,2}-)?(xs|sm|md|lg|xl|2xl|3xl|4xl)\b/);
   });
 });
