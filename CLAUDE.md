@@ -386,7 +386,11 @@ live in `docs/decisions.md` under the same identifier.
   property is "Harbor House Inn", South Haven, Michigan, for copy only. Fee
   15% of attributed booking value (D6). Measured 2026-09-17: 730 daily rows,
   12,286 breakdown rows, 581 bookings, $257,770.90; blended click-through
-  16.0%, conversion 4.0%, average booking $444.
+  16.0%, conversion 4.0%, average booking $444. Live on Supabase 2026-09-17:
+  `db:verify` matched the seed line, all three dimensions reconcile; warm
+  query times 32–69 ms over the transaction pooler, ~450 ms on a cold
+  connection. SSL is mandatory: `ssl: "require"` in the client and
+  `?sslmode=require` on both URLs.
 - **2026-09-17 — Light theme only (D7).** Warm paper palette measured from the
   marketing site. The `vercel:shadcn` skill's "dark by default for dashboards"
   guidance is overridden on purpose.
