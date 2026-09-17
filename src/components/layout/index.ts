@@ -13,5 +13,6 @@ export { Sidebar } from "./sidebar";
 export { SidebarProvider, useSidebar } from "./sidebar-context";
 export { NavList } from "./nav-list";
 export { ThemeToggle } from "./theme-toggle";
+export { IconButton } from "./icon-button";
 export { useViewParam } from "./use-view-param";
 export { PillSelect, type PillOption } from "./pill-select";
