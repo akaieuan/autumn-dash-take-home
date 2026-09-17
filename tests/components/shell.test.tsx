@@ -24,6 +24,16 @@ describe("RangeSegment", () => {
 });
 
 describe("TopBar", () => {
+  it("carries the phone's menu button in its corner: a small rounded button that opens the sidebar drawer, hidden from sm", () => {
+    render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range="30d" dataThrough="2026-09-16" basePath="/" /></SidebarProvider></TooltipProvider>);
+    const menu = screen.getByRole("button", { name: "Open menu" });
+    expect(menu.className).toContain("sm:hidden");
+    expect(menu.className).toContain("rounded-(--r-in)");
+    expect(menu.getAttribute("aria-controls")).toBe("app-sidebar");
+    expect(menu.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(menu);
+    expect(menu.getAttribute("aria-expanded")).toBe("true");
+  });
   it("names the section, the two screens and the data date", () => {
     render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range="30d" dataThrough="2026-09-16" basePath="/" /></SidebarProvider></TooltipProvider>);
     expect(screen.queryByText("Dashboard")).toBeNull(); // the bar carries only the tabs and controls

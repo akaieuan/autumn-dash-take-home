@@ -16,3 +16,4 @@ export { ThemeToggle } from "./theme-toggle";
 export { IconButton } from "./icon-button";
 export { useViewParam } from "./use-view-param";
 export { PillSelect, type PillOption } from "./pill-select";
+export { MenuButton } from "./menu-button";

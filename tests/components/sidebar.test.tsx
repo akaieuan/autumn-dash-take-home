@@ -33,15 +33,16 @@ describe("Sidebar", () => {
     expect(other.parentElement?.className).toContain("border-t"); // pinned at the bottom, behind a hairline
     expect(screen.getByRole("navigation", { name: "General" }).parentElement?.className).toContain("flex-1"); // what pushes it there
   });
-  it("reads as a menu on phones and as a panel collapse from sm: the icons are chosen by breakpoint classes", () => {
+  it("is off the page on phones until the drawer opens, and its own button is then the X that closes it", () => {
     wrap();
+    const aside = screen.getByRole("complementary", { name: "Main" });
+    expect(aside.className).toContain("max-sm:data-[drawer=false]:hidden"); // no rail on a phone: the top bar's menu button opens the drawer
     const button = screen.getByRole("button", { name: "Collapse sidebar" });
-    expect(button.querySelector("svg.lucide-menu")?.getAttribute("class")).toContain("sm:hidden");
+    expect(button.querySelector("svg.lucide-menu")).toBeNull();
+    expect(button.querySelector("svg.lucide-x")?.getAttribute("class")).toContain("sm:hidden");
     const panelIcon = button.querySelector("svg.lucide-panel-left")?.getAttribute("class") ?? "";
     expect(panelIcon).toContain("hidden");
     expect(panelIcon).toContain("sm:block");
-    fireEvent.click(button); // opens the drawer on a phone: the menu icon becomes an X
-    expect(screen.getByRole("button", { name: "Expand sidebar" }).querySelector("svg.lucide-x")?.getAttribute("class")).toContain("sm:hidden");
   });
   it("snaps between the panel and the rail from its top-row control, remembering the state in a cookie", () => {
     wrap();

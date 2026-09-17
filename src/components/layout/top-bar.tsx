@@ -4,6 +4,7 @@ import { longDate } from "@/lib/format";
 import { DASHBOARD_SCREENS, type Screen } from "@/lib/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { MenuButton } from "./menu-button";
 import { RangeSegment } from "./range-segment";
 import { RangeSelect } from "./range-select";
 import { ThemeToggle } from "./theme-toggle";
@@ -33,6 +34,7 @@ export function TopBar({
     <header className="sticky top-0 z-30 px-(--page-gutter) pt-2 sm:px-[calc(var(--page-gutter)+0.5rem)]">
       {/* One line at every width. The tabs can scroll if a screen is narrower than their text; nothing wraps. */}
       <div className="flex h-14 items-center gap-1.5 rounded-(--r-header) border border-border/70 bg-background/75 px-2 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 lg:gap-4 lg:px-4">
+        <MenuButton />
         <nav aria-label="Screens" className="flex shrink-0 gap-1">
           {DASHBOARD_SCREENS.map((s) => (
             <Link
