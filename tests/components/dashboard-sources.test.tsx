@@ -5,7 +5,10 @@
 // The funnel rows are labelled by the glossary, whose wording differs from the brief's:
 // `impressions.label` is "Saw your hotel" (the brief quoted "People reached", which is the
 // chart's METRIC_LABELS wording), `clicks.label` is "Clicked through", and
-// `direct_bookings.label` is "Direct bookings from Autumn". Each expected string is written
+// `direct_bookings.label` is "Direct bookings from Autumn". The campaign purpose line is
+// `glossary.brand_protection.purpose` ("Keeps you first when guests search your name, so OTAs
+// don't take a booking that was already yours."); the brief quoted an earlier draft ("Keeps online
+// travel agencies from winning guests who were already looking for you."). Each expected string is written
 // out in full here, so a component that stopped reading the glossary — or a glossary reword —
 // turns this file red.
 import { describe, it, expect } from "vitest";
