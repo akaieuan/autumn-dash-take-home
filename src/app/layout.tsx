@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
-import { SIDEBAR_COOKIE, parseSidebarWidth } from "@/lib/sidebar";
+import { SIDEBAR_COOKIE, parseSidebarState } from "@/lib/sidebar";
 import { AppFrame } from "@/components/layout";
 import "./globals.css";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const sidebarWidth = parseSidebarWidth((await cookies()).get(SIDEBAR_COOKIE)?.value);
+  const sidebar = parseSidebarState((await cookies()).get(SIDEBAR_COOKIE)?.value);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="flex min-h-full flex-col font-sans">
         <TooltipProvider delayDuration={150}>
-          <AppFrame sidebarWidth={sidebarWidth}>{children}</AppFrame>
+          <AppFrame sidebar={sidebar}>{children}</AppFrame>
         </TooltipProvider>
       </body>
     </html>

@@ -1,41 +1,37 @@
 "use client";
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { clampSidebarWidth, isRail, SIDEBAR_DEFAULT, SIDEBAR_RAIL, writeSidebarCookie } from "@/lib/sidebar";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { writeSidebarCookie, type SidebarState } from "@/lib/sidebar";
 
 interface SidebarContextValue {
-  width: number;
+  /** Wide screens: rail or full panel. Persisted. */
   collapsed: boolean;
-  dragging: boolean;
-  /** Jump between the rail and the last expanded width. */
+  /** Small screens: whether the panel is drawn over the page. Never persisted; starts closed. */
+  drawerOpen: boolean;
   toggle: () => void;
-  /** Live width while dragging (not persisted). */
-  preview: (px: number) => void;
-  /** Settle on a width and persist it. */
-  commit: (px: number) => void;
-  setDragging: (on: boolean) => void;
+  closeDrawer: () => void;
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
-/** One source of truth for the panel's width, shared by the panel, its resize edge and the top-bar trigger. */
-export function SidebarProvider({ initialWidth, children }: { initialWidth: number; children: React.ReactNode }) {
-  const [width, setWidth] = useState(() => clampSidebarWidth(initialWidth));
-  const [dragging, setDragging] = useState(false);
-  const lastExpanded = useRef(isRail(initialWidth) ? SIDEBAR_DEFAULT : clampSidebarWidth(initialWidth));
+/**
+ * One source of truth for the panel. The same toggle drives both states; CSS decides which one is
+ * visible at the current width, so no code ever asks how wide the window is.
+ */
+export function SidebarProvider({ initialState, children }: { initialState: SidebarState; children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(initialState === "collapsed");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const commit = useCallback((px: number) => {
-    const w = clampSidebarWidth(px);
-    if (!isRail(w)) lastExpanded.current = w;
-    setWidth(w);
-    writeSidebarCookie(w);
+  const toggle = useCallback(() => {
+    setCollapsed((c) => {
+      const next = !c;
+      writeSidebarCookie(next ? "collapsed" : "expanded");
+      return next;
+    });
+    setDrawerOpen((o) => !o);
   }, []);
-  const toggle = useCallback(() => commit(isRail(width) ? lastExpanded.current : SIDEBAR_RAIL), [commit, width]);
-  const preview = useCallback((px: number) => setWidth(px), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const value = useMemo<SidebarContextValue>(
-    () => ({ width, collapsed: isRail(width), dragging, toggle, preview, commit, setDragging }),
-    [width, dragging, toggle, preview, commit],
-  );
+  const value = useMemo<SidebarContextValue>(() => ({ collapsed, drawerOpen, toggle, closeDrawer }), [collapsed, drawerOpen, toggle, closeDrawer]);
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
 }
 

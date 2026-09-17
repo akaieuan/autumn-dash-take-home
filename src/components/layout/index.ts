@@ -11,6 +11,5 @@ export { AppShell } from "./app-shell";
 export { AppFrame } from "./app-frame";
 export { Sidebar } from "./sidebar";
 export { SidebarProvider, useSidebar } from "./sidebar-context";
-export { SidebarTrigger } from "./sidebar-trigger";
 export { NavList } from "./nav-list";
 export { ThemeToggle } from "./theme-toggle";

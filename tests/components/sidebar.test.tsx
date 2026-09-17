@@ -3,60 +3,63 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Sidebar, SidebarProvider, SidebarTrigger } from "@/components/layout";
-import { clampSidebarWidth, parseSidebarWidth, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_RAIL } from "@/lib/sidebar";
+import { Sidebar, SidebarProvider } from "@/components/layout";
+import { parseSidebarState, type SidebarState } from "@/lib/sidebar";
 
 const pathname = "/website-traffic";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ push: vi.fn() }) }));
 
-const wrap = (ui: React.ReactNode, width = SIDEBAR_DEFAULT) =>
-  render(<TooltipProvider><SidebarProvider initialWidth={width}><SidebarTrigger />{ui}</SidebarProvider></TooltipProvider>);
+const wrap = (state: SidebarState = "expanded") =>
+  render(<TooltipProvider><SidebarProvider initialState={state}><Sidebar /></SidebarProvider></TooltipProvider>);
 
-describe("sidebar width rules", () => {
-  it("clamps to the rail below the expanded minimum and to the maximum above it", () => {
-    expect(clampSidebarWidth(20)).toBe(SIDEBAR_RAIL);
-    expect(clampSidebarWidth(150)).toBe(SIDEBAR_RAIL); // half-open snaps shut
-    expect(clampSidebarWidth(200)).toBe(200);
-    expect(clampSidebarWidth(900)).toBe(SIDEBAR_MAX);
-    expect(parseSidebarWidth(undefined)).toBe(SIDEBAR_DEFAULT);
-    expect(parseSidebarWidth("garbage")).toBe(SIDEBAR_DEFAULT);
+describe("sidebar state", () => {
+  it("reads the cookie value, defaulting to expanded", () => {
+    expect(parseSidebarState("collapsed")).toBe("collapsed");
+    expect(parseSidebarState(undefined)).toBe("expanded");
+    expect(parseSidebarState("garbage")).toBe("expanded");
   });
 });
 
 describe("Sidebar", () => {
-  it("marks Dashboard active for both dashboard screens and keeps unbuilt items as disabled, labelled buttons", () => {
-    wrap(<Sidebar />);
+  it("marks Dashboard active for both dashboard screens and keeps unbuilt items quiet, labelled buttons", () => {
+    wrap();
     expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
-    const calendar = screen.getByRole("button", { name: /Calendar/ });
-    expect(calendar).toBeDisabled();
-    expect(calendar).toHaveTextContent("Soon");
+    const calendar = screen.getByRole("button", { name: "Calendar" });
+    expect(calendar.getAttribute("aria-disabled")).toBe("true");
+    expect(calendar).not.toHaveTextContent("Soon"); // "coming soon" lives in the tooltip, not the label
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByRole("navigation", { name: "General" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Other" })).toBeInTheDocument();
   });
-  it("collapses to the rail from the top-bar trigger, remembering the width in a cookie", () => {
-    wrap(<Sidebar />);
+  it("snaps between the panel and the rail from its top-row control, remembering the state in a cookie", () => {
+    wrap();
     const aside = screen.getByRole("complementary", { name: "Main" });
     expect(aside.dataset.collapsed).toBe("false");
-    expect(aside.style.getPropertyValue("--sidebar-w")).toBe(`${SIDEBAR_DEFAULT}px`);
     fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(aside.dataset.collapsed).toBe("true");
-    expect(aside.style.getPropertyValue("--sidebar-w")).toBe(`${SIDEBAR_RAIL}px`);
-    expect(document.cookie).toContain(`autumn-sidebar=${SIDEBAR_RAIL}`);
-    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
-    expect(aside.style.getPropertyValue("--sidebar-w")).toBe(`${SIDEBAR_DEFAULT}px`); // back to the last width, not a fixed one
+    expect(document.cookie).toContain("autumn-sidebar=collapsed");
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+    expect(screen.queryByRole("separator")).toBeNull(); // no resize handle: two states only
   });
-  it("renders the rail from the server-provided width without a click", () => {
-    wrap(<Sidebar />, SIDEBAR_RAIL);
+  it("renders the rail from the server-provided state without a click", () => {
+    wrap("collapsed");
     expect(screen.getByRole("complementary", { name: "Main" }).dataset.collapsed).toBe("true");
   });
-  it("exposes a resize handle with the width range, and is never an overlay", () => {
-    wrap(<Sidebar />);
-    const handle = screen.getByRole("separator", { name: "Resize sidebar" });
-    expect(handle.getAttribute("aria-valuemin")).toBe(String(SIDEBAR_RAIL));
-    expect(handle.getAttribute("aria-valuemax")).toBe(String(SIDEBAR_MAX));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    // Under sm the rail is forced by a class, not by a viewport hook.
-    expect(screen.getByRole("complementary", { name: "Main" }).className).toContain("max-sm:w-16");
+  it("on small screens the open state is a drawer over the page with a backdrop that closes it", () => {
+    wrap("collapsed");
+    const aside = screen.getByRole("complementary", { name: "Main" });
+    expect(aside.dataset.drawer).toBe("false");
+    expect(screen.queryByRole("button", { name: "Close menu" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(aside.dataset.drawer).toBe("true");
+    expect(aside.className).toContain("max-sm:data-[drawer=true]:fixed"); // CSS decides, never a viewport hook
+    fireEvent.click(screen.getByRole("button", { name: "Close menu" }));
+    expect(aside.dataset.drawer).toBe("false");
+  });
+  it("closes the drawer when a destination is chosen", () => {
+    wrap("collapsed");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    fireEvent.click(screen.getByRole("link", { name: "Dashboard" }));
+    expect(screen.getByRole("complementary", { name: "Main" }).dataset.drawer).toBe("false");
   });
 });

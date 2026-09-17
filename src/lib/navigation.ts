@@ -34,8 +34,8 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 
 /** Dashboard's own tabs; the top bar renders these, the sidebar treats them as one destination. */
 export const DASHBOARD_SCREENS = [
-  { key: "overview", label: "Overview", path: "/" },
-  { key: "website-traffic", label: "Website traffic", path: "/website-traffic" },
+  { key: "overview", label: "Overview", short: "Overview", path: "/" },
+  { key: "website-traffic", label: "Website Traffic", short: "Traffic", path: "/website-traffic" },
 ] as const;
 export type Screen = (typeof DASHBOARD_SCREENS)[number]["key"];
 
