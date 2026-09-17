@@ -150,3 +150,17 @@ export function monthContext(days: DayLike[], date: string | null): MonthContext
 export function weekContext<T extends DayLike>(days: T[], date: string | null): (T | null)[] {
   return date === null ? [] : weekOf(days, date);
 }
+
+/** One tile per month for narrow calendars: the month's total and its busiest day, newest last. */
+export interface MonthTile { key: string; total: number; busiest: string | null }
+export function monthTiles(days: DayLike[], count: number): MonthTile[] {
+  const months = monthTotals(days).slice(-count);
+  return months.map((m) => {
+    let busiest: DayLike | null = null;
+    for (const d of days) {
+      if (d.date.slice(0, 7) !== m.key || d.value === null) continue;
+      if (busiest === null || d.value > (busiest.value as number)) busiest = d;
+    }
+    return { key: m.key, total: m.total, busiest: busiest?.date ?? null };
+  });
+}

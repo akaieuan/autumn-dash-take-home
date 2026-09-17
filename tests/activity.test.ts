@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns,
-  visibleWindow, dayRank, monthContext, weekContext, type DayLike,
+  visibleWindow, dayRank, monthContext, weekContext, monthTiles, type DayLike,
 } from "@/lib/activity";
 
 /** A local date walker, so the fixtures below never borrow the helper under test. */
@@ -178,5 +178,20 @@ describe("weekContext", () => {
       "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05",
     ]);
     expect(weekContext(DAYS, null)).toEqual([]);
+  });
+});
+
+describe("monthTiles", () => {
+  it("takes the last N months with their totals and busiest day", () => {
+    const days = [
+      { date: "2026-07-30", value: 10 }, { date: "2026-07-31", value: 40 },
+      { date: "2026-08-01", value: 5 }, { date: "2026-08-15", value: 50 }, { date: "2026-08-31", value: 20 },
+      { date: "2026-09-01", value: null }, { date: "2026-09-02", value: 7 },
+    ];
+    expect(monthTiles(days, 2)).toEqual([
+      { key: "2026-08", total: 75, busiest: "2026-08-15" },
+      { key: "2026-09", total: 7, busiest: "2026-09-02" },
+    ]);
+    expect(monthTiles(days, 12)).toHaveLength(3);
   });
 });

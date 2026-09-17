@@ -1,8 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
-import { count, longDate, weekdayDate, weekdayShort } from "@/lib/format";
-import { dayRank, heatLevel, monthColumns, monthContext, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
+import { count, longDate, monthShort, weekdayDate, weekdayShort } from "@/lib/format";
+import { dayRank, heatLevel, monthColumns, monthContext, monthTiles, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const rank = shown === null ? null : dayRank(days, shown.date);
   const month = monthContext(days, pinnedDate);
 
+  // Under 28rem a year or six months of day tiles is a field of dots, so those spans become month tiles
+  // there (owner, 2026-09-17): six or twelve squares, each with its name and total. Tapping one keeps
+  // its busiest day open, so the card, the week and the month below all follow. 13 weeks stays a day grid.
+  const months = span === "quarter" ? [] : monthTiles(days, span === "year" ? 12 : 6);
+  const monthMax = Math.max(0, ...months.map((m) => m.total));
   // One cell per week for the month row: the label sits on the week its month starts in, blank otherwise.
   const monthByColumn = new Map(monthColumns(visible).map((m, i) => [m.column, { label: m.label, odd: i % 2 === 1 }]));
   const weekCells = Array.from({ length: weeks }, (_, i) => ({ column: i + 1, back: weeks - 1 - i, month: monthByColumn.get(i + 1) ?? null }));
@@ -152,7 +157,33 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:grid-rows-[auto_auto]">
           {/* This column is its own container: the weeks it shows depend on the width the tiles actually get. */}
           <div className="@container flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
-            <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
+            {months.length > 0 ? (
+              <div className="grid grid-cols-6 gap-1.5 @md:hidden">
+                {months.map((m) => {
+                  const level = heatLevel(m.total, monthMax) ?? 0;
+                  const isPinned = pinnedDate !== null && pinnedDate.slice(0, 7) === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      aria-label={`${monthShort(`${m.key}-01`)} ${m.key.slice(0, 4)}: ${count(m.total)} ${unit}`}
+                      aria-pressed={isPinned}
+                      disabled={m.busiest === null}
+                      onClick={() => { if (m.busiest) pick(m.busiest); }}
+                      className={cn(
+                        "flex aspect-square w-full flex-col justify-between rounded-(--r-in) p-1.5 text-left transition-transform motion-safe:hover:scale-105 disabled:opacity-40",
+                        LEVEL[level],
+                        isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
+                      )}
+                    >
+                      <span className={cn("text-[11px] font-medium leading-none", level === 4 ? "text-card" : "text-foreground")}>{monthShort(`${m.key}-01`)}</span>
+                      <span className={cn("self-end text-[11px] leading-none tabular-nums", level === 4 ? "text-card/80" : "text-muted-foreground")}>{count(m.total)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1", months.length > 0 && "hidden @md:grid")}>
               <div aria-hidden="true" />
               <div aria-hidden="true" className={cn("col-start-2 row-start-1 grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground", span === "year" ? "gap-[2px]" : "gap-[3px]")}>
                 {weekCells.map((w) => (

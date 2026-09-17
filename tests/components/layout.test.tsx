@@ -26,6 +26,7 @@ describe("layout atoms", () => {
     expect(document.getElementById("markets")?.className).toContain("rounded-(--radius-panel)");
     expect(document.getElementById("markets")?.className).not.toContain("rounded-xl"); // cn must drop the Card's base radius
     expect(document.getElementById("markets")?.className).toContain("overflow-visible"); // chart tooltips must not clip at the panel edge
+    expect(screen.getByText("All").parentElement?.className).toContain("max-w-full"); // an action wider than the panel wraps inside its slot
   });
   // Thirteen callers repeated scroll-mt-20 next to their id before 2026-09-17 (design audit item 3).
   // A panel that can be jumped to now reserves the sticky top bar's room by itself; one that cannot

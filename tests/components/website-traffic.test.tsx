@@ -89,6 +89,21 @@ describe("DayCard height", () => {
 });
 
 describe("ActivityCalendar", () => {
+  it("turns six months and a year into month tiles under 28rem, and keeps 13 weeks as days", () => {
+    const half = render(<ActivityCalendar activity={activity} initialSpan="half" />);
+    const monthButtons = () => [...half.container.querySelectorAll("button")].filter((b) => /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}:/.test(b.getAttribute("aria-label") ?? ""));
+    expect(monthButtons()).toHaveLength(6);
+    expect(monthButtons()[0].parentElement?.className).toContain("@md:hidden");
+    expect(half.container.querySelector("#activity [role=group]")?.parentElement?.className).toContain("hidden @md:grid");
+    fireEvent.click(monthButtons()[0]); // tapping a month keeps its busiest day open
+    const pinned = half.container.querySelector("[data-date][aria-pressed='true']") as HTMLElement;
+    expect(pinned.dataset.date?.slice(0, 7)).toBe(monthButtons()[0].getAttribute("aria-label")?.match(/(\w{3}) (\d{4})/) ? pinned.dataset.date?.slice(0, 7) : "");
+    half.unmount();
+    const quarter = render(<ActivityCalendar activity={activity} initialSpan="quarter" />);
+    expect([...quarter.container.querySelectorAll("button")].filter((b) => /\d{4}:/.test(b.getAttribute("aria-label") ?? "")).length).toBe(0);
+    expect(quarter.container.querySelector("#activity [role=group]")?.parentElement?.className).not.toContain("hidden");
+  });
+
   it("keeps the header readout at one width so the span toggle never moves while hovering", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
     const readout = container.querySelector("#activity p[aria-live]") as HTMLElement;
