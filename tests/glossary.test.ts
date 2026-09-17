@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { glossary, valueLabel } from "@/lib/glossary";
+import { glossary, valueLabel, campaignKey, deviceKey, MARKET_HINTS } from "@/lib/glossary";
 import { DIMENSION_DEFS } from "../scripts/seed/profile";
 
 describe("glossary", () => {
@@ -10,15 +10,26 @@ describe("glossary", () => {
       expect(e.meaning.trim().endsWith("."), key).toBe(true);
     }
   });
-  it("has a plain-language entry with a purpose for every seeded campaign", () => {
-    for (const c of DIMENSION_DEFS.campaign) {
-      const e = glossary[c.label as keyof typeof glossary];
-      expect(e, c.label).toBeDefined();
-      expect(e.purpose, c.label).toBeTruthy();
+  it("maps every seeded campaign and device label to a key that has an entry", () => {
+    for (const d of DIMENSION_DEFS.campaign) {
+      const k = campaignKey(d.label);
+      expect(k, d.label).not.toBeNull();
+      expect(glossary[k!].purpose, d.label).toBeTruthy();
     }
+    for (const d of DIMENSION_DEFS.device) {
+      const k = deviceKey(d.label);
+      expect(k, d.label).not.toBeNull();
+      expect(glossary[k!].label, d.label).toBeTruthy();
+    }
+    expect(campaignKey("Nope")).toBeNull();
+    expect(deviceKey("Nope")).toBeNull();
   });
-  it("valueLabel passes cities and devices through unchanged", () => {
+  it("has a drive hint for every named feeder market except Other", () => {
+    for (const d of DIMENSION_DEFS.feeder_market) if (d.label !== "Other") expect(MARKET_HINTS[d.label], d.label).toBeTruthy();
+  });
+  it("valueLabel gives campaigns their plain name and passes cities through unchanged", () => {
     expect(valueLabel("Chicago, IL")).toBe("Chicago, IL");
     expect(valueLabel("Retargeting")).toBe("Reminders");
+    expect(valueLabel("Brand Protection")).toBe("Brand protection");
   });
 });

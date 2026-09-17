@@ -3,12 +3,14 @@
  * term once, and a meaning an innkeeper understands. Components render labels
  * through these entries; no metric definition lives inline in a component.
  */
+export type CampaignKey = "brand_protection" | "discovery" | "hotel_ads" | "retargeting";
+export type DeviceKey = "device_mobile" | "device_desktop" | "device_tablet";
 export type GlossaryKey =
   | "bookings" | "booking_value" | "autumn_fee" | "net_revenue" | "avg_booking_value"
   | "impressions" | "clicks" | "website_visits" | "ctr" | "conversion"
   | "cost_per_booking" | "ota_commission" | "new_visitors" | "pages_per_session"
   | "campaign" | "device" | "feeder_market"
-  | "Brand Protection" | "Discovery & Competitors" | "Google Hotel Ads" | "Retargeting";
+  | CampaignKey | DeviceKey;
 
 export interface GlossaryEntry { label: string; industryTerm?: string; meaning: string; purpose?: string }
 
@@ -30,12 +32,49 @@ export const glossary: Record<GlossaryKey, GlossaryEntry> = {
   campaign: { label: "Campaigns", meaning: "The kinds of ads Autumn runs for you. Each does a different job." },
   device: { label: "Devices", meaning: "Whether guests found you on a phone, a computer or a tablet." },
   feeder_market: { label: "Where guests come from", industryTerm: "feeder markets", meaning: "The cities guests were in when they searched and booked." },
-  "Brand Protection": { label: "Brand protection", meaning: "Ads on searches for your hotel's own name.", purpose: "Keeps you first when guests search your name, so OTAs don't take a booking that was already yours." },
-  "Discovery & Competitors": { label: "Discovery", industryTerm: "non-brand search", meaning: "Ads on searches like 'South Haven inn' or 'Lake Michigan B&B'.", purpose: "Reaches travellers who don't know you yet." },
-  "Google Hotel Ads": { label: "Google Hotel Ads", meaning: "Your direct rate shown next to OTA prices on Google Hotels.", purpose: "Wins the comparison so guests book with you, not them." },
-  Retargeting: { label: "Reminders", industryTerm: "retargeting", meaning: "Ads shown to people who visited your site but didn't book.", purpose: "Brings back guests who were already interested." },
+  brand_protection: { label: "Brand protection", meaning: "Ads on searches for your hotel's own name.", purpose: "Keeps you first when guests search your name, so OTAs don't take a booking that was already yours." },
+  discovery: { label: "Discovery", industryTerm: "non-brand search", meaning: "Ads on searches like 'South Haven inn' or 'Lake Michigan B&B'.", purpose: "Reaches travellers who don't know you yet." },
+  hotel_ads: { label: "Google Hotel Ads", meaning: "Your direct rate shown next to OTA prices on Google Hotels.", purpose: "Wins the comparison so guests book with you, not them." },
+  retargeting: { label: "Reminders", industryTerm: "retargeting", meaning: "Ads shown to people who visited your site but didn't book.", purpose: "Brings back guests who were already interested." },
+  device_mobile: { label: "Phone", meaning: "Visits and bookings made on a phone." },
+  device_desktop: { label: "Computer", meaning: "Visits and bookings made on a laptop or desktop computer." },
+  device_tablet: { label: "Tablet", meaning: "Visits and bookings made on a tablet." },
 };
 
 export const isGlossaryKey = (k: string): k is GlossaryKey => k in glossary;
-/** Label for any breakdown value; campaign names have plain-language entries, others (devices, cities) are already plain. */
-export const valueLabel = (value: string) => (isGlossaryKey(value) ? glossary[value].label : value);
+
+/** Seeded `breakdowns.value` → glossary key. Null for a label the glossary does not know. */
+const CAMPAIGN_KEYS: Record<string, CampaignKey> = {
+  "Brand Protection": "brand_protection",
+  "Discovery & Competitors": "discovery",
+  "Google Hotel Ads": "hotel_ads",
+  Retargeting: "retargeting",
+};
+const DEVICE_KEYS: Record<string, DeviceKey> = { Mobile: "device_mobile", Desktop: "device_desktop", Tablet: "device_tablet" };
+
+export const campaignKey = (seedLabel: string): CampaignKey | null => CAMPAIGN_KEYS[seedLabel] ?? null;
+export const deviceKey = (seedLabel: string): DeviceKey | null => DEVICE_KEYS[seedLabel] ?? null;
+
+/**
+ * Label for any breakdown value. Campaign names carry a plain-language entry;
+ * devices and cities are already plain and pass through, so a query row reads
+ * the way the seed wrote it. A component that wants the softer device wording
+ * ("Phone" for "Mobile") goes through `deviceKey` and the glossary itself.
+ */
+export const valueLabel = (value: string) => {
+  const c = campaignKey(value);
+  return c ? glossary[c].label : value;
+};
+
+/** Drive-time hints for the seeded feeder markets (copy only; South Haven, Michigan as origin). */
+export const MARKET_HINTS: Record<string, string> = {
+  "Chicago, IL": "2 h 15 drive",
+  "Grand Rapids, MI": "1 h 10 drive",
+  "Detroit, MI": "2 h 45 drive",
+  "Indianapolis, IN": "3 h 30 drive",
+  "Milwaukee, WI": "by ferry",
+  "Kalamazoo, MI": "45 min drive",
+  "Columbus, OH": "5 h drive",
+  "St. Louis, MO": "5 h 30 drive",
+  "Toronto, ON": "6 h drive",
+};

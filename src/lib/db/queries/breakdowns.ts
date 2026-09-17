@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { rowsOf, type AnyDb } from "../types";
 import type { DateRange } from "@/lib/date-range";
 import { DIMENSIONS, type Dimension } from "../schema";
-import { FEE_RATE_BPS } from "@/lib/config";
+import { PROPERTY } from "@/lib/property";
 import { valueLabel } from "@/lib/glossary";
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -27,7 +27,7 @@ async function aggregate(db: AnyDb, dimension: Dimension, from: string, to: stri
 }
 
 /** One dimension over the range, ranked by bookings then value, each row with its share and its previous-period figures. */
-export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimension, feeRateBps = FEE_RATE_BPS): Promise<BreakdownRowDto[]> {
+export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimension, feeRateBps = PROPERTY.feeRateBps): Promise<BreakdownRowDto[]> {
   const c = range.comparison;
   const [cur, prev] = await Promise.all([
     aggregate(db, dimension, range.from, range.to),
@@ -51,7 +51,7 @@ export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimen
     .sort((a, b) => b.bookings - a.bookings || b.bookingValueCents - a.bookingValueCents || b.clicks - a.clicks || a.value.localeCompare(b.value));
 }
 
-export async function getAllBreakdowns(db: AnyDb, range: DateRange, feeRateBps = FEE_RATE_BPS): Promise<Record<Dimension, BreakdownRowDto[]>> {
+export async function getAllBreakdowns(db: AnyDb, range: DateRange, feeRateBps = PROPERTY.feeRateBps): Promise<Record<Dimension, BreakdownRowDto[]>> {
   const results = await Promise.all(DIMENSIONS.map((d) => getBreakdown(db, range, d, feeRateBps)));
   return Object.fromEntries(DIMENSIONS.map((d, i) => [d, results[i]])) as Record<Dimension, BreakdownRowDto[]>;
 }

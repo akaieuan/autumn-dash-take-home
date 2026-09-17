@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { rowsOf, type AnyDb } from "../types";
 import { addDays, type DateRange, type Granularity } from "@/lib/date-range";
-import { FEE_RATE_BPS, OTA_COMMISSION_RATE } from "@/lib/config";
+import { PROPERTY, OTA_COMMISSION_RATE } from "@/lib/property";
 
 const n = (v: unknown) => Number(v ?? 0);
 const toCents = (dollars: unknown) => Math.round(n(dollars) * 100);
@@ -25,7 +25,7 @@ export interface OverviewDto {
 }
 
 /** One pass over daily_metrics for a window. Every ratio is computed from the same rows it describes. */
-export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRateBps = FEE_RATE_BPS): Promise<PeriodTotals> {
+export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRateBps = PROPERTY.feeRateBps): Promise<PeriodTotals> {
   const [r] = rowsOf(await db.execute(sql`
     select count(*)::int as days,
       coalesce(sum(impressions), 0) as impressions, coalesce(sum(clicks), 0) as clicks,
@@ -46,7 +46,7 @@ export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRa
   };
 }
 
-export async function getOverview(db: AnyDb, range: DateRange, feeRateBps = FEE_RATE_BPS): Promise<OverviewDto> {
+export async function getOverview(db: AnyDb, range: DateRange, feeRateBps = PROPERTY.feeRateBps): Promise<OverviewDto> {
   const c = range.comparison;
   const [current, previous, lastYear] = await Promise.all([
     getPeriodTotals(db, range.from, range.to, feeRateBps),

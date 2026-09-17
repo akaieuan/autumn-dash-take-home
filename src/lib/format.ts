@@ -1,9 +1,13 @@
 import type { Granularity } from "./date-range";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const int = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /** Whole dollars from integer cents: 1868500 → "$18,685". */
 export const money = (cents: number) => usd.format(Math.round(cents / 100));
+
+/** A whole count with thousands separators: 12345 → "12,345". */
+export const count = (n: number) => int.format(Math.round(n));
 
 const trim = (v: number, d: number) => String(Number(v.toFixed(d)));
 
@@ -39,11 +43,17 @@ export const oneIn = (rate: number) => (rate <= 0 ? "none" : `1 in ${Math.round(
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const parts = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return { y, m, d }; };
-export const shortDate = (iso: string) => { const { m, d } = parts(iso); return `${d} ${MONTHS[m - 1]}`; };
-export const longDate = (iso: string) => { const { y, m, d } = parts(iso); return `${d} ${MONTHS[m - 1]} ${y}`; };
+/** US date voice throughout, the way the seeded property's owner reads a date: "Sep 1". */
+export const shortDate = (iso: string) => { const { m, d } = parts(iso); return `${MONTHS[m - 1]} ${d}`; };
+export const longDate = (iso: string) => { const { y, m, d } = parts(iso); return `${MONTHS[m - 1]} ${d}, ${y}`; };
 export function bucketLabel(iso: string, g: Granularity): string {
   const { y, m } = parts(iso);
   if (g === "month") return `${MONTHS[m - 1]} ${y}`;
-  if (g === "week") return `w/c ${shortDate(iso)}`;
+  if (g === "week") return `Wk of ${shortDate(iso)}`;
   return shortDate(iso);
+}
+
+/** "Aug 18 – Sep 16, 2026"; both years spelled out when the range crosses one. */
+export function rangeLabel(from: string, to: string): string {
+  return parts(from).y === parts(to).y ? `${shortDate(from)} – ${longDate(to)}` : `${longDate(from)} – ${longDate(to)}`;
 }
