@@ -26,17 +26,17 @@ describe("RangeSegment", () => {
 
 describe("TopBar", () => {
   it("names the section, the two screens and the data date", () => {
-    render(<TooltipProvider><SidebarProvider initialWidth={240}><TopBar active="overview" range="30d" dataThrough="2026-09-16" basePath="/" /></SidebarProvider></TooltipProvider>);
-    expect(screen.getByText("Dashboard")).toBeInTheDocument(); // the property name now lives in the sidebar
-    expect(screen.getByRole("button", { name: "Collapse sidebar" }).getAttribute("aria-controls")).toBe("app-sidebar");
+    render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range="30d" dataThrough="2026-09-16" basePath="/" /></SidebarProvider></TooltipProvider>);
+    expect(screen.queryByText("Dashboard")).toBeNull(); // the bar carries only the tabs and controls
+    expect(screen.queryByRole("button", { name: /sidebar/ })).toBeNull(); // the collapse control lives in the sidebar now
     expect(screen.getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "Website traffic" }).getAttribute("href")).toBe("/website-traffic?range=30d");
+    expect(screen.getByRole("link", { name: "Website Traffic" }).getAttribute("href")).toBe("/website-traffic?range=30d");
     expect(screen.getByText("Data through Sep 16, 2026")).toBeInTheDocument();
   });
   it("renders same-height placeholders while loading so the header never jumps", () => {
-    const { container } = render(<TooltipProvider><SidebarProvider initialWidth={240}><TopBar active="overview" range={null} dataThrough={null} basePath="/" /></SidebarProvider></TooltipProvider>);
+    const { container } = render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range={null} dataThrough={null} basePath="/" /></SidebarProvider></TooltipProvider>);
     expect(container.querySelector("header")?.className).toContain("sticky"); // the bar sticks on scroll
-    expect(container.querySelector("header > div")?.className).toContain("min-h-14");
+    expect(container.querySelector("header > div")?.className).toContain("h-14"); // one fixed-height line at every width
     expect(screen.queryByText(/Data through/)).toBeNull();
     expect(container.querySelectorAll("[data-slot=skeleton]").length).toBeGreaterThan(0);
   });
