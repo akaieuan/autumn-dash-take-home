@@ -29,14 +29,21 @@ export function TrafficBodySkeleton() {
   );
 }
 
+/** The opening sentence's shape, so the shell paints before the totals arrive. */
+export function TrafficIntroSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-4 w-56 rounded-(--r-in)" />
+      <Skeleton className="h-9 w-[36rem] max-w-full rounded-(--r-in)" />
+      <Skeleton className="h-4 w-80 rounded-(--r-in)" />
+    </div>
+  );
+}
+
 export function TrafficPageSkeleton() {
   return (
     <Stack>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-4 w-56 rounded-(--r-in)" />
-        <Skeleton className="h-9 w-[36rem] max-w-full rounded-(--r-in)" />
-        <Skeleton className="h-4 w-80 rounded-(--r-in)" />
-      </div>
+      <TrafficIntroSkeleton />
       <TrafficBodySkeleton />
     </Stack>
   );

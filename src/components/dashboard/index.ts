@@ -5,7 +5,7 @@ export { InsightChart } from "./insight-chart";
 export { InsightCard } from "./insight-card";
 export { InsightList } from "./insight-list";
 export { GlossaryPanel, GLOSSARY_GROUPS, type GlossaryGroup } from "./glossary-panel";
-export { OverviewBodySkeleton, OverviewPageSkeleton } from "./overview-skeleton";
+export { OverviewBodySkeleton, OverviewTopSkeleton, OverviewPageSkeleton } from "./overview-skeleton";
 export { FeederMarkets } from "./feeder-markets";
 export { CampaignSummary } from "./campaign-summary";
 export { FunnelStep } from "./funnel-step";

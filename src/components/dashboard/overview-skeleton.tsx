@@ -34,9 +34,10 @@ export function OverviewBodySkeleton() {
   );
 }
 
-export function OverviewPageSkeleton() {
+/** The headline and the four quick stats: what paints while the first two queries run. */
+export function OverviewTopSkeleton() {
   return (
-    <Stack>
+    <>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-4 w-56 rounded-(--r-in)" />
         <Skeleton className="h-9 w-full max-w-3xl rounded-(--r-in)" />
@@ -52,6 +53,14 @@ export function OverviewPageSkeleton() {
           ))}
         </div>
       </Panel>
+    </>
+  );
+}
+
+export function OverviewPageSkeleton() {
+  return (
+    <Stack>
+      <OverviewTopSkeleton />
       <OverviewBodySkeleton />
     </Stack>
   );

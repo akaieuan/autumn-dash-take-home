@@ -18,6 +18,7 @@ import { AssistantPopover } from "@/components/assistant";
 import {
   TrafficIntro,
   TrafficBodySkeleton,
+  TrafficPageSkeleton,
   ActivityCalendar,
   TrafficStory,
   CampaignEfficiencyTable,
@@ -38,11 +39,6 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
   const bounds = await getDataBounds(db);
   const range = parseRange(rangeParam, bounds.min, bounds.max);
   const metric: TrafficMetric = isTrafficMetric(metricParam) ? metricParam : "clicks";
-  const c = range.comparison;
-  const [totals, previous] = await Promise.all([
-    getPeriodTotals(db, range.from, range.to),
-    c ? getPeriodTotals(db, c.prevFrom, c.prevTo) : null,
-  ]);
   return (
     <AppShell
       active="website-traffic"
@@ -51,12 +47,29 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
       basePath="/website-traffic"
       metric={metric === "clicks" ? undefined : metric}
     >
-      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
-      <Suspense fallback={<TrafficBodySkeleton />}>
-        <TrafficBody range={range} metric={metric} dataThrough={bounds.max} span={span} />
+      {/* Only the data bounds gate the first byte; the opening sentence and the body stream behind their skeletons. */}
+      <Suspense fallback={<TrafficPageSkeleton />}>
+        <TrafficContent range={range} metric={metric} dataThrough={bounds.max} span={span} />
       </Suspense>
       <AssistantPopover />
     </AppShell>
+  );
+}
+
+/** The opening sentence (two period totals), then the body behind a second boundary. */
+async function TrafficContent({ range, metric, dataThrough, span }: { range: DateRange; metric: TrafficMetric; dataThrough: string; span: CalendarSpan }) {
+  const c = range.comparison;
+  const [totals, previous] = await Promise.all([
+    getPeriodTotals(db, range.from, range.to),
+    c ? getPeriodTotals(db, c.prevFrom, c.prevTo) : null,
+  ]);
+  return (
+    <>
+      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
+      <Suspense fallback={<TrafficBodySkeleton />}>
+        <TrafficBody range={range} metric={metric} dataThrough={dataThrough} span={span} />
+      </Suspense>
+    </>
   );
 }
 

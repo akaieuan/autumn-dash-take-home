@@ -1,5 +1,5 @@
 export { TrafficIntro, type TrafficTotals } from "./traffic-intro";
-export { TrafficPageSkeleton, TrafficBodySkeleton } from "./traffic-skeleton";
+export { TrafficPageSkeleton, TrafficBodySkeleton, TrafficIntroSkeleton } from "./traffic-skeleton";
 export { ActivityCalendar, heatLevel, monthColumns } from "./activity-calendar";
 export { DayCard } from "./day-card";
 export { WeekStrip, MonthSummary } from "./day-context";

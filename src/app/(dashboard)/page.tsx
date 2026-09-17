@@ -23,6 +23,7 @@ import {
   InsightList,
   GlossaryPanel,
   OverviewBodySkeleton,
+  OverviewPageSkeleton,
   FeederMarkets,
   CampaignSummary,
   FunnelSection,
@@ -39,10 +40,6 @@ export default async function OverviewPage({ searchParams }: { searchParams: Sea
   const bounds = await getDataBounds(db);
   const range = parseRange(rangeParam, bounds.min, bounds.max);
   const metric: TrendMetric = isTrendMetric(metricParam) ? metricParam : "booking_value";
-  const [overview, quick] = await Promise.all([
-    getOverview(db, range, PROPERTY.feeRateBps),
-    getQuickAnalytics(db, range),
-  ]);
   return (
     <AppShell
       active="overview"
@@ -51,13 +48,29 @@ export default async function OverviewPage({ searchParams }: { searchParams: Sea
       basePath="/"
       metric={metric === "booking_value" ? undefined : metric}
     >
+      {/* Only the data bounds gate the first byte; every other query streams in behind its own skeleton. */}
+      <Suspense fallback={<OverviewPageSkeleton />}>
+        <OverviewContent range={range} metric={metric} />
+      </Suspense>
+      <AssistantPopover />
+    </AppShell>
+  );
+}
+
+/** The headline and quick stats (two queries), then the slower body behind a second boundary. */
+async function OverviewContent({ range, metric }: { range: DateRange; metric: TrendMetric }) {
+  const [overview, quick] = await Promise.all([
+    getOverview(db, range, PROPERTY.feeRateBps),
+    getQuickAnalytics(db, range),
+  ]);
+  return (
+    <>
       <Headline overview={overview} range={range} />
       <QuickAnalytics data={quick} />
       <Suspense fallback={<OverviewBodySkeleton />}>
         <OverviewBody range={range} metric={metric} overview={overview} />
       </Suspense>
-      <AssistantPopover />
-    </AppShell>
+    </>
   );
 }
 
