@@ -3,6 +3,7 @@ export { TrafficPageSkeleton, TrafficBodySkeleton, TrafficIntroSkeleton } from "
 export { ActivityCalendar, heatLevel, monthColumns } from "./activity-calendar";
 export { DayCard } from "./day-card";
 export { WeekStrip, MonthSummary } from "./day-context";
+export { MonthBlocks } from "./month-blocks";
 export { WeekdayRhythm } from "./weekday-rhythm";
 export { useCalendarSpan, CALENDAR_SPANS, type CalendarSpan } from "./use-calendar-span";
 export { TRAFFIC_METRICS, TRAFFIC_METRIC_LABELS, isTrafficMetric, type TrafficMetric } from "./traffic-config";

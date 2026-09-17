@@ -3,14 +3,14 @@ import { Grid, Stack, Panel, PanelHeader, PanelBody, EmptyState, RangeSegment, R
 import { MetricLabel, Value, DeltaText, InsightTag, LiveDot, GlossaryEntry, Eyebrow } from "@/components/copy";
 import { Sparkline, Meter, ShareBar, ShareLegend, ChartLegend, StyleSegment, MetricSelect, TrendChart, TrendTable, seriesColor } from "@/components/charts";
 import { Headline, QuickAnalytics, QuickStat, InsightList, InsightCard, FeederMarkets, CampaignSummary, FunnelSection, GlossaryPanel, OverviewBodySkeleton } from "@/components/dashboard";
-import { ActivityCalendar, DayCard, WeekStrip, MonthSummary, WeekdayRhythm, TrafficIntro, TrafficMetricSelect, TrafficStory, CampaignTrafficChart, CampaignTrafficTable, EventImpactCard, WhatAutumnDid, CampaignEfficiencyTable, DeviceConversion } from "@/components/website-traffic";
+import { ActivityCalendar, DayCard, MonthBlocks, WeekStrip, MonthSummary, WeekdayRhythm, TrafficIntro, TrafficMetricSelect, TrafficStory, CampaignTrafficChart, CampaignTrafficTable, EventImpactCard, WhatAutumnDid, CampaignEfficiencyTable, DeviceConversion } from "@/components/website-traffic";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { range, overview, quick, trend, markets, campaigns, funnel, insights, activity, campaignSeries, impacts, efficiency, deviceRows } from "./fixtures";
-import { weekdayAverages, weekOf } from "@/lib/activity";
+import { monthBlocks, weekdayAverages, weekOf } from "@/lib/activity";
 
 export const dynamic = "force-static";
 
@@ -27,6 +27,12 @@ const CHART = [
   { name: "--series-1", note: "identity 1" }, { name: "--series-2", note: "identity 2" }, { name: "--series-3", note: "identity 3" }, { name: "--series-4", note: "identity 4" }, { name: "--series-other", note: "folded remainder" },
 ];
 const HEAT = [{ name: "--heat-0" }, { name: "--heat-1" }, { name: "--heat-2" }, { name: "--heat-3" }, { name: "--heat-4" }];
+
+/** The calendar's narrow stage, rendered on its own: six months in 3 × 2, twelve in 4 × 3. */
+const halfBlocks = monthBlocks(activity.days, 6);
+const yearBlocks = monthBlocks(activity.days, 12);
+const blockMax = (bs: { total: number | null }[]) => Math.max(0, ...bs.map((b) => b.total ?? 0));
+const busiestDay = activity.days.reduce((b, d) => ((d.value ?? -1) > (b.value ?? -1) ? d : b)).date;
 
 const devices = funnel.devices.map((d, i) => ({ label: ["Phone", "Computer", "Tablet"][i], share: d.share, color: seriesColor(i) }));
 
@@ -96,6 +102,7 @@ export default function DesignSystemPage() {
             <Spec name="DayCard" file="website-traffic/day-card.tsx" note="The calendar's kept-open day; fixed min height so hovering never moves the grid." surface="card"><DayCard day={activity.days[activity.days.length - 12]} typical={41} mode="pinned" unit="visits" rank={{ day: 12, days: 371, weekday: 2, weekdays: 53 }} /></Spec>
             <Spec name="WeekStrip · MonthSummary" file="website-traffic/day-context.tsx" note="What the chosen day sits inside, from the same click." surface="card"><WeekStrip days={weekOf(activity.days, activity.days[activity.days.length - 12].date)} pinned={activity.days[activity.days.length - 12].date} unit="visits" /><MonthSummary label="Sep 2026" total={1628} rank={2} count={13} deltaPct={18} unit="visits" /></Spec>
             <Spec name="EventImpactCard" file="website-traffic/event-impact-card.tsx" note="One change Autumn made, the same days before and after; under seven days it says so instead of comparing." surface="card"><EventImpactCard impact={impacts[0]} /><EventImpactCard impact={impacts[1]} /></Spec>
+            <Spec name="MonthBlocks" file="website-traffic/month-blocks.tsx" note="The calendar's narrow stage: six or twelve calendar months in the box the 13-week grid would fill. Oldest top-left; only the roomier 3 × 2 has space for the change on the month before." surface="card"><div className="@container h-52 max-w-sm"><MonthBlocks blocks={halfBlocks} columns={3} unit="visits" pinnedDate={busiestDay} max={blockMax(halfBlocks)} /></div><div className="@container h-52 max-w-sm"><MonthBlocks blocks={yearBlocks} columns={4} unit="visits" pinnedDate={busiestDay} max={blockMax(yearBlocks)} /></div></Spec>
             <Spec name="TrafficMetricSelect" file="website-traffic/traffic-metric-select.tsx" note="Visits · Saw your hotel · Booked, on PillSelect."><TrafficMetricSelect metric="clicks" range="30d" /></Spec>
           </DsGrid>
         </DsSection>
@@ -119,7 +126,7 @@ export default function DesignSystemPage() {
           <Spec name="TrafficStory" file="website-traffic/traffic-story.tsx" note="The composed row: chart and list share one chosen change. Page through the changes; the row never changes height."><TrafficStory data={campaignSeries} impacts={impacts} range={range} metric="clicks" /></Spec>
           <Spec name="CampaignEfficiencyTable" file="website-traffic/campaign-efficiency-table.tsx" note="Ranked by value per visit; the total row reads daily_metrics, so it never drifts from the Overview."><CampaignEfficiencyTable data={efficiency} /></Spec>
           <Spec name="GlossaryPanel" file="dashboard/glossary-panel.tsx"><GlossaryPanel /></Spec>
-          <Spec name="ActivityCalendar" file="website-traffic/activity-calendar.tsx" note="Three spans on 1fr columns; hover reads into the header, a click pins the day and drives the card, the week and the month."><ActivityCalendar activity={activity} /></Spec>
+          <Spec name="ActivityCalendar" file="website-traffic/activity-calendar.tsx" note="Wide: a square is a day, 13/26/53 columns. Under 28rem (42rem for a year) the same 13:7 stage holds 6 or 12 month blocks instead; the header stacks readout left, toggle right."><ActivityCalendar activity={activity} /></Spec>
           <Spec name="TrafficIntro" file="website-traffic/traffic-intro.tsx"><TrafficIntro range={range} totals={{ visits: 1548, allVisits: 12679, newVisitors: 1116, previousVisits: 1402 }} /></Spec>
           <Spec name="OverviewBodySkeleton" file="dashboard/overview-skeleton.tsx" note="Reserves the plot height so the chart never shifts the page."><OverviewBodySkeleton /></Spec>
         </DsSection>

@@ -25,8 +25,11 @@ export function PanelHeader({ title, description, action, headingId }: { title: 
         <h2 id={headingId} className="text-base font-semibold leading-snug">{title}</h2>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
-      {/* Capped at the panel's width: an action row wider than the panel wraps inside its slot instead of running past the edge. */}
-      {action ? <div className="min-w-0 max-w-full shrink-0 text-xs font-medium">{action}</div> : null}
+      {/* Capped at the panel's width: an action row wider than the panel wraps inside its slot instead
+          of running past the edge. It grows to fill whatever line it lands on and keeps its content at
+          the right, so wrapped under the title it reads as a full-width right-aligned row rather than
+          a ragged one (owner, 2026-09-17). On one line it still sits at the right. */}
+      {action ? <div className="flex min-w-0 max-w-full grow justify-end text-xs font-medium">{action}</div> : null}
     </div>
   );
 }

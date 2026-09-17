@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns,
-  visibleWindow, dayRank, monthContext, weekContext, bucketGrid, type DayLike,
+  visibleWindow, dayRank, monthContext, weekContext, monthBlocks, type DayLike,
 } from "@/lib/activity";
 
 /** A local date walker, so the fixtures below never borrow the helper under test. */
@@ -181,14 +181,41 @@ describe("weekContext", () => {
   });
 });
 
-describe("bucketGrid", () => {
-  it("folds the last cells × size days into buckets that know their total and busiest day", () => {
-    const days = Array.from({ length: 10 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, value: i === 0 ? null : i * 10 }));
-    const b = bucketGrid(days, 4, 2); // the last 8 days: 09-03..09-10 in pairs
-    expect(b).toHaveLength(4);
-    expect(b[0]).toEqual({ from: "2026-09-03", to: "2026-09-04", total: 50, busiest: "2026-09-04" });
-    expect(b[3]).toEqual({ from: "2026-09-09", to: "2026-09-10", total: 170, busiest: "2026-09-10" });
-    const all = bucketGrid(days, 5, 2); // covers 09-01, which has no data
-    expect(all[0]).toEqual({ from: "2026-09-01", to: "2026-09-02", total: 10, busiest: "2026-09-02" });
+/**
+ * Three calendar months, hand-built so every total below is a sum a reader can check:
+ * July 20 (a tie on the busiest day), August 25 (one day with no data), September 50.
+ */
+const BLOCK_DAYS: DayLike[] = [
+  { date: "2026-07-30", value: 10 },
+  { date: "2026-07-31", value: 10 },   // the tie: both 10, so the first one wins
+  { date: "2026-08-01", value: 5 },
+  { date: "2026-08-02", value: null },
+  { date: "2026-08-03", value: 20 },
+  { date: "2026-09-01", value: 50 },
+];
+
+describe("monthBlocks", () => {
+  it("walks back calendar months from the last day, padding the ones the data never reached", () => {
+    const b = monthBlocks(BLOCK_DAYS, 4); // 2026-06 … 2026-09
+    expect(b.map((m) => m.key)).toEqual(["2026-06", "2026-07", "2026-08", "2026-09"]);
+    expect(b[0]).toEqual({ key: "2026-06", total: null, busiest: null, deltaPct: null }); // padded
+    expect(b[1]).toEqual({ key: "2026-07", total: 20, busiest: "2026-07-30", deltaPct: null }); // tie → first; no month before it
+    expect(b[2]).toEqual({ key: "2026-08", total: 25, busiest: "2026-08-03", deltaPct: 25 });   // (25 − 20) / 20
+    expect(b[3]).toEqual({ key: "2026-09", total: 50, busiest: "2026-09-01", deltaPct: 100 });  // (50 − 25) / 25
+  });
+  it("still returns exactly `count` blocks when the data is shorter than the window", () => {
+    const b = monthBlocks(BLOCK_DAYS, 12);
+    expect(b).toHaveLength(12);
+    expect(b[0].key).toBe("2025-10");          // twelve months back from 2026-09, across the year boundary
+    expect(b.filter((m) => m.total === null)).toHaveLength(9);
+    expect(b[11]).toEqual({ key: "2026-09", total: 50, busiest: "2026-09-01", deltaPct: 100 });
+  });
+  it("never divides by a zero month, and counts a zero day as data", () => {
+    const b = monthBlocks([{ date: "2026-08-01", value: 0 }, { date: "2026-09-01", value: 7 }], 2);
+    expect(b[0]).toEqual({ key: "2026-08", total: 0, busiest: "2026-08-01", deltaPct: null });
+    expect(b[1]).toEqual({ key: "2026-09", total: 7, busiest: "2026-09-01", deltaPct: null }); // previous month is 0
+  });
+  it("has nothing to draw without days", () => {
+    expect(monthBlocks([], 6)).toEqual([]);
   });
 });

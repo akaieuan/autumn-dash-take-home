@@ -1,35 +1,41 @@
 "use client";
 import { useRef, useState } from "react";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
-import { count, longDate, shortDate, weekdayDate, weekdayShort } from "@/lib/format";
-import { dayRank, heatLevel, monthColumns, monthContext, bucketGrid, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
+import { count, longDate, monthShort, weekdayDate, weekdayShort } from "@/lib/format";
+import { dayRank, heatLevel, monthBlocks, monthColumns, monthContext, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { CALENDAR_SPANS, useCalendarSpan, type CalendarSpan } from "./use-calendar-span";
 import { DayCard } from "./day-card";
 import { MonthSummary, WeekStrip } from "./day-context";
+import { MonthBlocks } from "./month-blocks";
+import { LEVEL, EMPTY } from "./heat-classes";
 
 /** The barrel takes these from here; the arithmetic itself lives in `@/lib/activity`. */
 export { heatLevel, monthColumns } from "@/lib/activity";
 
-/** Five static classes so Tailwind can see them; the tokens follow the theme. */
-const LEVEL = ["bg-(--heat-0)", "bg-(--heat-1)", "bg-(--heat-2)", "bg-(--heat-3)", "bg-(--heat-4)"] as const;
-const EMPTY = "bg-transparent";
 const SPAN_LABEL: Record<CalendarSpan, string> = { year: "Year", half: "6 months", quarter: "13 weeks" };
-/** Narrow screens get the same three choices in two characters; the long label stays in `aria-label`. */
-const SPAN_SHORT: Record<CalendarSpan, string> = { year: "1y", half: "6m", quarter: "13w" };
+/** How many month blocks a span shows on a narrow panel; 13 weeks is short enough to stay day tiles. */
+const SPAN_BLOCKS: Record<CalendarSpan, number> = { year: 12, half: 6, quarter: 0 };
 const STEP: Record<string, number> = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1, PageDown: 28, PageUp: -28 };
 
 /**
- * How many weeks a calendar of a given width can show and still keep every tile a thumb-sized square:
- * under 28rem the last 13, under 42rem the last 26, wider the chosen span. Columns are auto-placed
- * with no explicit count, so a hidden week simply gives its width to the rest. Static classes, so
- * Tailwind can see them; the same rule covers a week's tiles and its month label.
+ * The stage is one box at every span on a narrow panel: the block grid is exactly as tall as the
+ * 13-week day grid at the same width, so switching span never moves the panel. The 13-week grid
+ * there is 13 square columns with a 3px gap and no weekday column, so its height is
+ * (W − 12 × 3) / 13 × 7 + 6 × 3, and `cqw` resolves against the tile column's own `@container`.
  */
-const weekVisibility = (weeksBack: number) => (weeksBack >= 26 ? "@max-2xl:hidden" : weeksBack >= 13 ? "@max-md:hidden" : "");
+const STAGE_HEIGHT = "h-[calc((100cqw_-_36px)/13*7_+_18px)]";
 
 const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: ${day.value === null ? "no data" : `${count(day.value)} ${unit}`}`;
+
+/** "Apr – Sep 2026" within one year, "Oct 2025 – Sep 2026" across one: the distance the blocks cover. */
+function blockDistance(keys: string[]): string {
+  const [a, z] = [keys[0], keys[keys.length - 1]];
+  const name = (k: string) => monthShort(`${k}-01`);
+  return a.slice(0, 4) === z.slice(0, 4) ? `${name(a)} – ${name(z)} ${z.slice(0, 4)}` : `${name(a)} ${a.slice(0, 4)} – ${name(z)} ${z.slice(0, 4)}`;
+}
 
 /**
  * A year of days as a heatmap, one column per week, Sunday at the top. The grid's columns are `1fr`,
@@ -62,25 +68,25 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const rank = shown === null ? null : dayRank(days, shown.date);
   const month = monthContext(days, pinnedDate);
 
-  // Under 28rem a year or six months of day tiles is a field of dots, and month tiles broke the look
-  // (owner, 2026-09-17). So every span keeps the 13-week geometry there, 7 rows by 13 columns of the
-  // same squares, and only what a square means changes: a day, two days, four days. Same size, same
-  // card height, nothing moves when the span changes. A tap keeps the square's busiest day open.
-  const daysPerSquare = span === "year" ? 4 : span === "half" ? 2 : 1;
-  // The same line at every span, so the three states are the same height on a phone (13 weeks kept the note too).
-  const squareNote = daysPerSquare === 1 ? "Each square is a day." : daysPerSquare === 2 ? "Each square is two days." : "Each square is four days.";
-  const buckets = daysPerSquare === 1 ? [] : bucketGrid(days, 91, daysPerSquare);
-  const bucketMax = Math.max(0, ...buckets.map((b) => b.total ?? 0));
-  const bucketColumns = buckets.length > 0 ? monthColumns(buckets.map((b) => ({ date: b.from }))) : [];
+  // Under 28rem a year or six months of day tiles is a field of dots. Squares standing for two or
+  // four days were tried and rejected the same day (owner, 2026-09-17, D40): a square still reads as
+  // a day, and folding days hides how far back the span reaches. Six or twelve month blocks fill the
+  // same stage instead, name their months and carry their totals. 13 weeks keeps its day tiles.
+  const blocks = SPAN_BLOCKS[span] === 0 ? [] : monthBlocks(days, SPAN_BLOCKS[span]);
+  const blockMax = Math.max(0, ...blocks.map((b) => b.total ?? 0));
+  // Blocks hide the dates a day tile carries, so the row above them says the distance out loud.
+  const distance = blocks.length === 0 ? "" : blockDistance(blocks.map((b) => b.key));
+  // The note is one line at every span, so the legend row is the same height whichever stage shows.
+  const stageNote = span === "quarter" ? "Each square is a day." : "Each block is a month.";
   // One cell per week for the month row: the label sits on the week its month starts in, blank otherwise.
   const monthByColumn = new Map(monthColumns(visible).map((m, i) => [m.column, { label: m.label, odd: i % 2 === 1 }]));
   const weekCells = Array.from({ length: weeks }, (_, i) => ({ column: i + 1, back: weeks - 1 - i, month: monthByColumn.get(i + 1) ?? null }));
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
 
-  // A day tile carries data-date; a narrow-screen square carries data-bucket (its busiest day). Either pins that day.
+  // A day tile carries data-date; a month block carries data-busiest (its busiest day). Either pins that day.
   const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-date],[data-bucket]");
-    return el?.dataset.date ?? el?.dataset.bucket ?? null;
+    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-date],[data-busiest]");
+    return el?.dataset.date ?? el?.dataset.busiest ?? null;
   };
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => setHover(dateUnder(e));
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -123,9 +129,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         title={title}
         description="Darker is busier. Point at a day to read it, click to keep it open."
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Fixed width, text kept to the right: the day under the pointer changes length, the toggle beside it must not move. */}
-            <p aria-live="polite" className="flex h-8 w-52 items-center justify-end truncate whitespace-nowrap tabular-nums text-muted-foreground">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            {/* Under sm the readout takes its own line and reads from the left, under the title, with the
+                toggle on the line below at the right (owner, 2026-09-17). From sm it is a fixed width with
+                its text kept to the right: the day under the pointer changes length, the toggle must not move. */}
+            <p aria-live="polite" className="flex h-8 basis-full items-center truncate whitespace-nowrap tabular-nums text-muted-foreground sm:w-52 sm:basis-auto sm:justify-end">
               {shown ? (
                 <>
                   <span className="text-foreground">{weekdayDate(shown.date)}</span>
@@ -136,28 +144,29 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                 "Point at a day"
               )}
             </p>
-            <ToggleGroup
-              type="single"
-              value={span}
-              onValueChange={(v) => {
-                if (CALENDAR_SPANS.includes(v as CalendarSpan)) setSpan(v as CalendarSpan);
-              }}
-              aria-label="How far back"
-              className="rounded-full border border-border bg-card p-0.5"
-            >
-              {CALENDAR_SPANS.map((s) => (
-                <ToggleGroupItem
-                  key={s}
-                  value={s}
-                  // The accessible name carries both the short and the long label, so the visible text is always part of it.
-                  aria-label={`${SPAN_SHORT[s]} ${SPAN_LABEL[s]}`}
-                  className="h-7 rounded-full px-2.5 text-xs font-medium text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-card sm:px-3"
-                >
-                  <span className="sm:hidden">{SPAN_SHORT[s]}</span>
-                  <span className="hidden sm:inline">{SPAN_LABEL[s]}</span>
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <div className="flex basis-full justify-end sm:basis-auto">
+              <ToggleGroup
+                type="single"
+                value={span}
+                onValueChange={(v) => {
+                  if (CALENDAR_SPANS.includes(v as CalendarSpan)) setSpan(v as CalendarSpan);
+                }}
+                aria-label="How far back"
+                className="rounded-full border border-border bg-card p-0.5"
+              >
+                {/* The full label at every width: "1y" needed an aria-label to be readable, and the
+                    three pills fit a 375px panel on their own line anyway (owner, 2026-09-17). */}
+                {CALENDAR_SPANS.map((s) => (
+                  <ToggleGroupItem
+                    key={s}
+                    value={s}
+                    className="h-7 rounded-full px-3 text-xs font-medium text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-card"
+                  >
+                    {SPAN_LABEL[s]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           </div>
         }
       />
@@ -166,59 +175,34 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:grid-rows-[auto_auto]">
           {/* This column is its own container: the weeks it shows depend on the width the tiles actually get. */}
           <div className="@container flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
-            {buckets.length > 0 ? (
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 @md:hidden">
-                <div aria-hidden="true" />
-                <div aria-hidden="true" className="grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] gap-[3px] text-[10px] leading-4 text-muted-foreground">
-                  {Array.from({ length: 13 }, (_, c) => {
-                    const m = bucketColumns.find((x) => x.column === c + 1);
-                    return <span key={c} className="min-w-0 overflow-visible whitespace-nowrap">{m ? m.label : null}</span>;
-                  })}
-                </div>
-                <div aria-hidden="true" />
+            {blocks.length > 0 ? (
+              <div className={cn("grid grid-cols-1 gap-y-1", span === "year" ? "@2xl:hidden" : "@md:hidden")}>
+                {/* Where the day grid puts month labels, the block stage puts the whole distance. */}
+                <p className="h-4 truncate text-[10px] leading-4 text-muted-foreground">{distance}</p>
                 <div
                   role="group"
-                  aria-label={`Each square is ${daysPerSquare} days: ${count(total)} ${unit} in the last year`}
+                  aria-label={`Each block is a month: ${count(total)} ${unit} in the last year`}
                   onPointerMove={onMove}
                   onPointerDown={onDown}
                   onPointerLeave={() => setHover(null)}
                   onClick={onClick}
-                  className="grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)] gap-[3px]"
+                  className={STAGE_HEIGHT}
                 >
-                  {buckets.map((b) => {
-                    const level = heatLevel(b.total, bucketMax);
-                    const isPinned = pinnedDate !== null && b.from <= pinnedDate && pinnedDate <= b.to;
-                    return (
-                      <button
-                        key={b.from}
-                        type="button"
-                        data-bucket={b.busiest ?? undefined}
-                        data-level={level ?? undefined}
-                        aria-label={`${shortDate(b.from)} – ${shortDate(b.to)}: ${b.total === null ? "no data" : `${count(b.total)} ${unit}`}`}
-                        aria-pressed={isPinned}
-                        disabled={b.busiest === null}
-                        tabIndex={-1}
-                        className={cn(
-                          "aspect-square w-full rounded-(--radius-min) transition-transform motion-safe:hover:scale-110",
-                          level === null ? EMPTY : LEVEL[level],
-                          isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
-                        )}
-                      />
-                    );
-                  })}
+                  <MonthBlocks blocks={blocks} columns={span === "year" ? 4 : 3} unit={unit} pinnedDate={pinnedDate} max={blockMax} />
                 </div>
               </div>
             ) : null}
-            <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1", buckets.length > 0 && "hidden @md:grid")}>
-              <div aria-hidden="true" />
-              <div aria-hidden="true" className={cn("col-start-2 row-start-1 grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground", span === "year" ? "gap-[2px]" : "gap-[3px]")}>
+            {/* One column under @md, so the tile grid is exactly 100cqw there and the 13-week stage is
+                the height the block stage copies. The weekday names and the second column start at @md. */}
+            <div className={cn("grid grid-cols-1 gap-y-1 @md:grid-cols-[auto_minmax(0,1fr)] @md:gap-x-2", span === "half" && "hidden @md:grid", span === "year" && "hidden @2xl:grid")}>
+              <div aria-hidden="true" className={cn("grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground @md:col-start-2 @md:row-start-1", span === "year" ? "gap-[2px]" : "gap-[3px]")}>
                 {weekCells.map((w) => (
-                  <span key={w.column} className={cn("min-w-0 overflow-visible whitespace-nowrap", weekVisibility(w.back))}>
+                  <span key={w.column} className="min-w-0 overflow-visible whitespace-nowrap">
                     {w.month ? <span className={cn(w.month.odd && "hidden @md:inline")}>{w.month.label}</span> : null}
                   </span>
                 ))}
               </div>
-              <div aria-hidden="true" className="col-start-1 row-start-2 hidden grid-rows-7 gap-[2px] text-[10px] leading-none text-muted-foreground @md:grid">
+              <div aria-hidden="true" className="hidden grid-rows-7 gap-[2px] text-[10px] leading-none text-muted-foreground @md:col-start-1 @md:row-start-2 @md:grid">
                 {[0, 1, 2, 3, 4, 5, 6].map((r) => (
                   <span key={r} className="flex items-center">{r % 2 === 1 ? weekdayShort(r) : ""}</span>
                 ))}
@@ -232,12 +216,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                 onPointerLeave={() => setHover(null)}
                 onClick={onClick}
                 onKeyDown={onKeyDown}
-                className={cn("col-start-2 row-start-2 grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)]", span === "year" ? "gap-[2px]" : "gap-[3px]")}
+                className={cn("grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)] @md:col-start-2 @md:row-start-2", span === "year" ? "gap-[2px]" : "gap-[3px]")}
               >
-                {visible.map((d, i) => {
+                {visible.map((d) => {
                   const level = heatLevel(d.value, visibleMax);
                   const isPinned = d.date === pinnedDate;
-                  const back = weeks - 1 - Math.floor(i / 7);
                   return (
                     <button
                       key={d.date}
@@ -252,7 +235,6 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                         // A 4px corner on a year's ~10px tile reads as a circle, so the year gets 2px (owner, 2026-09-17).
                         span === "year" ? "rounded-(--radius-tile)" : "rounded-(--radius-min)",
                         level === null ? EMPTY : LEVEL[level],
-                        weekVisibility(back),
                         isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
                         !isPinned && hover === d.date && "ring-2 ring-foreground/50",
                       )}
@@ -277,7 +259,8 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                   </>
                 ) : null}
               </span>
-              <span className="@md:hidden">{squareNote}</span>
+              {/* Visible exactly when the stage it describes is: the year's blocks hold to 42rem. */}
+              <span className={span === "year" ? "@2xl:hidden" : "@md:hidden"}>{stageNote}</span>
               <span aria-hidden="true" className="inline-flex items-center gap-1">
                 Fewer
                 {LEVEL.map((c) => (

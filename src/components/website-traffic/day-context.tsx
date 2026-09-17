@@ -27,17 +27,18 @@ export function WeekStrip({ days, pinned, onPick, unit }: { days: (ActivityDay |
               key={d.date}
               type="button"
               aria-pressed={pinned === d.date}
-              aria-label={dayLabel(d, unit)}
               onClick={() => onPick?.(d.date)}
               className="flex h-full flex-col items-center justify-end gap-1"
             >
-              <span className="text-[11px] leading-none tabular-nums text-muted-foreground">{d.value === null ? "—" : count(d.value)}</span>
+              {/* The name comes from content, not aria-label: the visible "52" and "Su" would not be part of an aria-label's name (Lighthouse label-content-name-mismatch, 2026-09-17). */}
+              <span className="sr-only">{dayLabel(d, unit)}</span>
+              <span aria-hidden="true" className="text-[11px] leading-none tabular-nums text-muted-foreground">{d.value === null ? "—" : count(d.value)}</span>
               <span
                 aria-hidden="true"
                 className={cn("w-full max-w-8 shrink-0 rounded-t-(--radius-min)", pinned === d.date ? "bg-(--chart-1)" : "bg-(--heat-2)")}
                 style={{ height: `${max > 0 ? Math.max(4, Math.round((BAR_ROOM * (d.value ?? 0)) / max)) : 4}px` }}
               />
-              <span className="text-[11px] leading-none text-muted-foreground">{weekdayShort(i).slice(0, 2)}</span>
+              <span aria-hidden="true" className="text-[11px] leading-none text-muted-foreground">{weekdayShort(i).slice(0, 2)}</span>
             </button>
           ),
         )}
