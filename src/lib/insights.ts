@@ -4,6 +4,7 @@ import type { EventImpactDto } from "./db/queries/events";
 import type { Dimension } from "./db/schema";
 import type { DateRange } from "./date-range";
 import { delta, longDate, money, oneIn, pct } from "./format";
+import { comparisonsCoincide } from "./date-range";
 
 /**
  * Insights are computed at render time from the same numbers the charts show,
@@ -37,7 +38,7 @@ export function computeInsights({ overview, breakdowns, range, events = [] }: In
   const cur = overview.current, prev = overview.previous, ly = overview.lastYear, cmp = range.comparison;
 
   // 1. Booking value against the previous period, with last year as the seasonal check.
-  if (prev && cmp && prev.bookingValueCents > 0) {
+  if (prev && cmp && prev.bookingValueCents > 0 && !comparisonsCoincide(range)) {
     const d = delta(cur.bookingValueCents, prev.bookingValueCents).pct ?? 0;
     const aheadOfLastYear = ly && ly.bookingValueCents > 0 && cur.bookingValueCents >= ly.bookingValueCents;
     const chart: InsightChart = {

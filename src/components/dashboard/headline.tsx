@@ -1,11 +1,12 @@
 import type { OverviewDto } from "@/lib/db/queries";
-import type { DateRange } from "@/lib/date-range";
+import { comparisonsCoincide, type DateRange } from "@/lib/date-range";
 import { money, rangeLabel } from "@/lib/format";
 import { DeltaText } from "@/components/copy";
 
 /** The answer, in one sentence (D1). The only large type on the page. */
 export function Headline({ overview: o, range }: { overview: OverviewDto; range: DateRange }) {
   const c = range.comparison;
+  const oneComparison = comparisonsCoincide(range);
   return (
     <section aria-label="Headline" className="flex flex-col gap-2">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -17,7 +18,7 @@ export function Headline({ overview: o, range }: { overview: OverviewDto; range:
         <span className="tabular-nums">{money(o.current.netCents)}</span> after Autumn&apos;s {o.feeRateBps / 100}% fee.
       </h1>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-        {o.previous && c ? (
+        {o.previous && c && !oneComparison ? (
           <DeltaText
             current={o.current.bookingValueCents}
             previous={o.previous.bookingValueCents}

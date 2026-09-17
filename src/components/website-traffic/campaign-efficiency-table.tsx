@@ -27,7 +27,7 @@ export function CampaignEfficiencyTable({ data }: { data: CampaignEfficiencyDto 
   const bottom = rows[rows.length - 1];
   const summary =
     rows.length >= 2 && top.valuePerVisitCents !== null && bottom.valuePerVisitCents !== null && bottom.valuePerVisitCents > 0
-      ? `Every dollar on ${top.label} brought back ${moneyExact(top.valuePerVisitCents)} per visit, ${times(top.valuePerVisitCents / bottom.valuePerVisitCents)} ${bottom.label}.`
+      ? `A ${top.label} visit brings back ${moneyExact(top.valuePerVisitCents)}, ${times(top.valuePerVisitCents / bottom.valuePerVisitCents)} a ${bottom.label} visit.`
       : null;
   return (
     <Panel id="efficiency" className="@container scroll-mt-20">

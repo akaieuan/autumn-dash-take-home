@@ -132,22 +132,88 @@ Query tests run against an in-process Postgres (PGlite) using the real
 migration and a hand-computed fixture, so no database is needed to run the
 suite.
 
-## Screenshots
+## The two screens
 
-**Before: the current Autumn dashboard**, as given in the brief. Extracted
-from the take-home PDF and kept unedited in `docs/reference/`.
+Screenshots are of the deployed site, in `public/screenshots/`.
+
+### Overview · `/`
+
+One sentence answers the owner's question, and everything below it earns
+that sentence's trust.
+
+- **The headline.** Direct bookings, their value, and what the owner kept after
+  Autumn's 15% fee, with the fee itself stated and two comparisons: the
+  previous period and the same period last year.
+- **Four quick stats** with sparklines: direct bookings, booking value, visited
+  your site, saw your hotel.
+- **Day by day.** One trend chart, this period in green and the period before
+  in amber, last year dashed. Area, bars or line; chart or table; any metric.
+- **What's happening.** Insights computed at render time from the same numbers
+  on the page, tagged Win, Watch, or Autumn is on it, each with its own
+  evidence bars so nothing is asserted without being shown.
+- **Where your guests come from.** Cities ranked by bookings, with drive times.
+- **What each campaign is doing.** A plain purpose line per campaign, "1 in N"
+  instead of a click-through rate, and a footer that reconciles to the headline.
+- **From seen to booked**, the glossary in plain words, and **Ask Autumn**.
+- Light and dark themes; a phone layout that keeps the sentence first.
+
+![Overview on desktop](public/screenshots/overview-desktop.png)
+
+| Phone: the headline | Phone: what's happening |
+|---|---|
+| ![Overview on a phone, headline](public/screenshots/overview-mobile-headline.png) | ![Overview on a phone, insights](public/screenshots/overview-mobile-insights.png) |
+
+![Day by day beside what's happening](public/screenshots/overview-trend-and-insights.png)
+
+![Day by day as bars, with the three-period tooltip](public/screenshots/overview-trend-bars-tooltip.png)
+
+![Where guests come from, and what each campaign is doing](public/screenshots/overview-markets-and-campaigns.png)
+
+![From seen to booked, the glossary, and Ask Autumn](public/screenshots/overview-funnel-glossary-ask-autumn.png)
+
+### Website traffic · `/website-traffic`
+
+Traffic explained through the campaigns that produce it, so an owner can
+decide the next campaign rather than read analytics.
+
+- **Every day people visited.** A year of days as a calendar; point at a day to
+  read it, click to keep it open, and see it against a typical weekday.
+- **Visits by campaign.** Visits stacked by campaign, with each change Autumn
+  made marked on the day it happened.
+- **What Autumn did.** Each change with the days before and after it: visits,
+  how many clicked, bookings, value.
+- **Where the next dollar goes.** Cost per visit, cost per booking, how many
+  booked, and value per visit, per campaign; the total row reads the daily
+  totals, never a sum of the rows.
+- **Which days are busiest**, and **what they visit on, and what books.**
+
+![Website traffic, dark theme](public/screenshots/traffic-desktop-dark.png)
+
+![Visits by campaign, and what Autumn did](public/screenshots/traffic-visits-by-campaign.png)
+
+![Where the next dollar goes](public/screenshots/traffic-next-dollar.png)
+
+![Which days are busiest, and what they visit on](public/screenshots/traffic-weekdays-and-devices.png)
+
+## Before: the current Autumn dashboard
+
+The screens given in the brief, extracted from the PDF and kept unedited in
+`docs/reference/`.
 
 | Marketing dashboard | Website traffic |
 |---|---|
 | ![Current Autumn marketing dashboard](docs/reference/current-dashboard-overview.png) | ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) |
 
-**After: the redesign**, in `docs/screenshots/`. Both screens, both themes,
-desktop and phone.
+## Design process
 
-| | Light | Dark |
-|---|---|---|
-| Overview | `overview-desktop.png` · `overview-mobile.png` | `overview-desktop-dark.png` · `overview-mobile-dark.png` |
-| Website traffic | `traffic-desktop.png` · `traffic-mobile.png` | `traffic-desktop-dark.png` · `traffic-mobile-dark.png` |
+The first sketch fixed the shape before any component existed: a sentence, a
+row of cards kept close to the current product, and one main chart the owner
+can restyle. The artboard then grew it into a user story, the data contract,
+an atomic component library, and the page at three widths.
+
+| First sketch | The artboard |
+|---|---|
+| ![Wireframe sketch](public/screenshots/design-wireframe.png) | ![Design artboard](public/screenshots/design-artboard.png) |
 
 ## Docs
 

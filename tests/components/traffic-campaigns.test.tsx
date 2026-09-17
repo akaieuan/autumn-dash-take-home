@@ -218,7 +218,7 @@ describe("WhatAutumnDid", () => {
 describe("CampaignEfficiencyTable", () => {
   it("prices a visit to the cent and ranks by what a visit gives back", () => {
     const { container } = wrap(<CampaignEfficiencyTable data={efficiency} />);
-    expect(screen.getByText("Every dollar on Brand protection brought back $3.66 per visit, 4.2× Discovery.")).toBeInTheDocument();
+    expect(screen.getByText("A Brand protection visit brings back $3.66, 4.2× a Discovery visit.")).toBeInTheDocument();
     const row = screen.getByRole("row", { name: "Brand protection" });
     expect(within(row).getByText("$0.07")).toBeInTheDocument();
     expect(within(row).getByText("1 in 130")).toBeInTheDocument();

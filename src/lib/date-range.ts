@@ -32,6 +32,10 @@ export const daysBetween = (a: string, b: string) => Math.round((toUTC(b) - toUT
 export const dayOfWeek = (iso: string) => new Date(toUTC(iso)).getUTCDay();
 export function eachDay(start: string, end: string): string[] { const out: string[] = []; for (let d = start; d <= end; d = addDays(d, 1)) out.push(d); return out; }
 
+/** True when the previous-period and last-year windows are the same days (year to date, last 12 months). Show one comparison, not two. */
+export const comparisonsCoincide = (r: Pick<DateRange, "comparison">): boolean =>
+  !!r.comparison && r.comparison.prevFrom === r.comparison.lastYearFrom && r.comparison.prevTo === r.comparison.lastYearTo;
+
 export function granularityFor(days: number): Granularity {
   if (days <= 31) return "day"; // 90 daily bars are noise; weeks read
   if (days <= 400) return "week";
@@ -52,13 +56,17 @@ export function parseRange(param: string | undefined, dataMin: string, dataMax: 
   }
   if (from < dataMin) from = dataMin;
   const days = daysBetween(from, to);
+  // Year to date and last 12 months are year-shaped: the only comparison an owner means is the same
+  // span a year earlier. The days immediately before 1 January would run from spring to Christmas, a
+  // different season, so for those presets both windows are last year and the page shows one line.
+  const yearShaped = preset === "ytd" || preset === "12m";
+  const lastYearFrom = addYears(from, -1), lastYearTo = addYears(to, -1);
+  const lastYearLabel = preset === "ytd" ? "the same period last year" : preset === "12m" ? "the year before" : "this time last year";
   const comparison = preset === "all" ? null : {
-    prevTo: addDays(from, -1),
-    prevFrom: addDays(from, -days),
-    prevLabel: preset === "ytd" ? "the same period last year" : `the previous ${days} days`,
-    lastYearFrom: addYears(from, -1),
-    lastYearTo: addYears(to, -1),
-    lastYearLabel: "this time last year",
+    prevFrom: yearShaped ? lastYearFrom : addDays(from, -days),
+    prevTo: yearShaped ? lastYearTo : addDays(from, -1),
+    prevLabel: yearShaped ? lastYearLabel : `the previous ${days} days`,
+    lastYearFrom, lastYearTo, lastYearLabel,
   };
   return { preset, from, to, days, granularity: granularityFor(days), label: LABELS[preset], comparison };
 }
