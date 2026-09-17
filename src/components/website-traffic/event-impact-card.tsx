@@ -24,19 +24,19 @@ export function EventImpactCard({ impact }: { impact: EventImpactDto }) {
     { label: "Value", before: money(before.bookingValueCents), after: money(after.bookingValueCents) },
   ];
   return (
-    <article id={`event-${event.id}`} className="flex scroll-mt-20 flex-col gap-4">
+    <article id={`event-${event.id}`} className="flex min-h-[19.5rem] scroll-mt-20 flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <p className={EYEBROW}>
           {event.kindLabel} · {longDate(event.date)} · {event.campaignLabel ?? "Whole program"}
         </p>
-        <h3 className="text-base font-semibold leading-snug">{event.title}</h3>
-        <p className="text-sm leading-snug text-muted-foreground">{event.note}</p>
+        <h3 className="line-clamp-2 text-base font-semibold leading-snug">{event.title}</h3>
+        <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">{event.note}</p>
       </div>
       {tooSoon ? (
-        <p className="rounded-(--r-in) bg-background px-3 py-2 text-xs text-muted-foreground">Too soon to compare</p>
+        <p className="flex min-h-[10.75rem] items-center justify-center rounded-(--r-in) bg-background p-3 text-xs text-muted-foreground">Too soon to compare</p>
       ) : (
         // The comparison sits in its own inset, header and rows in a steady rhythm, the visits delta as its own line.
-        <dl className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-5 gap-y-2 rounded-(--r-in) bg-background p-3 text-xs">
+        <dl className="grid min-h-[10.75rem] grid-cols-[minmax(0,1fr)_auto_auto] content-start items-baseline gap-x-5 gap-y-2 rounded-(--r-in) bg-background p-3 text-xs">
           <div className="contents">
             <span className="text-[11px] text-muted-foreground">{days} days each side</span>
             <span className={`${num} ${EYEBROW} whitespace-nowrap`}>Before</span>

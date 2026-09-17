@@ -3,7 +3,7 @@ import { Grid, Stack, Panel, PanelHeader, PanelBody, EmptyState, RangeSegment, R
 import { MetricLabel, Value, DeltaText, InsightTag, LiveDot, GlossaryEntry } from "@/components/copy";
 import { Sparkline, Meter, ShareBar, ShareLegend, ChartLegend, StyleSegment, MetricSelect, TrendChart, TrendTable, seriesColor } from "@/components/charts";
 import { Headline, QuickAnalytics, QuickStat, InsightList, InsightCard, FeederMarkets, CampaignSummary, FunnelSection, GlossaryPanel, OverviewBodySkeleton } from "@/components/dashboard";
-import { ActivityCalendar, DayCard, WeekStrip, MonthSummary, WeekdayRhythm, TrafficIntro, TrafficMetricSelect, CampaignTrafficChart, CampaignTrafficTable, EventImpactCard, WhatAutumnDid, CampaignEfficiencyTable, DeviceConversion } from "@/components/website-traffic";
+import { ActivityCalendar, DayCard, WeekStrip, MonthSummary, WeekdayRhythm, TrafficIntro, TrafficMetricSelect, TrafficStory, CampaignTrafficChart, CampaignTrafficTable, EventImpactCard, WhatAutumnDid, CampaignEfficiencyTable, DeviceConversion } from "@/components/website-traffic";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -93,7 +93,7 @@ export default function DesignSystemPage() {
             <Spec name="MetricSelect · StyleSegment" file="charts/metric-select.tsx · charts/style-segment.tsx"><div className="flex flex-wrap items-center gap-3"><MetricSelect metric="booking_value" range="30d" basePath="/design-system" /><StyleSegment /></div></Spec>
             <Spec name="QuickStat" file="dashboard/quick-stat.tsx" note="Container query: the sparkline yields to the number under 15rem." surface="card"><QuickStat stat={quick.stats[1]} /></Spec>
             <Spec name="InsightCard" file="dashboard/insight-card.tsx" note="Tag, title, sentence, and the insight's own graph." surface="card"><InsightCard insight={insights[0]} /></Spec>
-            <Spec name="DayCard" file="website-traffic/day-card.tsx" note="The calendar's kept-open day; fixed min height so hovering never moves the grid." surface="card"><DayCard day={activity.days[activity.days.length - 12]} typical={41} mode="pinned" unit="visits" /></Spec>
+            <Spec name="DayCard" file="website-traffic/day-card.tsx" note="The calendar's kept-open day; fixed min height so hovering never moves the grid." surface="card"><DayCard day={activity.days[activity.days.length - 12]} typical={41} mode="pinned" unit="visits" rank={{ day: 12, days: 371, weekday: 2, weekdays: 53 }} /></Spec>
             <Spec name="WeekStrip · MonthSummary" file="website-traffic/day-context.tsx" note="What the chosen day sits inside, from the same click." surface="card"><WeekStrip days={weekOf(activity.days, activity.days[activity.days.length - 12].date)} pinned={activity.days[activity.days.length - 12].date} unit="visits" /><MonthSummary label="Sep 2026" total={1628} rank={2} count={13} deltaPct={18} unit="visits" /></Spec>
             <Spec name="EventImpactCard" file="website-traffic/event-impact-card.tsx" note="One change Autumn made, the same days before and after; under seven days it says so instead of comparing." surface="card"><EventImpactCard impact={impacts[0]} /><EventImpactCard impact={impacts[1]} /></Spec>
             <Spec name="TrafficMetricSelect" file="website-traffic/traffic-metric-select.tsx" note="Visits · Saw your hotel · Booked, on PillSelect."><TrafficMetricSelect metric="clicks" range="30d" /></Spec>
@@ -116,6 +116,7 @@ export default function DesignSystemPage() {
             <Spec name="CampaignTrafficTable" file="website-traffic/campaign-traffic-table.tsx" note="The chart's twin: buckets × campaigns with totals."><Panel className="h-full"><CampaignTrafficTable data={campaignSeries} range={range} /></Panel></Spec>
             <Spec name="WhatAutumnDid" file="website-traffic/what-autumn-did.tsx"><WhatAutumnDid impacts={impacts} /></Spec>
           </DsGrid>
+          <Spec name="TrafficStory" file="website-traffic/traffic-story.tsx" note="The composed row: chart and list share one chosen change. Page through the changes; the row never changes height."><TrafficStory data={campaignSeries} impacts={impacts} range={range} metric="clicks" /></Spec>
           <Spec name="CampaignEfficiencyTable" file="website-traffic/campaign-efficiency-table.tsx" note="Ranked by value per visit; the total row reads daily_metrics, so it never drifts from the Overview."><CampaignEfficiencyTable data={efficiency} /></Spec>
           <Spec name="GlossaryPanel" file="dashboard/glossary-panel.tsx"><GlossaryPanel /></Spec>
           <Spec name="ActivityCalendar" file="website-traffic/activity-calendar.tsx" note="Three spans on 1fr columns; hover reads into the header, a click pins the day and drives the card, the week and the month."><ActivityCalendar activity={activity} /></Spec>
