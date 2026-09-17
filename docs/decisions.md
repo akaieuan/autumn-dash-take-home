@@ -1,83 +1,771 @@
 # Decision log
 
-Why the Autumn marketing dashboard looks the way it does, and the test that
-would go red if each decision were silently reversed.
+This file explains why the Autumn marketing dashboard looks and works the way
+it does. It is written for someone reviewing the project who has not read the
+code yet.
 
-**How to use this file.** One row per settled question. A row is `proposed`
-until its proving test or gate exists and has been seen to fail once
-(CLAUDE.md §6, §10); then it is `verified` with the date. Never delete a row:
-a reversed decision gets a `superseded by Dn` note and stays, with its
-measurement, so the next reader inherits a decision instead of re-running the
-argument. Identifiers are shared with the spec
-(`docs/superpowers/specs/2026-09-17-autumn-dashboard-design.md`) and with
-CLAUDE.md §12.
+## What the project is
 
-Columns: **Decision** (what), **Instead of** (the alternative actually
-considered), **Because** (the reason, argued from the customer, the data or
-the constraint), **Proven by** (test file, gate, or measurement that depends
-on it), **Status**.
+An independent-hotel owner opens this dashboard to answer one question: **is
+Autumn helping my hotel get more direct bookings and revenue?** Autumn runs
+the hotel's online advertising and charges a percentage only on the bookings
+it brings in.
 
-## Product
+The dashboard has two screens that read live from a hosted Postgres
+database:
 
-| ID | Decision | Instead of | Because | Proven by | Status |
-|---|---|---|---|---|---|
-| D1 | The Overview headline is one sentence: bookings, booking value, and what the owner kept after Autumn's fee. | Four equal stat cards led by gross booking value (the reference product). | The owner's first two questions are "did Autumn get me bookings" and "how much revenue"; Autumn charges 11–19% only on attributed bookings, so net is the number that decides whether they stay a customer. The reference product never shows the fee. | `tests/components/headline-card.test.tsx` (sentence, net, both deltas); `tests/queries/overview.test.ts` (fee = value × bps / 10000, net = value − fee, hand-computed). | proposed |
-| D2 | The second screen is `/bookings`, "Where your direct bookings come from": direct vs OTA mix, campaigns in plain words, feeder markets, guest behaviour, recent bookings. | Website traffic, mirroring the reference product's second tab. | Traffic explains the funnel; bookings explain the money. The owner's third question ("are the right guests finding me") is answered by markets and campaigns, not by page views. Insight cards on the Overview deep-link into its anchors, so the connection is navigational, not decorative. | `tests/components/insight-list.test.tsx` (anchor links resolve to `/bookings#…`); `tests/seed-generators.test.ts` (every generated anchor is one the page renders); plan Task 12 cross-screen gate (campaign bookings sum equals context-strip bookings). | proposed |
-| D3 | Default range is the last 30 days, compared to the previous 30 days and to the same 30 days one year earlier. | Year to date (the reference default). | "What changed since last month" needs the previous period; "is this seasonal or a problem" needs last year. YTD hides both behind a growing denominator. | `tests/date-range.test.ts` (30d default; prev and last-year windows; `ytd` collapses to one comparison; `all` has none). | proposed |
-| D4 | Metrics are named in plain language first; the industry term appears once, in parentheses, with a tooltip; click-through rate is shown as "1 in N". | Industry labels with an info icon (CTR, CVR, impressions). | The brief says the owner may not know what CTR or attribution mean. A label they must decode is a label they skip. | `tests/glossary.test.ts` (no bare acronym in any label); `tests/components/campaign-table.test.tsx` (`1 in 3`, no "CTR" text); `tests/components/stat-tile.test.tsx` (label + meaning rendered). | proposed |
-| D5 | Chart budget: one trend chart on the Overview; one stacked mix chart plus tables and meters on Bookings. | Six donut charts and two data tables per screen (reference product). | "Do not optimize for showing the most charts." Meters and ranked lists answer "which" faster than a donut, and a single trend with two comparison lines answers "what changed" without a metric picker per card. | Visual gate in plan Task 13 (screenshots reviewed by the owner); the component library has no donut/pie component to reach for. | proposed |
-| D6 | Autumn's fee is shown at 15% of attributed booking value, stored per property in `fee_rate_bps`. | Hiding the fee; or a flat monthly figure. | The published model is pay-for-performance at 11–19%; 15% is the midpoint and one column to change. Showing it builds the trust the brief asks for. | `tests/queries/overview.test.ts` (`feeCents: 18758` on `125050` at 1500 bps, net `106292`); `tests/queries/breakdowns.test.ts` (per-campaign fee). Amended 2026-09-17: with no properties table the rate is `PROPERTY.feeRateBps` in `src/lib/property.ts` (Task 2 folded the rate into `PROPERTY` and renamed `config.ts`; `tests/property.test.ts` holds it equal to the seed's own `PROPERTY`). | verified 2026-09-17 |
-| D7 | Light theme only, warm paper palette measured from findautumn.com, one sage accent. | shadcn's dark-dashboard default (recommended by the `vercel:shadcn` skill). | The brief asks for calm and hospitality-native; the company's own site is paper-white. A dark analytics theme reads as an ad platform, the thing the brief says to avoid. | `src/app/globals.css` has no `.dark` block (grep gate in plan Task 13); contrast measured ≥ 4.5:1 for muted text on card. | proposed |
-| D8 | One seeded property: Harbor House Inn, South Haven, Michigan, 22 rooms, Chicago drive market. | A generic "Hotel A" with flat demand. | The reference screenshots show Chicago, South Haven and Detroit as feeder markets, so the geography is already Autumn's. A lakeshore inn has strong, explainable seasonality, which makes trend and year-over-year views believable. | `tests/seed-profile.test.ts` (July > 2× January; weekend > weekday; holiday spikes; ADR band). | superseded by D21 (2026-09-17): property identity remains Harbor House Inn for copy, but is no longer a table |
-| D9 | Data window 2024-09-17..2026-09-16 (730 days) with Autumn starting 2025-02-03. | 720 days all under Autumn. | A 4.5-month pre-Autumn baseline lets the owner see the before/after that the marketing site promises ("trust the work"), and two full summers make the year-over-year comparison real rather than partial. | `tests/seed-generators.test.ts` (≥ 720 distinct days; no Autumn rows before the start date; direct share rises from < 34% to > 46%). | superseded by D21 (2026-09-17): the window is still 730 days, but the whole window is under Autumn with an eight-week ramp; no pre-Autumn baseline |
-| D10 | "Today" is `MAX(date)` in the database, never the wall clock. | `new Date()`. | The deployed app must be correct whenever it is opened, weeks after seeding, with no cron or reseed. | `tests/date-range.test.ts` (`to === dataMax`); `tests/queries/overview.test.ts` (`getDataBounds` returns min/max from rows). | proposed |
+- **Overview** (`/`): the headline answer, a trend chart, plain-language
+  insights, where guests come from, and how each campaign is doing.
+- **Website Traffic** (`/website-traffic`): which days visitors arrive, which
+  campaigns produce them, what Autumn changed and what happened after, and
+  where the next advertising dollar would do the most good.
 
-## Engineering
+The database holds two years of generated hotel-marketing data for one
+fictional property, Harbor House Inn in South Haven, Michigan. The generator
+is deterministic: running it again produces the same rows.
 
-| ID | Decision | Instead of | Because | Proven by | Status |
-|---|---|---|---|---|---|
-| D11 | Next.js 16 App Router with Server Components fetching directly through Drizzle; no REST layer; one client component for the range control and one per chart. | Client-side fetching with React Query, or Route Handlers. | Two screens of read-only aggregates are the textbook Server Component case: no waterfall, secrets stay on the server, and the URL carries all state so links are shareable. Route Handlers would add a layer nothing else consumes. | `npm run build` lists both routes as dynamic server-rendered; no `app/api` directory exists; component tests render without a network mock. | proposed |
-| D12 | Neon Postgres over the HTTP driver, with Drizzle ORM and generated migrations. | Supabase, MongoDB, or SQLite-on-disk. | The data is relational and the screens are aggregates; Postgres does `sum`/`count … filter` natively. Neon's free tier, HTTP driver and Vercel Marketplace listing make deploy a single env var. The schema is driver-agnostic, so Supabase would be a one-file swap. | `tests/queries/schema.test.ts` (migration applies cleanly in PGlite); `npm run db:migrate` on Neon; `db:verify` line matches `db:seed` line. | superseded by D23 (2026-09-17): Supabase Postgres over postgres-js, same Drizzle schema |
-| D13 | Query tests run against PGlite (in-process Postgres) using the generated migration and a hand-computed fixture. | Mocking Drizzle, or testing only against Neon. | A mocked query cannot fail for a SQL reason; a Neon-only test needs a secret in CI and pays network latency per case. PGlite runs the real migration, so the schema is tested too. | `tests/queries/*.test.ts` (13 cases; negative control recorded in the Task 6 commit: dropping the `source` filter reddens `directShare`). | proposed |
-| D14 | Money is integer cents everywhere below the render layer; formatting happens only in `src/lib/format.ts`. | Floating dollars in the DTOs. | Sums of floats drift; cents sum exactly and the fee/net arithmetic stays integer. One formatter means one place to change currency display. | `tests/format.test.ts`; `tests/queries/overview.test.ts` (`bookingValueCents: 125050` from a `numeric` `1250.50`, `netCents` exact). Amended 2026-09-17: the database column is `numeric` dollars (D21); `toCents()` at the query boundary is the single conversion. ESLint rule for `Intl` still to add. | verified 2026-09-17 |
-| D15 | The seed is deterministic (mulberry32, seed `20260917`), truncates and re-inserts, and prints an acceptance line that `db:verify` re-derives from `count(*)`/`MIN`/`MAX`. | Random seed; append-only inserts; a boolean "seeded ok". | Repeatable setup is part of what is being judged. A derived line that a partial insert could not produce is the cheapest proof the database matches the generator. | `tests/seed-generators.test.ts` (two runs identical); `npm run db:seed` and `npm run db:verify` printing the same line (recorded in the Task 5 commit body). | verified 2026-09-17: `tests/seed-generators.test.ts` (deterministic) and `tests/queries/seed.test.ts` (seed twice → identical acceptance; `verifyDatabase` re-derives the same line) |
-| D16 | Campaign daily metrics derive their `bookings` and `booking_value` from the bookings rows, not from an independent random draw. | Generating each table independently. | The two screens must never disagree. If the campaign table and the headline are computed from the same rows, they cannot. | `tests/seed-generators.test.ts` ("campaign metric bookings equal attributed booking rows per day and campaign"); plan Task 12 cross-screen gate. | superseded by D22 (2026-09-17): the same principle, now enforced as exact apportionment of daily totals |
-| D17 | Insights are generated by the seed from the actual rows, month by month, with kinds `win` / `watch` / `action`. | Hand-written insight copy; or a runtime insight engine. | Hand-written insights drift from the numbers. A runtime engine is out of scope. Deriving them at seed time keeps the narrative true to the data and keeps "what is Autumn doing about it" answerable. | `tests/seed-generators.test.ts` (an insight month for every month after start; anchors valid); `tests/components/insight-list.test.tsx` (kinds rendered in plain words; empty state explicit). | superseded by D24 (2026-09-17): insights are computed at render time from `daily_metrics`, not seeded |
-| D18 | Component library is separate from routes: `src/components/<area>/index.ts` barrels, DTO-typed props, no data fetching in components; `components/ui` is CLI-owned and has no barrel. | Colocating components under `app/`, or a single global barrel. | Pages that only compose are easy to read and to re-plan; DTO types are the contract that lets components be tested with fixtures. Per-area barrels keep imports clean without a single module that drags every component into every route's graph. | Component tests import from barrels; grep gate in plan Task 13: no `@/lib/db` import under `src/components`; no imports of `@/components/**/file` from `src/app`. | proposed |
-| D19 | Trend buckets are aggregated in TypeScript over a per-day map rather than `date_trunc` in SQL. | `date_trunc('week', …)`. | A "last 90 days" view should bucket from its first day, not snap to Monday boundaries the owner did not pick. Rows per query are ≤ 730, so the cost is negligible. | `tests/queries/overview.test.ts` (`bucketStarts` from the first day; comparisons aligned by index; week sums). Verified 2026-09-17. Negative control: removing the date filter from `getPeriodTotals` reddened two tests, restored. | verified 2026-09-17 |
-| D20 | Overview streams its trend, insights and preview behind Suspense; Bookings runs six queries in one `Promise.all`. | Streaming everything, or nothing. | The Overview's headline is the answer and should paint first; its trend is the slowest query. Bookings' sections are all above the fold on desktop, so one round-trip is faster than five boundaries. | Measured on Neon in plan Task 14 (record TTFB and the trend query time here). | proposed |
-| D21 | Two tables at two grains: `daily_metrics` (one row per day, `date` is the primary key) and `breakdowns` (one row per day per dimension value: campaign, device, feeder market). Owner's design, 2026-09-17. | The eight-table model in the original spec (bookings grain, campaigns, markets, traffic, hourly, insights). | The two grains are genuinely different; mixing them either repeats the daily total on every breakdown row or forces a group-by to ask "what happened today". One generic `breakdowns` table serves the three structurally identical sections (category, value, four metrics) with one seeding function and one component instead of three. The `date` primary key is the natural key; a synthetic id would add nothing. Fewer tables means less surface area to get wrong. What it gives up: direct-vs-OTA mix, lead time, booking hour and a recent-bookings list, which need a bookings grain; those sections leave the plan. | `tests/queries/schema.test.ts` (migration creates both tables, the `(date, dimension)` index, and a check constraint rejects an unknown dimension); `drizzle/0000_*.sql` matches the owner's SQL. | verified 2026-09-17 |
-| D22 | Breakdowns are derived from daily totals by exact apportionment (largest-remainder), with per-value weights for impressions, click-through, conversion and booking value; clicks are capped at impressions and bookings at clicks per row. | Independently random numbers per breakdown row that only sum "close to" the day. | "Not random noise" is satisfied when a breakdown adds up to its day without a tolerance. Exactness also makes `db:verify` a strict equality check per dimension, so a partial insert is caught. | `tests/seed-apportion.test.ts`; `tests/seed-generators.test.ts` ("every breakdown dimension sums exactly … for all four metrics"; monotone constraints; zero bookings ⇔ zero value). Negative control 2026-09-17: disabling remainder distribution reddened three tests, restored. **Amended 2026-09-17:** largest-remainder is kept for impressions (hundreds a day) but clicks and bookings are assigned by weighted draw (`apportionByDraw`), because with one booking a day the remainder rule always gave it to the heaviest weight and eight of ten markets showed zero over 30 days. Sums remain exact by construction. New assertions: no market or campaign has zero bookings over the full window, at most two markets over the last 90 days, brand protection converts > 2× discovery. Negative control: reverting bookings to largest-remainder reddened the zero-rows test, restored. Measured after reseed: 30-day markets Chicago 49%, eight of ten booking. | verified 2026-09-17 |
-| D23 | Supabase Postgres via the transaction pooler (port 6543) with `postgres` (postgres-js) and `prepare: false`; migrations over the session pooler via `DIRECT_URL`. | Neon over the HTTP driver. | Owner's platform choice. The transaction pooler suits serverless functions but rejects prepared statements, hence `prepare: false`. The Drizzle schema, the seed and every query are driver-agnostic; `rowsOf()` hides the one difference in `execute()` result shape between postgres-js and PGlite. | `tests/queries/seed.test.ts` runs the production seed function unchanged against PGlite; `npm run db:migrate` then `db:seed` then `db:verify` on Supabase, 2026-09-17: seed 4.9 s; verify printed the identical acceptance line and `yes` for all three dimensions. Two connection facts learned the hard way: Supabase rejects non-SSL connections (`ssl: "require"` in `client.ts` and `?sslmode=require` on both URLs so drizzle-kit gets it too), and a `[REGION]` placeholder left in the host is an invalid URL. Query timings over the transaction pooler, three runs each: 30-day daily aggregate 446 / 32 / 45 ms (first run is connection setup), 30-day campaign breakdown 103 / 69 / 54 ms, all-time monthly trend 72 / 48 / 50 ms. | verified 2026-09-17 |
-| D24 | Insights are computed at render time from `daily_metrics` (period vs previous period, vs last year, per-dimension movers, and since 2026-09-17 the most recent event with its before/after). | A seeded `insights` table. | A stored insight is a derived fact that must be kept in sync with the numbers under it: the same two-sources-of-truth problem the two-table split avoids. Computed at render, it can never disagree with the chart beside it. | `tests/insights.test.ts`: six rules (value vs previous with last-year as the seasonal check, year over year, cost vs OTA commission, campaign riser and click-through drop paired with an action, new market, phone share), expected titles and ordering computed by hand; watches sort first. Verified 2026-09-17. | verified 2026-09-17 |
-| D25 | Bookings per day are sampled by error diffusion (expected = clicks × conversion × jitter, remainder carried to the next day) instead of a binomial draw. | Binomial(clicks, conversion). | With ~1 booking a day, binomial noise swings monthly totals ±15% and hid a +22%/yr trend in the first run (July 2025: 45, July 2026: 42). Error diffusion keeps daily counts lumpy (0–3) while monthly totals track the rate, so seasonality and year-over-year growth are visible in the data rather than in the parameters. | `tests/seed-generators.test.ts` ("shows seasonality and year-over-year growth"); measured 2026-09-17: July 2025 39 bookings → July 2026 46; January ≈ 10; daily histogram 0:232 1:416 2:81 3:1. | verified 2026-09-17 |
-| D26 | A `campaign_events` table (date, campaign or program-wide, kind, title, note) records what Autumn did, and the seed applies each event's effect to the generator from its date. | Inferring "what changed" from the numbers alone; or a static "what we did" list unconnected to the data. | The owner's questions "what changed since last month" and "what is Autumn doing about it" need a cause, not a correlation. With events driving the generator (a budget raise multiplies that campaign's impressions, a copy refresh its click-through), before/after comparisons anchored on an event are true by construction, the way an album's first week compares with the last album's. 24 events over two years. | `tests/seed-generators.test.ts` ("events cause the data": Discovery impressions +15% after the 2025-04-14 budget raise vs the 14 days before; Discovery click-through +5% after the 2026-08-03 copy refresh vs the 28 days before; a Brand Protection event does not move Discovery; every event is inside the window, names a real campaign, and launch dates equal `startsOn`). Negative control 2026-09-17: disabling the effect multipliers reddened the causality test; restored. Query: `tests/queries/events.test.ts` (`getEvents` ordering and range; `getEventImpact` before/after windows hand-computed from the fixture for a campaign event and a program-wide one; clipping to the last day with data). | verified 2026-09-17 |
-| D27 | A `campaigns` table with four rows: plain objective, focus, launch date, status, monthly budget. `name` matches `breakdowns.dimension_value`. | Campaign labels only, with copy hard-coded in the glossary. | An owner asks "what is this campaign for?" and "where is it pointed?"; that is data about the campaign, not UI copy, and belongs beside the events that change it. The soft join on `name` keeps `breakdowns` generic. | `tests/queries/schema.test.ts` (FK from events to campaigns rejects an unknown name); `tests/queries/events.test.ts` (`getCampaignMeta` labels and budgets in cents); `tests/seed-generators.test.ts` (metadata rows equal the seeded campaign set). | verified 2026-09-17 |
-| D28 | `spend` (numeric dollars, default 0) on both `daily_metrics` and `breakdowns`, priced per campaign click and apportioned to devices and markets by clicks. | Showing only Autumn's fee. | "How much money" was the owner's first question. Autumn funds the ads, so spend beside fee and booking value is the honest cost-versus-return story: spend runs about 7% of booking value against a 15% fee. The default keeps every existing fixture valid. | `tests/seed-generators.test.ts` (spend sums exactly per dimension; zero clicks ⇒ zero spend; spend/value in 4–15%); `db:verify` reconciles spend per dimension; `tests/queries/overview.test.ts` (`spendCents: 4500` from three fixture days); `tests/queries/breakdowns.test.ts` (`spendCents: 1700` per campaign). | verified 2026-09-17 |
-| D32 | Range and metric changes push the URL with `scroll: false` inside a transition (`useViewParam`), so the page keeps its scroll position and the old content stays until the new payload arrives. | A plain `router.push` (scrolls to the top and trips `loading.tsx`). | An owner reading the funnel who switches 30d → 90d should stay on the funnel. Measured 2026-09-17 at 1440px: scroll 1200 → 1158 after the switch (the page got shorter), never 0. | `tests/components/shell.test.tsx` (`push` called with `{ scroll: false }`; the current range does not navigate). | verified 2026-09-17 |
-| D33 | An insight carries its own small graph (`Insight.chart`: two or three bars, or a share bar) filled by the rule from the numbers its sentence quotes. The anchor links ("See the trend") are gone. | Links that scroll to the big chart. | The link only re-focused a chart already on screen; the graph is the evidence for that one sentence, in the trend chart's colours (green now, amber before, grey last year), so it can never disagree with the text. | `tests/insights.test.ts` (value-down carries the three cents figures with range-derived labels; an event carries after/before); `tests/components/dashboard.test.tsx` (bar width 88% for 880 of 1000; no link rendered). | verified 2026-09-17 |
-| D34 | The glossary is a panel in the bento beside the funnel, every group visible at once (one column per group on wide panels). The bottom rows are markets + campaigns, then funnel + glossary (`Grid variant="detail"`). | The old full-width section under the bento with a side-nav of tabs. | The tab list collapsed into shadcn's fixed 32px row height and its labels overlapped (owner's screenshot, 2026-09-17), and the section sat alone in dead space. All terms on the page means nothing to click and no empty band under a short group. | `tests/components/dashboard.test.tsx` (every group is a region; a term from the last group is rendered). | verified 2026-09-17 |
-| D35 | The activity calendar on Website Traffic: 53 trailing weeks of daily visits ending on the last seeded day, whatever range the header shows; five heat steps mixed in oklab from `--chart-1` to the card surface; columns are `1fr` so the year always fits without sideways scroll; hover reads into a fixed line in the header, nothing floats. | A range-bound heatmap (sparse at 30 days); a floating per-cell tooltip (371 bubbles, can overflow the page). | "Which days do people visit?" needs a year to read seasonality; a trailing year is always well-formed and the caption says so. Days before the data are `null` and blank, never 0. | `tests/queries/activity.test.ts` (starts on the Sunday before the window, 19 days = 3 columns, null before the first row, max/total by hand, cents for money); `tests/components/website-traffic.test.tsx` (quartile levels, month labels skip a stub, one cell per day, hover readout). | verified 2026-09-17 |
-| D36 | Dashboard screens live in a `(dashboard)` route group whose layout owns the sidebar frame; `/design-system` sits outside it and renders every token, primitive and component from the code with fixture DTOs, unlinked from the product and `noindex`. | Keep the frame in the root layout and hide the sidebar on one route; or a Storybook. | The reference must show the real components in the real theme without a second toolchain, and must never be reachable by an owner: no nav entry, no link, robots off. The route group was already the audit's recommendation for growth. | `tests/architecture.test.ts` (no product file contains a `/design-system` link); `next build` lists `/design-system` as static beside the two dynamic screens. | verified 2026-09-17 |
-| D29 | Pages per visit is total pageviews over total sessions, with both denominators stored on `daily_metrics`. The stored daily rate is kept for single-day views. | `avg(pages_per_session)` across daily rows. | An average stored without its denominator cannot be re-aggregated: averaging daily rates weights a quiet Tuesday like a peak Saturday. Storing the denominators makes any range correct, and makes `new_visitors` a real share of a real count instead of an unbounded number that exceeded total sessions on all 730 rows. | `tests/queries/overview.test.ts` (weighted 3.68 where the unweighted average reads 3.5; a single-day range equals that day's stored rate; a window with no sessions reads 0 rather than dividing by zero); `tests/seed-generators.test.ts` (sessions cover the paid visits, new visitors never exceed sessions, the stored rate agrees with its own denominators). Negative control 2026-09-17: reverting to the unweighted average reddened two tests. Measured live: the correction moves the figure 0.17% over 30 days and 0.38% over two years. | verified 2026-09-17 |
-| D30 | Event causality is proven by regenerating with one effect neutralised and comparing the two runs, not by comparing the window before an event with the window after it. | A before/after comparison on a single run. | Season, weekday mix and other events drift across the boundary too. Measured 2026-09-17: across the 2026-08-03 copy refresh the campaign with a 15% click-through effect appeared to move 0.6% while the untouched control campaign moved 2.8%, so the old test was reading drift, and it failed the moment the random stream shifted. Neutralising the effect and regenerating isolates it: 12.77% click-through with the effect against 11.61% without. | `tests/seed-generators.test.ts` ("an effect moves only its own campaign, and only from its own date"): the toggle comparison for a click-through event and for a budget event, plus byte equality of every daily row before each event date, which also proves effects are strictly forward-acting. | verified 2026-09-17 |
-| D31 | The second screen is Website Traffic, explained through the days visits arrive on and the campaigns that produce them: an activity calendar as the hero (three spans, a day card, the week and month of the chosen day), visits by campaign over time with every Autumn event marked, what Autumn did with before/after, where the next dollar goes, weekday rhythm, device conversion. Nothing that is on the Overview (markets, glossary) repeats here. Supersedes D2 (Bookings). | Bookings attribution (D2); or a traffic page of channels, page paths and time of day. | Owner's ruling 2026-09-17: the second screen must help decide the next campaign. Channels, new-vs-returning, page paths and time of day are not in the data and are not faked (CLAUDE.md §2); the artboard's AdSources, NewVsReturning, VisitDepth and DriveTimePlot are dropped in favour of the three campaign components the query layer already serves (handoff: docs/superpowers/plans/2026-09-17-website-traffic-handoff.md). | `tests/queries/traffic.test.ts` (series, events pinned to buckets, efficiency by hand); `tests/components/traffic-campaigns.test.tsx`; `tests/components/website-traffic.test.tsx`; `tests/activity.test.ts`. | verified 2026-09-17 |
-| D37 | The calendar's span (year / 6 months / 13 weeks) is a per-browser preference like the chart style; tiles are always `1fr` columns so fewer weeks means bigger tiles and the year always fits; the kept-open day drives the day card, the week strip and the month summary from the same click. | A fixed 53-week grid; a floating tooltip per tile. | Owner's comment on the artboard 2026-09-17: the panel had dead space and the clicked day should surface its data quickly. Everything below the tiles reads from the one pinned day. | `tests/components/website-traffic.test.tsx` (13-week span shows 13 columns and numbers inside tiles; click pins; ArrowRight moves a week; the day card follows). | verified 2026-09-17 |
-| D38 | "What Autumn did" shows one change at a time with previous/next arrows and a dot per change; the chosen change shades its after-window on the campaign chart and its marker grows, and a marker click picks it back. The chart and the list share that one choice in `TrafficStory`. | The full list beside the chart (five cards made the row twice the viewport); a separate events page. | Owner's review 2026-09-17: the row was too tall to read in one screen, and a picked change should show on the graph. Measured after: chart and list are 402px each at 1440px. | `tests/components/traffic-campaigns.test.tsx` ("1 of 2", Next moves to the second card, `onSelect` called with its id, arrows disable at the ends). | verified 2026-09-17 |
+## How to read this file
 
-## Rejected with measurement
+Every settled question gets one entry with four parts:
 
-Record here anything tried and dropped, with the number that decided it.
+- **We chose** the thing that was built.
+- **Instead of** the alternative that was seriously considered.
+- **Why**, argued from the hotel owner, the data, or the brief.
+- **How we know it holds**: the test or check that would fail if someone
+  quietly reversed the decision.
+
+Each entry ends with a status:
+
+- **verified**: the proving test exists, and it was deliberately broken once
+  to confirm it fails, then restored.
+- **tested**: the proving test exists and passes, but it has not been
+  deliberately broken yet.
+- **superseded**: a later decision replaced it. The entry stays so the
+  reasoning is not lost.
+
+Numbers quoted here were measured on 2026-09-17 against the live database,
+not copied from a plan. On that date the gates read: typecheck clean, 28
+test files and 191 tests passing, seed and verify agreeing on
+`730 days, 730 daily rows, 12,286 breakdown rows, 918 bookings, $408,745.44
+booking value, $29,521.54 ad spend, 4 campaigns, 24 events`.
+
+Identifiers (D1, D2, ...) are shared with the design spec in
+`docs/superpowers/specs/` and with the project's operating contract in
+`CLAUDE.md`. Numbering follows the order questions were settled, not the
+order they appear here.
+
+---
+
+## 1. What the owner sees
+
+### D1. The headline is one sentence
+
+**We chose:** the top of the Overview is a sentence: how many direct
+bookings Autumn brought, what they were worth, and what the owner kept after
+Autumn's fee, with the change against the previous period in words.
+
+**Instead of:** four equal stat cards led by gross booking value, which is
+what the reference product does.
+
+**Why:** the owner's first two questions are "did Autumn get me bookings?"
+and "how much money?". Autumn's fee is a percentage of those bookings, so the
+net figure is the one that decides whether they stay a customer. The
+reference product never shows the fee at all.
+
+**How we know it holds:** `tests/components/dashboard.test.tsx` renders the
+headline and checks the sentence contains bookings, value, net and the
+delta; `tests/queries/overview.test.ts` checks fee and net against values
+computed by hand in the test.
+
+**Status:** tested.
+
+### D2 and D31. The second screen is Website Traffic
+
+**We chose:** the second screen explains traffic through the days visits
+arrive on and the campaigns that produce them. An activity calendar is the
+hero. Below it: visits by campaign over time with every Autumn change
+marked, a "what Autumn did" story with before and after numbers, a table of
+where the next dollar goes, weekday rhythm, and device conversion. Nothing
+that is already on the Overview repeats here.
+
+**Instead of:** a bookings-attribution screen (the original D2 choice), or a
+traffic page of channels, page paths and time of day like the reference
+product.
+
+**Why:** the owner ruled that the second screen must help decide the next
+campaign, not just describe the past. Channels, page paths and time of day
+are not in the data and were not faked to fill space. The three campaign
+components the query layer already served answered the owner's question
+better.
+
+**How we know it holds:** `tests/queries/traffic.test.ts` (series, events
+pinned to their buckets, efficiency figures computed by hand),
+`tests/components/traffic-campaigns.test.tsx`,
+`tests/components/website-traffic.test.tsx`, `tests/activity.test.ts`.
+
+**Status:** verified 2026-09-17. D2 (Bookings) is superseded by D31.
+
+### D3. The default range is 30 days with two comparisons
+
+**We chose:** the last 30 days, compared to the previous 30 days and to the
+same 30 days one year earlier. Presets: 30 days, 90 days, year to date, 12
+months, all time. The range lives in the URL so both screens share it and
+links can be sent to someone else.
+
+**Instead of:** year to date, which is the reference product's default.
+
+**Why:** "what changed since last month?" needs the previous period. "Is
+this seasonal or a problem?" needs last year. Year to date hides both behind
+a denominator that grows every day.
+
+**How we know it holds:** `tests/date-range.test.ts` checks the 30-day
+default, both comparison windows, that year-to-date collapses to one
+comparison and all-time has none, and that garbage input falls back to the
+default.
+
+**Status:** tested.
+
+### D4. Plain words first, industry terms second
+
+**We chose:** every metric is named in plain language. The industry term
+appears once, in parentheses, with a tooltip explaining it. Click-through
+rate is shown as "1 in N people clicked".
+
+**Instead of:** industry labels (CTR, CVR, impressions) with an info icon.
+
+**Why:** the brief says the owner may not know what CTR or attribution mean.
+A label they have to decode is a label they skip.
+
+**How we know it holds:** `tests/glossary.test.ts` fails if any label
+contains a bare acronym or any meaning is not a full sentence;
+`tests/components/copy.test.tsx` checks the metric label component shows the
+plain label and offers the meaning.
+
+**Status:** tested.
+
+### D5. A small chart budget
+
+**We chose:** one trend chart on the Overview. On Website Traffic, one
+activity calendar and one campaign chart. Everything else is a ranked list,
+a meter or a table.
+
+**Instead of:** six donut charts and two data tables per screen, which is
+what the reference product does.
+
+**Why:** the brief says not to optimise for showing the most charts. A
+ranked list answers "which one?" faster than a donut, and one trend line with
+two comparison lines answers "what changed?" without a metric picker on
+every card.
+
+**How we know it holds:** the chart library in `src/components/charts/` has
+no pie or donut component to reach for. Screens are reviewed by screenshot
+at phone and desktop widths.
+
+**Status:** tested.
+
+### D6. Autumn's fee is shown at 15%
+
+**We chose:** the fee is shown as 15% of attributed booking value. The rate
+is a single constant in `src/lib/property.ts`, so it is one line to change.
+
+**Instead of:** hiding the fee, or showing a flat monthly figure.
+
+**Why:** Autumn's published model is pay-for-performance in the 11 to 19%
+range, and 15% is the midpoint. Showing the fee next to the revenue it
+produced is what builds the trust the brief asks for.
+
+**How we know it holds:** `tests/queries/overview.test.ts` checks fee and
+net on a hand-computed fixture; `tests/property.test.ts` keeps the app's
+constant equal to the seed generator's copy so the copy and the data never
+disagree.
+
+**Status:** verified 2026-09-17. The exact percentage is the owner's call
+and remains an open question below.
+
+### D7. A warm, hospitality-native theme
+
+**We chose:** a warm paper palette measured from Autumn's own marketing
+site, with one sage accent. Light is the default. A dark theme was added
+later as an option that follows the device setting or the owner's explicit
+choice, using the same tokens.
+
+**Instead of:** the dark analytics dashboard that the shadcn tooling
+recommends by default.
+
+**Why:** the brief asks for calm and hospitality-native. The company's own
+site is paper-white. A dark analytics theme reads as an ad platform, which
+is exactly what the brief says to avoid. Dark mode was added only because
+some owners will open the dashboard on a phone set to dark at night.
+
+**How we know it holds:** `tests/architecture.test.ts` checks that the
+layout tokens and the dark theme block are both in the global stylesheet,
+and that components use theme tokens rather than hard-coded colours.
+
+**Status:** tested. The original "light only" ruling is superseded by the
+theme toggle added on 2026-09-17.
+
+### D8. One believable property
+
+**We chose:** one seeded property: Harbor House Inn, South Haven, Michigan,
+22 rooms, with Chicago as its main drive market.
+
+**Instead of:** a generic "Hotel A" with flat demand.
+
+**Why:** the reference screenshots already show Chicago, South Haven and
+Detroit as feeder markets, so the geography is Autumn's own. A lakeshore inn
+has strong, explainable seasonality, which makes the trend and
+year-over-year views believable. The property is copy only; there is no
+properties table.
+
+**How we know it holds:** `tests/seed-profile.test.ts` checks that July
+demand is more than twice January, weekends beat weekdays, holidays spike,
+and room rates stay in a plausible band.
+
+**Status:** tested.
+
+### D9. Two full years, all under Autumn
+
+**We chose:** a 730-day window ending on 2026-09-16, with Autumn active
+throughout and an eight-week ramp at the start, plus 22% year-on-year
+growth.
+
+**Instead of:** a shorter window, or a window with a pre-Autumn baseline.
+
+**Why:** two full summers make the year-over-year comparison real rather
+than partial. The earlier idea of a pre-Autumn baseline was dropped when the
+data model was simplified (D21); the ramp gives the same "it grew" story
+without a second mode of data.
+
+**How we know it holds:** `tests/seed-generators.test.ts` checks at least
+720 distinct days and that seasonality and year-on-year growth are visible
+in the generated rows.
+
+**Status:** verified 2026-09-17.
+
+### D10. "Today" is the last day with data
+
+**We chose:** every date range is anchored on the latest date in the
+database, never on the wall clock.
+
+**Instead of:** the current date.
+
+**Why:** the deployed app must be correct whenever it is opened, weeks after
+seeding, with no scheduled job to reseed. Anchoring on the clock would decay
+into an empty "last 30 days".
+
+**How we know it holds:** `tests/date-range.test.ts` checks the range ends
+on the data maximum; `tests/queries/overview.test.ts` checks the bounds
+query returns the true min and max.
+
+**Status:** tested.
+
+### D32. Changing the range does not move the page
+
+**We chose:** switching range or metric updates the URL without scrolling
+and inside a transition, so the page keeps its scroll position and the old
+content stays visible until the new data arrives.
+
+**Instead of:** a plain navigation, which scrolls to the top and shows the
+loading skeleton.
+
+**Why:** an owner reading the funnel who switches from 30 to 90 days should
+still be looking at the funnel. Measured at desktop width: scroll position
+went from 1200 to 1158 after a switch (the page got slightly shorter), never
+to 0.
+
+**How we know it holds:** `tests/components/shell.test.tsx` checks the
+navigation is called with scrolling disabled and that re-selecting the
+current range does not navigate.
+
+**Status:** verified 2026-09-17.
+
+### D33. Every insight carries its own small graph
+
+**We chose:** each insight card includes a small chart (two or three bars,
+or a share bar) built from the same numbers its sentence quotes, in the
+trend chart's colours.
+
+**Instead of:** a "See the trend" link that scrolled to the big chart.
+
+**Why:** the link only re-focused a chart already on screen. The small
+graph is the evidence for that one sentence and cannot disagree with it,
+because both come from the same rule.
+
+**How we know it holds:** `tests/insights.test.ts` checks a value-down
+insight carries the three figures with range-derived labels;
+`tests/components/dashboard.test.tsx` checks bar widths and that no link is
+rendered.
+
+**Status:** verified 2026-09-17.
+
+### D34. The glossary is a panel, always fully visible
+
+**We chose:** the glossary sits in the Overview grid beside the funnel, with
+every group of terms visible at once.
+
+**Instead of:** a full-width section under the grid with a tab list.
+
+**Why:** the tab list collapsed into a fixed row height and its labels
+overlapped in the owner's screenshot. Showing all terms means nothing to
+click and no empty band under a short group.
+
+**How we know it holds:** `tests/components/dashboard.test.tsx` checks every
+group renders as a region and a term from the last group is visible.
+
+**Status:** verified 2026-09-17.
+
+### D35 and D37. The activity calendar
+
+**We chose:** a calendar of daily visits, one tile per day, ending on the
+last seeded day regardless of the header range. The span (a year, six
+months, or 13 weeks) is a per-browser preference. Columns stretch to fit so
+the year never scrolls sideways. Clicking a day pins it, and the day card,
+week strip and month summary all read from that one pinned day. Hover shows
+in a fixed line in the header; nothing floats over the tiles.
+
+**Instead of:** a heatmap bound to the header range (sparse at 30 days), a
+fixed 53-week grid, or a floating tooltip per tile.
+
+**Why:** "which days do people visit?" needs a year to read seasonality. The
+owner's review said the panel had dead space and a clicked day should
+surface its data immediately. Days before the data began are blank, never
+shown as zero.
+
+**How we know it holds:** `tests/queries/activity.test.ts` (starts on the
+Sunday before the window, null before the first row, totals by hand);
+`tests/components/website-traffic.test.tsx` (heat levels, month labels, one
+tile per day, the 13-week span shows 13 columns, click pins, arrow keys
+move a week, the day card follows).
+
+**Status:** verified 2026-09-17.
+
+### D38. "What Autumn did" shows one change at a time
+
+**We chose:** one change at a time with previous and next arrows. The chosen
+change shades its after-window on the campaign chart and enlarges its
+marker; clicking a marker selects that change.
+
+**Instead of:** the full list beside the chart, which made the row twice the
+viewport height.
+
+**Why:** the owner's review said the row was too tall to read in one screen,
+and a picked change should show on the graph. After the change, chart and
+list are the same height at desktop width.
+
+**How we know it holds:** `tests/components/traffic-campaigns.test.tsx`
+checks the "1 of N" counter, that Next moves to the second card, that
+selection is reported, and that arrows disable at the ends.
+
+**Status:** verified 2026-09-17.
+
+---
+
+## 2. The data and how it is generated
+
+### D21. Two tables at two grains
+
+**We chose:** `daily_metrics` holds one row per day (the date is the primary
+key). `breakdowns` holds one row per day per dimension value, where the
+dimension is campaign, device, or feeder market. Two small supporting
+tables, `campaigns` and `campaign_events`, describe what Autumn is running
+and what it changed.
+
+**Instead of:** the eight-table model in the original spec, with a
+bookings table, hourly data and a stored insights table.
+
+**Why:** the two grains are genuinely different. Mixing them either repeats
+the daily total on every breakdown row or forces a group-by to ask "what
+happened today?". One generic breakdowns table serves three structurally
+identical screen sections with one seeding function and one component.
+Fewer tables means less surface area to get wrong. What was given up:
+booking lead time, booking hour and a recent-bookings list, which need a
+per-booking grain.
+
+**How we know it holds:** `tests/queries/schema.test.ts` applies the real
+migration in an in-process Postgres and checks both tables exist, the
+day-and-dimension index exists, and an unknown dimension is rejected.
+
+**Status:** verified 2026-09-17.
+
+### D22. Breakdowns add up to their day exactly
+
+**We chose:** daily totals are the source of truth. Each breakdown row is
+carved out of its day's total by exact apportionment: impressions by the
+largest-remainder method, clicks and bookings by a weighted draw. Clicks
+never exceed impressions and bookings never exceed clicks on any row.
+
+**Instead of:** independently random numbers per breakdown row that only
+sum "close to" the day.
+
+**Why:** the brief asks for data that is not random noise. A breakdown that
+adds up to its day without any tolerance satisfies that, and it lets the
+verify script check equality strictly, so a partial insert is caught.
+The weighted draw for bookings was added after the first version always
+handed a single daily booking to the heaviest market, leaving eight of ten
+markets at zero over 30 days.
+
+**How we know it holds:** `tests/seed-apportion.test.ts` and
+`tests/seed-generators.test.ts` check every dimension sums exactly for all
+four metrics, the monotone constraints, that zero bookings means zero
+value, and that no market or campaign has zero bookings over the full
+window. `db:verify` reconciles all three dimensions against the live
+database. After the reseed, Chicago is 49% of 30-day bookings and eight of
+ten markets book.
+
+**Status:** verified 2026-09-17.
+
+### D25. Bookings per day use error diffusion, not a coin flip
+
+**We chose:** the expected bookings for a day (clicks times conversion
+rate, with jitter) is accumulated, and the fractional remainder carries to
+the next day.
+
+**Instead of:** a binomial draw per day.
+
+**Why:** with about one booking a day, binomial noise swung monthly totals
+by 15% and hid a 22% annual growth trend in the first run (July 2025: 45
+bookings, July 2026: 42). Error diffusion keeps daily counts lumpy (zero to
+three) while monthly totals track the rate, so seasonality and growth are
+visible in the data rather than only in the parameters.
+
+**How we know it holds:** `tests/seed-generators.test.ts` ("shows
+seasonality and year-over-year growth"). Measured: July 2025 has 39
+bookings, July 2026 has 46, January about 10.
+
+**Status:** verified 2026-09-17.
+
+### D26. Events cause the data
+
+**We chose:** a `campaign_events` table lists what Autumn did (a budget
+raise, a copy refresh, a new campaign) with a date and a plain note. The
+generator applies each event's effect from its date forward. There are 24
+events over the two years.
+
+**Instead of:** inferring "what changed" from the numbers alone, or a static
+list of activity unconnected to the data.
+
+**Why:** the owner's questions "what changed since last month?" and "what is
+Autumn doing about it?" need a cause, not a correlation. With events driving
+the generator, an insight that says "after the copy refresh, clicks rose"
+is true by construction.
+
+**How we know it holds:** `tests/seed-generators.test.ts` checks every
+event is inside the window, names a real campaign, and that launch dates
+match campaign start dates. `tests/queries/events.test.ts` checks the
+before-and-after windows against hand-computed values. The causality proof
+itself is D30.
+
+**Status:** verified 2026-09-17.
+
+### D30. Causality is proven by a controlled regeneration
+
+**We chose:** to prove an event moves the data, the tests generate the
+dataset twice from the same seed, once with one event's effect switched
+off, and compare. Every daily row before the event's date must be
+byte-identical, which also proves effects are strictly forward-acting.
+
+**Instead of:** comparing the window before an event with the window after
+it in a single run.
+
+**Why:** season, weekday mix and other events drift across the boundary too.
+Measured: across one copy refresh, the campaign with a 15% click-through
+effect appeared to move 0.6% while an untouched control campaign moved
+2.8%. The old test was reading drift, and it broke the moment the random
+stream shifted. With the effect neutralised, the same campaign reads 11.61%
+click-through against 12.77% with it.
+
+**How we know it holds:** `tests/seed-generators.test.ts` ("an effect moves
+only its own campaign, and only from its own date").
+
+**Status:** verified 2026-09-17.
+
+### D27. Campaigns are data, not copy
+
+**We chose:** a `campaigns` table with four rows: a plain objective, a
+focus, a launch date, a status and a monthly budget. The campaign name
+matches the breakdown dimension value.
+
+**Instead of:** campaign labels only, with descriptions hard-coded in the
+glossary.
+
+**Why:** "what is this campaign for?" and "where is it pointed?" are facts
+about the campaign, not interface copy, and belong beside the events that
+change it.
+
+**How we know it holds:** `tests/queries/schema.test.ts` checks an event
+naming an unknown campaign is rejected; `tests/queries/events.test.ts`
+checks labels and budgets; `tests/seed-generators.test.ts` checks the
+metadata rows match the seeded campaign set.
+
+**Status:** verified 2026-09-17.
+
+### D28. Ad spend sits beside fee and booking value
+
+**We chose:** a `spend` column on both metric tables, priced per campaign
+click and apportioned to devices and markets by clicks.
+
+**Instead of:** showing only Autumn's fee.
+
+**Why:** "how much money?" was the owner's first question. Autumn funds the
+ads, so spend beside fee and booking value is the honest cost-versus-return
+story. On the seeded data, spend runs about 7% of booking value against a
+15% fee.
+
+**How we know it holds:** `tests/seed-generators.test.ts` (spend sums
+exactly per dimension, zero clicks means zero spend, spend stays between 4%
+and 15% of value); `db:verify` reconciles spend per dimension; the overview
+and breakdown query tests check spend on hand-built fixtures.
+
+**Status:** verified 2026-09-17.
+
+### D29. Pages per visit is a weighted figure
+
+**We chose:** total pageviews divided by total sessions over the range, with
+both counts stored per day.
+
+**Instead of:** averaging the stored daily rate across days.
+
+**Why:** an average stored without its denominator cannot be re-aggregated.
+Averaging daily rates weights a quiet Tuesday the same as a peak Saturday.
+Storing the counts also made "new visitors" a real share of a real number;
+before this fix it exceeded total sessions on every row.
+
+**How we know it holds:** `tests/queries/overview.test.ts` (weighted 3.68
+where the naive average reads 3.5; a single day equals its stored rate; an
+empty window reads zero rather than dividing by zero);
+`tests/seed-generators.test.ts` (new visitors never exceed sessions). On the
+live data the correction moves the figure by 0.17% over 30 days and 0.38%
+over two years, because the seeded rate is drawn from a tight band.
+
+**Status:** verified 2026-09-17.
+
+### D15. The seed is deterministic and proves itself
+
+**We chose:** the generator uses a fixed-seed random number generator,
+truncates and re-inserts, and prints one acceptance line built from what it
+inserted. A separate verify script recomputes the same line from the live
+database with `count`, `min`, `max` and `sum`.
+
+**Instead of:** a random seed, append-only inserts, or a boolean "seeded
+ok".
+
+**Why:** repeatable setup is part of what is being judged. A derived line
+that a partial or wrong run could not produce is the cheapest proof that
+the database matches the generator.
+
+**How we know it holds:** `tests/seed-generators.test.ts` (two runs are
+identical); `tests/queries/seed.test.ts` runs the real seed function twice
+against an in-process Postgres and checks the acceptance line matches both
+times. On the hosted database, seed and verify printed the same line.
+
+**Status:** verified 2026-09-17.
+
+### D24. Insights are computed, never stored
+
+**We chose:** insights are calculated when the page renders, from the same
+rows the charts use: this period against the previous, against last year,
+the biggest movers per dimension, and the most recent Autumn change with
+its before and after.
+
+**Instead of:** an insights table filled by the seed (the original D17).
+
+**Why:** a stored insight is a derived fact that has to be kept in sync
+with the numbers under it, the same two-sources-of-truth problem the
+two-table design avoids. Computed at render, an insight can never disagree
+with the chart beside it.
+
+**How we know it holds:** `tests/insights.test.ts` covers each rule (value
+against previous with last year as the seasonal check, year over year, cost
+against travel-agency commission, a rising campaign, a click-through drop
+paired with what Autumn does about it, a new market, phone share, the
+latest event) with titles and ordering computed by hand. Watches sort
+first.
+
+**Status:** verified 2026-09-17.
+
+---
+
+## 3. How the code is put together
+
+### D11. Server Components read the database directly
+
+**We chose:** Next.js App Router pages are Server Components that call the
+query layer directly. There is no REST layer. The only client components
+are the range control, the charts and small interactive pieces.
+
+**Instead of:** client-side fetching with a data library, or API route
+handlers.
+
+**Why:** two screens of read-only aggregates are the textbook case for
+Server Components: no request waterfall, database access stays on the
+server, and the URL carries all state so links are shareable. Route
+handlers would add a layer nothing else consumes.
+
+**How we know it holds:** `npm run build` lists both screens as
+server-rendered; there is no API directory; component tests render with
+fixture data and no network mock.
+
+**Status:** tested.
+
+### D23. Supabase Postgres with Drizzle ORM
+
+**We chose:** a hosted Supabase Postgres database, reached through a
+connection pooler suited to serverless functions, with Drizzle ORM and
+generated migrations. Migrations run over a separate direct connection.
+
+**Instead of:** Neon over an HTTP driver (the original D12), or a document
+database, or SQLite on disk.
+
+**Why:** the data is relational and every screen is an aggregate, which
+Postgres does natively. Supabase was the owner's platform choice. The
+schema, the seed and every query are driver-agnostic, so the switch from
+Neon was a one-file change.
+
+**How we know it holds:** `tests/queries/seed.test.ts` runs the production
+seed unchanged against an in-process Postgres. On the hosted database,
+migrate, seed and verify all passed on 2026-09-17, and the query layer
+answered in 32 to 69 ms on a warm connection over three runs.
+
+**Status:** verified 2026-09-17. D12 (Neon) is superseded.
+
+### D13. Query tests run against a real Postgres in memory
+
+**We chose:** query tests use PGlite, an in-process Postgres, apply the
+real generated migration, and load a fixture whose expected values are
+computed by hand in the test.
+
+**Instead of:** mocking the ORM, or testing only against the hosted
+database.
+
+**Why:** a mocked query cannot fail for a SQL reason. A hosted-only test
+needs a secret in CI and pays network latency per case. PGlite runs the
+real migration, so the schema is tested too.
+
+**How we know it holds:** every file under `tests/queries/`. Recorded
+negative control: dropping a source filter turned the direct-share test
+red.
+
+**Status:** tested.
+
+### D14. Money is integer cents below the render layer
+
+**We chose:** the database stores dollars as `numeric`. The query layer
+converts to integer cents once, at the boundary. Every view model carries
+cents. Formatting to dollars happens only in `src/lib/format.ts`.
+
+**Instead of:** floating-point dollars in the view models.
+
+**Why:** sums of floats drift; cents sum exactly and the fee arithmetic
+stays integer. One formatter means one place to change how money looks.
+
+**How we know it holds:** `tests/format.test.ts`;
+`tests/queries/overview.test.ts` (a `1250.50` row reads as `125050` cents
+and net is exact); `tests/architecture.test.ts` fails if money is formatted
+anywhere but the formatter.
+
+**Status:** verified 2026-09-17.
+
+### D18. Pages compose, components render, queries fetch
+
+**We chose:** a component library under `src/components/<area>/`, each
+area exporting through its own index file. Components take typed view
+models as props and never fetch. Pages only compose. The shadcn-generated
+primitives in `components/ui` are owned by the CLI and are not edited by
+hand.
+
+**Instead of:** colocating components under the routes, or one global
+export file.
+
+**Why:** pages that only compose are easy to read and to re-plan. Typed
+view models are the contract that lets components be tested with fixtures.
+Per-area exports keep imports clean without one module dragging every
+component into every route.
+
+**How we know it holds:** `tests/architecture.test.ts` scans the source and
+fails if a component imports the database layer, a page imports a file
+inside a component folder, a component sets outer margins, or any file
+uses a JavaScript viewport hook instead of CSS breakpoints.
+
+**Status:** tested.
+
+### D19. Trend buckets start from the first day of the range
+
+**We chose:** the query fetches per-day rows and buckets them in
+TypeScript from the first day of the chosen range.
+
+**Instead of:** SQL `date_trunc`, which snaps to calendar weeks.
+
+**Why:** a "last 90 days" view should bucket from its own first day, not
+from a Monday the owner did not pick. Rows per query never exceed 730, so
+the cost is negligible.
+
+**How we know it holds:** `tests/queries/overview.test.ts` checks bucket
+starts, that comparisons align by index, and the week sums.
+
+**Status:** verified 2026-09-17.
+
+### D20. The answer paints first, the rest streams
+
+**We chose:** each screen awaits its headline data, sends it, then streams
+the slower sections behind one Suspense boundary. Inside that boundary the
+remaining queries run in a single round trip.
+
+**Instead of:** streaming every section separately, or waiting for
+everything.
+
+**Why:** the headline is the answer and should appear first. One boundary
+for the rest is faster than five, because the sections are all visible
+together on desktop.
+
+**How we know it holds:** both page files follow this shape; the loading
+skeleton reserves the chart height so the page does not shift
+(`tests/components/dashboard.test.tsx`).
+
+**Status:** tested.
+
+### D36. A design-system page outside the product
+
+**We chose:** the two dashboard screens live in a route group whose layout
+owns the sidebar frame. A separate `/design-system` page renders every
+token, primitive and component from the real code with fixture data. It is
+unlinked from the product and marked not to be indexed.
+
+**Instead of:** hiding the sidebar on one route, or a Storybook.
+
+**Why:** the reference must show the real components in the real theme
+without a second toolchain, and an owner must never stumble into it.
+
+**How we know it holds:** `tests/architecture.test.ts` fails if any product
+file links to the design-system page; `npm run build` lists it as a static
+page beside the two dynamic screens.
+
+**Status:** verified 2026-09-17.
+
+---
+
+## 4. Superseded decisions, kept for the record
+
+| ID | What it was | Replaced by | Why |
+|---|---|---|---|
+| D2 | Second screen is a Bookings attribution page | D31 | The owner ruled the second screen must help decide the next campaign. |
+| D7 (original) | Light theme only | D7 as written above | A dark option that follows the device was added on 2026-09-17; the warm palette and light default stand. |
+| D8 (original) | A `properties` table | D8 as written above | The two-table model has no properties table; the property is a constant. |
+| D9 (original) | A pre-Autumn baseline inside the window | D9 as written above | The whole window is under Autumn with a ramp; simpler data, same story. |
+| D12 | Neon Postgres over an HTTP driver | D23 | Owner's platform choice; one-file change. |
+| D16 | Campaign metrics derived from a bookings table | D22 | Same principle, now enforced as exact apportionment of daily totals. |
+| D17 | Insights generated by the seed and stored | D24 | Stored insights can drift from the numbers under them. |
+
+## 5. Tried and dropped, with the number that decided it
 
 | Date | Tried | Result | Kept instead |
 |---|---|---|---|
-| 2026-09-17 | Before/after comparison as a causality test (D30) | Control campaign moved 2.8% while the campaign with a 15% effect moved 0.6% | Regenerate with the effect neutralised |
-| 2026-09-17 | Binomial sampling of daily bookings (D25) | July 2025 = 45, July 2026 = 42 despite +20% impressions; monthly noise ±15% | Error diffusion with carry |
+| 2026-09-17 | Before/after comparison as the causality test (D30) | An untouched control campaign moved 2.8% while the campaign with a 15% effect moved 0.6% | Regenerate with the effect switched off and compare |
+| 2026-09-17 | Binomial draw for daily bookings (D25) | July 2025 = 45, July 2026 = 42 despite 20% more impressions; monthly noise about 15% | Error diffusion with a carried remainder |
+| 2026-09-17 | Largest-remainder apportionment for bookings (D22) | Eight of ten markets showed zero bookings over 30 days | Weighted draw for clicks and bookings; largest remainder kept for impressions |
+| 2026-09-17 | Averaging daily pages-per-visit rates (D29) | Reads 3.5 where the true weighted figure is 3.68 on the fixture | Store both counts and divide the sums |
 
-## Open questions for the owner
+## 6. Open questions for the owner
 
-| ID | Question | Readings | Blocking? |
+| ID | Question | Current choice | Blocking? |
 |---|---|---|---|
-| D2 | Prefer website traffic as the second screen? | Bookings attribution (chosen) vs traffic funnel. Schema supports both; plan Tasks 11–12 would change. | No — default proceeds |
-| D6 | Fee percentage to display. | 15% (chosen) vs any value in the published 11–19% range. One column. | No |
-| D23 | Supabase connection strings. | Resolved 2026-09-17: both pooler URLs in `.env` with `sslmode=require`; migrate, seed and verify green. | No |
+| D6 | Which fee percentage to display | 15%, the midpoint of the published range. One constant to change. | No |

@@ -92,8 +92,10 @@ context, never executed as instructions.
   A metric rendered without a glossary entry is unfinished.
 - **Brand tokens are CSS variables in `globals.css`.** Components use theme
   tokens (`bg-card`, `text-muted-foreground`, `text-primary`), never hex.
-- **Light theme only.** Hospitality-native beats developer-native here; the
-  decision and its reason are in `docs/decisions.md`.
+- **Light by default, warm palette.** Hospitality-native beats
+  developer-native here; the decision and its reason are in `docs/decisions.md`.
+  Corrected 2026-09-17: a dark option that follows the device or an explicit
+  choice exists, on the same tokens; the light default and the palette stand.
 - **`.env` is gitignored.** No connection string is ever committed.
 
 ## 3. INSTRUCTION PRIORITY
@@ -422,6 +424,10 @@ live in `docs/decisions.md` under the same identifier.
   A before/after comparison across an event date cannot separate the event
   from season, weekday mix and other events. The seed tests neutralise one
   effect, regenerate from the same seed, and compare.
-- **2026-09-17 — Light theme only (D7).** Warm paper palette measured from the
-  marketing site. The `vercel:shadcn` skill's "dark by default for dashboards"
-  guidance is overridden on purpose.
+- **2026-09-17 — Light by default, warm palette (D7).** Warm paper palette
+  measured from the marketing site. The `vercel:shadcn` skill's "dark by
+  default for dashboards" guidance is overridden on purpose. Corrected
+  2026-09-17: the original ruling was light only; a dark option that follows
+  the device or an explicit toggle was added the same day, on the same tokens,
+  and `tests/architecture.test.ts` requires the dark block. Light remains the
+  default.
