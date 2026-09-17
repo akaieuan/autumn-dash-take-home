@@ -1,5 +1,5 @@
 import { parseRange } from "@/lib/date-range";
-import type { OverviewDto, PeriodTotals, QuickAnalyticsDto, TrendPoint, MarketDto, CampaignSummaryDto, FunnelDto, ActivityDto } from "@/lib/db/queries";
+import type { OverviewDto, PeriodTotals, QuickAnalyticsDto, TrendPoint, MarketDto, CampaignSummaryDto, FunnelDto, ActivityDto, CampaignSeriesDto, EventImpactDto, WindowTotals, CampaignEfficiencyDto, BreakdownRowDto } from "@/lib/db/queries";
 import type { Insight } from "@/lib/insights";
 
 /**
@@ -95,8 +95,70 @@ export const activity: ActivityDto = (() => {
     const doy = (t - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000;
     const season = 0.55 + 0.45 * Math.max(0, Math.cos(((doy - 185) / 365) * 2 * Math.PI));
     const weekend = d.getUTCDay() === 6 ? 1.4 : d.getUTCDay() === 5 ? 1.2 : 1;
-    days.push({ date: d.toISOString().slice(0, 10), value: t < start ? null : Math.round((14 + 44 * season) * weekend * (0.8 + 0.4 * rnd())) });
+    const value = t < start ? null : Math.round((14 + 44 * season) * weekend * (0.8 + 0.4 * rnd()));
+    // The day card's other three readings, from the same deterministic stream: new visitors are two
+    // thirds of a day's traffic, a busy day books once or twice, and a visit reads three-odd pages.
+    const newShare = 0.66 + 0.1 * rnd();
+    const booked = rnd();
+    days.push({
+      date: d.toISOString().slice(0, 10),
+      value,
+      newVisitors: value === null ? null : Math.round(value * newShare),
+      bookings: value === null ? null : booked > 0.88 ? 2 : booked > 0.55 ? 1 : 0,
+      pagesPerSession: value === null ? null : Math.round((2.6 + 1.6 * rnd()) * 10) / 10,
+    });
   }
   const values = days.flatMap((d) => (d.value === null ? [] : [d.value]));
   return { metric: "website_visits", from: days[0].date, to, weeks: Math.ceil(days.length / 7), max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days };
 })();
+
+/** Ten daily buckets of paid visits by campaign, ranked by total, with one event pinned to its day. */
+export const campaignSeries: CampaignSeriesDto = {
+  metric: "clicks",
+  granularity: "day",
+  buckets: trend.map((p) => p.bucket),
+  series: [
+    { name: "Discovery & Competitors", label: "Discovery", values: [70, 82, 64, 91, 77, 85, 60, 88, 74, 90], total: 781 },
+    { name: "Brand Protection", label: "Brand protection", values: [40, 44, 38, 47, 41, 45, 36, 46, 42, 44], total: 423 },
+    { name: "Google Hotel Ads", label: "Google Hotel Ads", values: [26, 30, 24, 31, 27, 29, 22, 30, 28, 29], total: 276 },
+    { name: "Retargeting", label: "Reminders", values: [8, 9, 7, 9, 8, 9, 6, 9, 8, 9], total: 82 },
+  ],
+  events: [
+    { id: 22, date: "2026-09-11", campaign: "Discovery & Competitors", campaignLabel: "Discovery", kind: "copy_refresh", kindLabel: "Ads refreshed", title: "Discovery ad copy refreshed", note: "New headlines lead with the lake, not the town.", bucket: "2026-09-11" },
+  ],
+};
+
+const window = (from: string, to: string, impressions: number, clicks: number, bookings: number, bookingValueCents: number, spendCents: number): WindowTotals => ({
+  from, to, impressions, clicks, bookings, bookingValueCents, spendCents, ctr: impressions ? clicks / impressions : 0, conversion: clicks ? bookings / clicks : 0,
+});
+
+export const impacts: EventImpactDto[] = [
+  {
+    event: campaignSeries.events[0],
+    days: 28,
+    before: window("2026-08-14", "2026-09-10", 3000, 300, 9, 400000, 50000),
+    after: window("2026-09-11", "2026-10-08", 3000, 375, 14, 650000, 60000),
+  },
+  {
+    event: { id: 24, date: "2026-09-14", campaign: "Brand Protection", campaignLabel: "Brand protection", kind: "bid_change", kindLabel: "Bids adjusted", title: "Bids raised on your name again", note: "A second OTA began bidding on your name in September." },
+    days: 3,
+    before: window("2026-09-11", "2026-09-13", 400, 130, 3, 140000, 6000),
+    after: window("2026-09-14", "2026-09-16", 410, 141, 3, 150000, 6500),
+  },
+];
+
+export const efficiency: CampaignEfficiencyDto = {
+  rows: [
+    { name: "Brand Protection", label: "Brand protection", visits: 1263, shareOfVisits: 0.27, spendCents: 60000, costPerVisitCents: 48, bookings: 31, conversion: 31 / 1263, costPerBookingCents: 1935, bookingValueCents: 1516900, valuePerVisitCents: 1201, previous: null },
+    { name: "Google Hotel Ads", label: "Google Hotel Ads", visits: 842, shareOfVisits: 0.18, spendCents: 60000, costPerVisitCents: 71, bookings: 15, conversion: 15 / 842, costPerBookingCents: 4000, bookingValueCents: 790800, valuePerVisitCents: 939, previous: null },
+    { name: "Retargeting", label: "Reminders", visits: 249, shareOfVisits: 0.05, spendCents: 22000, costPerVisitCents: 88, bookings: 7, conversion: 7 / 249, costPerBookingCents: 3143, bookingValueCents: 339900, valuePerVisitCents: 1365, previous: null },
+    { name: "Discovery & Competitors", label: "Discovery", visits: 2371, shareOfVisits: 0.5, spendCents: 120000, costPerVisitCents: 51, bookings: 25, conversion: 25 / 2371, costPerBookingCents: 4800, bookingValueCents: 1151700, valuePerVisitCents: 486, previous: null },
+  ],
+  total: { visits: 4725, spendCents: 262000, costPerVisitCents: 55, bookings: 78, conversion: 78 / 4725, costPerBookingCents: 3359, bookingValueCents: 3799300, valuePerVisitCents: 804 },
+};
+
+const deviceRow = (value: string, label: string, clicks: number, bookings: number, share: number): BreakdownRowDto => ({
+  value, label, impressions: clicks * 6, clicks, bookings, bookingValueCents: bookings * 48700, feeCents: bookings * 7305, spendCents: 0,
+  ctr: 1 / 6, conversion: clicks ? bookings / clicks : 0, shareOfBookings: bookings / 78, shareOfClicks: share, previous: null,
+});
+export const deviceRows: BreakdownRowDto[] = [deviceRow("Mobile", "Phone", 2977, 41, 0.63), deviceRow("Desktop", "Computer", 1465, 32, 0.31), deviceRow("Tablet", "Tablet", 283, 5, 0.06)];

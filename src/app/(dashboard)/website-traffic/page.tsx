@@ -1,58 +1,81 @@
+import { Suspense } from "react";
 import { db } from "@/lib/db/client";
-import { parseRange } from "@/lib/date-range";
-import { getActivity, getDataBounds, getFunnel, getMarkets, getTrend } from "@/lib/db/queries";
-import { AppShell, Grid, Panel, PanelHeader } from "@/components/layout";
-import { FeederMarkets } from "@/components/dashboard";
-import { TrendChart, comparisonLabels } from "@/components/charts";
+import { parseRange, type DateRange } from "@/lib/date-range";
+import { weekdayAverages } from "@/lib/activity";
+import {
+  getActivity,
+  getBreakdown,
+  getCampaignEfficiency,
+  getDataBounds,
+  getPeriodTotals,
+  getRecentEventImpacts,
+  getTrafficByCampaign,
+} from "@/lib/db/queries";
+import { AppShell, Grid, Stack } from "@/components/layout";
 import { AssistantPopover } from "@/components/assistant";
-import { TrafficIntro, SectionPlaceholder, DeviceSplit, ActivityCalendar } from "@/components/website-traffic";
+import {
+  TrafficIntro,
+  TrafficBodySkeleton,
+  ActivityCalendar,
+  TrafficStory,
+  CampaignEfficiencyTable,
+  WeekdayRhythm,
+  DeviceConversion,
+  isTrafficMetric,
+  type TrafficMetric,
+} from "@/components/website-traffic";
 
 export const dynamic = "force-dynamic";
 
-type Search = Promise<{ range?: string }>;
+type Search = Promise<{ range?: string; metric?: string }>;
 
-/** Scaffold of the second screen (D31). Real data where the query layer already has it; placeholders mark what the artboard pass will design. */
+/** The second screen (D31): traffic explained through the days it arrives on and the campaigns that produce it. */
 export default async function WebsiteTrafficPage({ searchParams }: { searchParams: Search }) {
-  const { range: rangeParam } = await searchParams;
+  const { range: rangeParam, metric: metricParam } = await searchParams;
   const bounds = await getDataBounds(db);
   const range = parseRange(rangeParam, bounds.min, bounds.max);
-  const [visits, markets, funnel, activity] = await Promise.all([
-    getTrend(db, range, "website_visits"),
-    getMarkets(db, range, 8),
-    getFunnel(db, range),
-    getActivity(db, bounds.max, "website_visits"),
+  const metric: TrafficMetric = isTrafficMetric(metricParam) ? metricParam : "clicks";
+  const c = range.comparison;
+  const [totals, previous] = await Promise.all([
+    getPeriodTotals(db, range.from, range.to),
+    c ? getPeriodTotals(db, c.prevFrom, c.prevTo) : null,
   ]);
-  const { prevLabel, lastYearLabel } = comparisonLabels(range);
-
   return (
-    <AppShell active="website-traffic" range={range.preset} dataThrough={bounds.max} basePath="/website-traffic">
-      <TrafficIntro range={range} />
-      <ActivityCalendar activity={activity} />
-      <Grid variant="sidebar">
-        <Panel id="visits" className="scroll-mt-20 h-full">
-          <PanelHeader title="Visits to your site" description="This period in green, the one before it in amber." />
-          <TrendChart metric="website_visits" granularity={range.granularity} points={visits} prevLabel={prevLabel} lastYearLabel={lastYearLabel} />
-        </Panel>
-        <SectionPlaceholder
-          id="channels"
-          title="Where visits come from"
-          description="The routes people take to your website."
-          planned={["Search and Google Hotels", "Typed in directly", "Social and email", "AI search (ChatGPT, Perplexity)"]}
-        />
-      </Grid>
-      <Grid variant="two">
-        <FeederMarkets markets={markets} />
-        <div className="flex flex-col gap-(--stack-gap)">
-          <DeviceSplit devices={funnel.devices} />
-          <SectionPlaceholder
-            id="pages"
-            title="What they look at"
-            description="The pages visitors read before they book."
-            planned={["Most-viewed pages", "Time of day visitors arrive", "Pages per visit over time"]}
-          />
-        </div>
-      </Grid>
+    <AppShell
+      active="website-traffic"
+      range={range.preset}
+      dataThrough={bounds.max}
+      basePath="/website-traffic"
+      metric={metric === "clicks" ? undefined : metric}
+    >
+      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
+      <Suspense fallback={<TrafficBodySkeleton />}>
+        <TrafficBody range={range} metric={metric} dataThrough={bounds.max} />
+      </Suspense>
       <AssistantPopover />
     </AppShell>
+  );
+}
+
+/** Everything below the headline, streamed behind one boundary; five queries in one round trip. */
+async function TrafficBody({ range, metric, dataThrough }: { range: DateRange; metric: TrafficMetric; dataThrough: string }) {
+  const [activity, series, impacts, efficiency, devices] = await Promise.all([
+    getActivity(db, dataThrough, "website_visits"),
+    getTrafficByCampaign(db, range, metric),
+    getRecentEventImpacts(db, range, 5),
+    getCampaignEfficiency(db, range),
+    getBreakdown(db, range, "device"),
+  ]);
+  return (
+    <Stack>
+      <ActivityCalendar activity={activity} />
+      <TrafficStory data={series} impacts={impacts} range={range} metric={metric} />
+      <CampaignEfficiencyTable data={efficiency} />
+      {/* Nothing here repeats the Overview: markets and the glossary live there (owner's ruling 2026-09-17). */}
+      <Grid variant="two">
+        <WeekdayRhythm averages={weekdayAverages(activity.days)} />
+        <DeviceConversion devices={devices} />
+      </Grid>
+    </Stack>
   );
 }
