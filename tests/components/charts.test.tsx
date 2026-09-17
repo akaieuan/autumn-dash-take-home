@@ -95,3 +95,14 @@ describe("the chart layer's copy of the trend contract", () => {
     expect([sameMetric, samePoint]).toEqual([true, true]);
   });
 });
+
+describe("comparisonLabels", () => {
+  const cmp = { prevFrom: "", prevTo: "", prevLabel: "the previous 30 days", lastYearFrom: "", lastYearTo: "", lastYearLabel: "this time last year" };
+  it("capitalises the range's own wording and adds last year only for 30 and 90 days", async () => {
+    const { comparisonLabels } = await import("@/components/charts");
+    expect(comparisonLabels({ preset: "30d", comparison: cmp })).toEqual({ prevLabel: "The previous 30 days", lastYearLabel: "This time last year" });
+    expect(comparisonLabels({ preset: "12m", comparison: { ...cmp, prevLabel: "the previous 365 days" } })).toEqual({ prevLabel: "The previous 365 days", lastYearLabel: null });
+    expect(comparisonLabels({ preset: "ytd", comparison: { ...cmp, prevLabel: "the same period last year" } }).lastYearLabel).toBeNull();
+    expect(comparisonLabels({ preset: "all", comparison: null })).toEqual({ prevLabel: null, lastYearLabel: null });
+  });
+});

@@ -33,7 +33,7 @@ export const dayOfWeek = (iso: string) => new Date(toUTC(iso)).getUTCDay();
 export function eachDay(start: string, end: string): string[] { const out: string[] = []; for (let d = start; d <= end; d = addDays(d, 1)) out.push(d); return out; }
 
 export function granularityFor(days: number): Granularity {
-  if (days <= 92) return "day";
+  if (days <= 31) return "day"; // 90 daily bars are noise; weeks read
   if (days <= 400) return "week";
   return "month";
 }

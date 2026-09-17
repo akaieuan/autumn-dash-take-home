@@ -3,15 +3,13 @@ import { parseRange } from "@/lib/date-range";
 import { getDataBounds, getFunnel, getMarkets, getTrend } from "@/lib/db/queries";
 import { AppShell, Grid, Panel, PanelHeader } from "@/components/layout";
 import { FeederMarkets } from "@/components/dashboard";
-import { TrendChart } from "@/components/charts";
+import { TrendChart, comparisonLabels } from "@/components/charts";
 import { AssistantPopover } from "@/components/assistant";
 import { TrafficIntro, SectionPlaceholder, DeviceSplit } from "@/components/website-traffic";
 
 export const dynamic = "force-dynamic";
 
 type Search = Promise<{ range?: string }>;
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Scaffold of the second screen (D31). Real data where the query layer already has it; placeholders mark what the artboard pass will design. */
 export default async function WebsiteTrafficPage({ searchParams }: { searchParams: Search }) {
@@ -23,15 +21,14 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
     getMarkets(db, range, 8),
     getFunnel(db, range),
   ]);
-  const prevLabel = range.comparison ? cap(range.comparison.prevLabel) : null;
-  const lastYearLabel = range.comparison ? cap(range.comparison.lastYearLabel) : null;
+  const { prevLabel, lastYearLabel } = comparisonLabels(range);
 
   return (
     <AppShell active="website-traffic" range={range.preset} dataThrough={bounds.max} basePath="/website-traffic">
       <TrafficIntro range={range} />
       <Grid variant="sidebar">
         <Panel id="visits" className="scroll-mt-20 h-full">
-          <PanelHeader title="Visits to your site" description="This period in colour, comparisons in grey." />
+          <PanelHeader title="Visits to your site" description="This period in green, the one before it in amber." />
           <TrendChart metric="website_visits" granularity={range.granularity} points={visits} prevLabel={prevLabel} lastYearLabel={lastYearLabel} />
         </Panel>
         <SectionPlaceholder

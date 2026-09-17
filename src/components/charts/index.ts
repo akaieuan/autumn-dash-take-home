@@ -3,6 +3,7 @@ export {
   METRIC_ORDER,
   METRIC_LABELS,
   metricKind,
+  comparisonLabels,
   type ChartMetric,
   type ChartPoint,
 } from "./chart-config";

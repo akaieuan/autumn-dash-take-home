@@ -27,7 +27,7 @@ import {
   CampaignSummary,
   FunnelSection,
 } from "@/components/dashboard";
-import { TrendChart, StyleSegment, MetricSelect } from "@/components/charts";
+import { TrendChart, StyleSegment, MetricSelect, comparisonLabels } from "@/components/charts";
 import { AssistantPopover } from "@/components/assistant";
 
 export const dynamic = "force-dynamic";
@@ -61,9 +61,6 @@ export default async function OverviewPage({ searchParams }: { searchParams: Sea
   );
 }
 
-/** Legend wording comes from the range itself, so "year to date" does not claim a "previous 260 days". */
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 /** The slower half of the page, streamed behind one Suspense boundary; five queries in one round trip. */
 async function OverviewBody({
   range,
@@ -82,8 +79,7 @@ async function OverviewBody({
     getAllBreakdowns(db, range),
   ]);
   const insights = computeInsights({ overview, breakdowns, range }, 3);
-  const prevLabel = range.comparison ? cap(range.comparison.prevLabel) : null;
-  const lastYearLabel = range.comparison ? cap(range.comparison.lastYearLabel) : null;
+  const { prevLabel, lastYearLabel } = comparisonLabels(range);
   return (
     <Stack>
       <Grid variant="sidebar">
@@ -91,7 +87,7 @@ async function OverviewBody({
           <PanelHeader
             headingId="trend-h"
             title="Day by day"
-            description="This period in colour, comparisons in grey."
+            description="This period in green, the one before it in amber."
             action={
               <div className="flex items-center gap-2">
                 <MetricSelect metric={metric} range={range.preset} basePath="/" />

@@ -78,7 +78,7 @@
   --ring: #6f8b7a;
   /* Chart marks, re-stepped 2026-09-17 for contrast on the paper surface (dataviz validator: this period + greys = emphasis form; D26) */
   --chart-1: #3f6b55; /* this period */
-  --chart-2: #a9a8a2; /* previous period */
+  --chart-2: #b8691a; /* previous period: amber, 3.6:1 on the paper surface */
   --chart-3: #cfcdc6; /* same period last year */
   --chart-4: #a0661e; /* second series, campaigns only */
   --chart-5: #95938c;
@@ -124,7 +124,7 @@
   --input: rgba(236, 235, 231, 0.16);
   --ring: #8fae9b;
   --chart-1: #8fae9b;
-  --chart-2: #77756f;
+  --chart-2: #e08a3c;
   --chart-3: #55534e;
   --chart-4: #d19a52;
   --chart-5: #8a8882;

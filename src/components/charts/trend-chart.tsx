@@ -17,7 +17,7 @@ type View = "chart" | "table";
 /**
  * One metric, three periods. Style (area | bars | line) is the viewer's preference; the plot fills the
  * panel it sits in and never drops below --plot-height, so switching style or view never moves the page.
- * Only this period animates (once, briefly); the grey comparisons are context and draw at once.
+ * Only this period animates (once, briefly); the amber previous period and the dashed last year draw at once.
  */
 export function TrendChart({ metric, granularity, points, prevLabel, lastYearLabel }: TrendProps) {
   const [style] = useChartStyle();
@@ -46,15 +46,17 @@ export function TrendChart({ metric, granularity, points, prevLabel, lastYearLab
               cursor
               content={
                 <ChartTooltipContent
-                  className="rounded-(--radius-float) p-(--float-pad)"
-                  formatter={(v, name) => [full(Number(v)), trendChartConfig[name as keyof typeof trendChartConfig]?.label ?? name]}
+                  className="min-w-44 rounded-(--radius-float) p-(--float-pad)"
+                  formatter={(v, name, item) => (
+                    <span className="flex w-full items-center gap-2">
+                      <span aria-hidden="true" className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: item.color }} />
+                      <span className="flex-1 text-muted-foreground">{trendChartConfig[name as keyof typeof trendChartConfig]?.label ?? name}</span>
+                      <span className="font-medium tabular-nums text-foreground">{full(Number(v))}</span>
+                    </span>
+                  )}
                 />
               }
             />
-            {hasComparison && lastYearLabel ? (
-              <Line type={curve} dataKey="lastYear" stroke="var(--color-lastYear)" strokeWidth={2} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
-            ) : null}
-            {hasComparison ? <Line type={curve} dataKey="previous" stroke="var(--color-previous)" strokeWidth={2} dot={false} isAnimationActive={false} /> : null}
             {style === "bars" ? (
               <Bar dataKey="current" fill="var(--color-current)" radius={[4, 4, 0, 0]} maxBarSize={24} {...anim} />
             ) : style === "line" ? (
@@ -62,6 +64,11 @@ export function TrendChart({ metric, granularity, points, prevLabel, lastYearLab
             ) : (
               <Area type={curve} dataKey="current" stroke="var(--color-current)" fill="var(--color-current)" fillOpacity={0.12} strokeWidth={2} dot={false} activeDot={{ r: 5, strokeWidth: 2 }} {...anim} />
             )}
+            {/* Comparisons draw after the current series so they stay visible over bars and fills. */}
+            {hasComparison ? <Line type={curve} dataKey="previous" stroke="var(--color-previous)" strokeWidth={1.75} dot={false} isAnimationActive={false} /> : null}
+            {hasComparison && lastYearLabel ? (
+              <Line type={curve} dataKey="lastYear" stroke="var(--color-lastYear)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+            ) : null}
           </ComposedChart>
         </ChartContainer>
       )}
