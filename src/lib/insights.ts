@@ -1,0 +1,65 @@
+import type { OverviewDto } from "./db/queries/overview";
+import type { BreakdownRowDto } from "./db/queries/breakdowns";
+import type { Dimension } from "./db/schema";
+import type { DateRange } from "./date-range";
+import { delta, money, pct } from "./format";
+
+/**
+ * Insights are computed at render time from the same numbers the charts show,
+ * so they can never disagree with them (docs/decisions.md D24). Pure: no I/O.
+ */
+export type InsightKind = "win" | "watch" | "action";
+export interface Insight { id: string; kind: InsightKind; title: string; body: string; anchor?: "trend" | "campaigns" | "markets" | "devices" }
+
+export interface InsightInput { overview: OverviewDto; breakdowns: Record<Dimension, BreakdownRowDto[]>; range: DateRange }
+
+const ORDER: Record<InsightKind, number> = { watch: 0, win: 1, action: 2 };
+
+export function computeInsights({ overview, breakdowns, range }: InsightInput, limit = 5): Insight[] {
+  const out: Insight[] = [];
+  const cur = overview.current, prev = overview.previous, ly = overview.lastYear, cmp = range.comparison;
+
+  // 1. Booking value against the previous period, with last year as the seasonal check.
+  if (prev && cmp && prev.bookingValueCents > 0) {
+    const d = delta(cur.bookingValueCents, prev.bookingValueCents).pct ?? 0;
+    const aheadOfLastYear = ly && ly.bookingValueCents > 0 && cur.bookingValueCents >= ly.bookingValueCents;
+    if (d >= 10) out.push({ id: "value-up", kind: "win", title: `Booking value up ${d}% vs ${cmp.prevLabel}`, body: `${cur.bookings} direct bookings worth ${money(cur.bookingValueCents)}, against ${money(prev.bookingValueCents)} the period before.`, anchor: "trend" });
+    else if (d <= -10) out.push({ id: "value-down", kind: "watch", title: `Booking value down ${Math.abs(d)}% vs ${cmp.prevLabel}`, body: aheadOfLastYear ? `Still ahead of this time last year, so this looks like the season rather than a problem.` : `Below both the previous period and this time last year. Worth a look at which campaigns slowed.`, anchor: aheadOfLastYear ? "trend" : "campaigns" });
+  }
+
+  // 2. Year over year.
+  if (ly && cmp && ly.bookings > 0) {
+    const d = delta(cur.bookings, ly.bookings).pct ?? 0;
+    if (d >= 15) out.push({ id: "yoy-up", kind: "win", title: `${d}% more bookings than this time last year`, body: `${cur.bookings} now vs ${ly.bookings} then. The program is growing year on year, not only with the season.`, anchor: "trend" });
+  }
+
+  // 3. What a booking cost against what an OTA would have charged.
+  if (overview.costPerBookingCents !== null && overview.otaCommissionPerBookingCents !== null && overview.costPerBookingCents < overview.otaCommissionPerBookingCents) {
+    out.push({ id: "cheaper-than-ota", kind: "win", title: `Each booking cost ${money(overview.costPerBookingCents)} in fees`, body: `An online travel agency would have charged about ${money(overview.otaCommissionPerBookingCents)} on the same stay. You kept ${money(cur.netCents)} after Autumn's fee.` });
+  }
+
+  // 4. Campaigns: the biggest riser, and any campaign whose click-through fell sharply.
+  const campaigns = breakdowns.campaign ?? [];
+  const riser = campaigns.filter((c) => c.previous).map((c) => ({ c, gain: c.bookings - (c.previous?.bookings ?? 0) })).sort((a, b) => b.gain - a.gain)[0];
+  if (riser && riser.gain >= 2) out.push({ id: "campaign-riser", kind: "win", title: `${riser.c.label} brought ${riser.gain} more bookings than before`, body: `${riser.c.bookings} bookings worth ${money(riser.c.bookingValueCents)} this period.`, anchor: "campaigns" });
+  for (const c of campaigns) {
+    const p = c.previous;
+    if (!p || p.impressions < 200 || c.impressions < 200) continue;
+    const prevCtr = p.clicks / p.impressions;
+    if (prevCtr > 0 && c.ctr < prevCtr * 0.8) {
+      out.push({ id: `ctr-drop-${c.value}`, kind: "watch", title: `Fewer people clicked the ${c.label.toLowerCase()} ads`, body: `${pct(c.ctr, 1)} of people who saw them clicked, down from ${pct(prevCtr, 1)}. Competitors often bid harder going into the season.`, anchor: "campaigns" });
+      out.push({ id: `ctr-action-${c.value}`, kind: "action", title: `What Autumn does when clicks fall`, body: `Ad copy and bids on ${c.label.toLowerCase()} searches are refreshed automatically; you don't need to do anything.`, anchor: "campaigns" });
+      break;
+    }
+  }
+
+  // 5. A market that produced bookings for the first time.
+  const newMarket = (breakdowns.feeder_market ?? []).find((m) => m.previous && m.previous.bookings === 0 && m.bookings >= 3);
+  if (newMarket) out.push({ id: "new-market", kind: "win", title: `New guests from ${newMarket.label}`, body: `${newMarket.bookings} bookings from a city that sent none the period before.`, anchor: "markets" });
+
+  // 6. Phones.
+  const mobile = (breakdowns.device ?? []).find((d) => d.value === "Mobile");
+  if (mobile && mobile.shareOfClicks >= 0.55) out.push({ id: "mobile", kind: "action", title: `${pct(mobile.shareOfClicks)} of visitors arrive on a phone`, body: `Worth checking your booking page on your own phone now and then: that is where most guests decide.`, anchor: "devices" });
+
+  return out.sort((a, b) => ORDER[a.kind] - ORDER[b.kind]).slice(0, limit);
+}
