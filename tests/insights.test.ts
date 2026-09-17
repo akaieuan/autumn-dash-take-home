@@ -69,6 +69,11 @@ describe("computeInsights", () => {
     expect(out[0].body).toBe("On Aug 3, 2026. In the 28 days since, Discovery ads brought 14 bookings worth $6,500, against 9 in the 28 days before. 1 in 8 clicked, against 1 in 10 before.");
     expect(computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range, events: [{ ...impact, days: 3 }] })).toEqual([]);
   });
+  it("does not report a previous-period move when that window is last year: the year-over-year rule owns it", () => {
+    const ytd = parseRange("ytd", "2024-09-17", "2026-09-16");
+    const out = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000, bookings: 60 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range: ytd });
+    expect(out.map((i) => i.id)).toEqual(["yoy-up"]);
+  });
   it("returns nothing when there is no comparison and no fee advantage", () => {
     expect(computeInsights({ overview: overview({ previous: null, lastYear: null, costPerBookingCents: 9500 }), breakdowns: none, range: { ...range, comparison: null } })).toEqual([]);
   });

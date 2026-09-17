@@ -248,17 +248,17 @@ describe("DayCard", () => {
 });
 
 describe("TrafficIntro", () => {
-  // One word for one thing (design audit 2026-09-17, item 10): the headline calls an ad-driven visit
-  // what the glossary calls it, and says where first-time visitors come from in the glossary's own
-  // words. Rewording either entry without following it here turns this red.
+  // The headline states ads' visits as a share of every visit the site had (main, 2026-09-17): the same
+  // unit on both sides and the scope said out loud, so the share is real. Never a share of new visitors.
   const range = parseRange("30d", "2024-09-17", "2026-09-16");
-  it("names visits the way the glossary does and keeps new visitors separate from them", () => {
-    render(<TrafficIntro range={range} totals={{ visits: 1548, newVisitors: 1116, previousVisits: 1402 }} />);
+  it("states ads' visits as one-in-N of all visits, and never as a share of new visitors", () => {
+    render(<TrafficIntro range={range} totals={{ visits: 1548, allVisits: 6192, newVisitors: 1116, previousVisits: 1402 }} />);
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).toHaveTextContent("1,548 people visited your site from Autumn's ads. 1,116 first-time visitors came from any source, not only ads.");
-    expect(glossary.website_visits.label).toBe("Visited your site");
-    expect(h1.textContent).toContain(glossary.website_visits.label.toLowerCase());
-    expect(glossary.new_visitors.meaning).toContain("from any source, not only ads");
-    expect(h1.textContent).toContain("from any source, not only ads");
+    expect(h1).toHaveTextContent("1,548 people came to your website from Autumn's ads, about 1 in 4 of the 6,192 visits your site had in all.");
+    expect(h1.textContent).not.toContain("1,116");
+  });
+  it("drops the share when the site total is unknown", () => {
+    render(<TrafficIntro range={range} totals={{ visits: 1548, allVisits: 0, newVisitors: 1116, previousVisits: null }} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("1,548 people came to your website from Autumn's ads.");
   });
 });

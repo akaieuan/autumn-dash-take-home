@@ -65,7 +65,7 @@ interface CampaignEfficiencyDto { rows: CampaignEfficiencyRow[]; total: { visits
 - Rows are ranked by `valuePerVisitCents` desc: the top row is where a new dollar earns most. `total` comes from `daily_metrics`, so the footer never drifts from the Overview.
 - Per-unit figures are `null` when the divisor is zero; render "—", never "$0".
 - Columns, in this order and these words: **Campaign** (label + one-line purpose from `glossary[name].purpose` via `campaignKey`), **Visits** (with share meter), **Cost per visit**, **Booked** (`oneIn(conversion)`), **Cost per booking**, **Value per visit**. Spend is Autumn's money, so the header row says "What Autumn spent" once, above the two cost columns.
-- One sentence above the table, computed from the rows: "Every dollar on {top.label} brought back {money(top.valuePerVisitCents)} per visit, {ratio}× {bottom.label}." Only when both are non-null.
+- One sentence above the table, computed from the rows: "A {top.label} visit brings back {money(top.valuePerVisitCents)}, {ratio}× a {bottom.label} visit." (Corrected 2026-09-17: the first draft mixed per-dollar and per-visit units.) Only when both are non-null.
 
 ### 1d. Also available, unchanged
 

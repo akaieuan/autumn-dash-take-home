@@ -45,7 +45,7 @@ Each entry ends with a status:
 
 Numbers quoted here were measured on 2026-09-17 against the live database,
 not copied from a plan. On that date the gates read: typecheck clean, 28
-test files and 191 tests passing, seed and verify agreeing on
+test files and 193 tests passing, seed and verify agreeing on
 `730 days, 730 daily rows, 12,286 breakdown rows, 918 bookings, $408,745.44
 booking value, $29,521.54 ad spend, 4 campaigns, 24 events`.
 
@@ -627,6 +627,37 @@ migrate, seed and verify all passed on 2026-09-17, and the query layer
 answered in 32 to 69 ms on a warm connection over three runs.
 
 **Status:** verified 2026-09-17. D12 (Neon) is superseded.
+
+### D39. Row security is on, with no policies
+
+**We chose:** every table has row-level security enabled and no policies.
+The app never uses Supabase's REST API; it reads Postgres directly as the
+`postgres` role, which bypasses row security, so nothing the owner sees
+changes. Supabase's public API, reachable by anyone holding the project's
+publishable key, now returns no rows and refuses writes.
+
+**Instead of:** leaving row security off, which Supabase flags as critical on
+every table in the `public` schema, or writing read-only policies for an API
+the product does not use.
+
+**Why:** the publishable key is designed to be public. With row security off,
+anyone with it could read the four tables through the REST API, and could
+also write to them, including emptying the seed the live dashboard reads.
+No policies is the honest shape: the product has no API consumers, so the
+API should return nothing. The migration is five statements and reversible
+in one.
+
+**How we know it holds:** `tests/queries/schema.test.ts` asserts
+`relrowsecurity` is true on all four tables and that the foreign-key index on
+`campaign_events` exists; it runs against the real migration. Measured live
+on 2026-09-17, before and after applying it: with the publishable key,
+`GET /rest/v1/daily_metrics` returned 2 rows before and 0 after, on all four
+tables; a `POST /rest/v1/campaigns` after returned 401, "new row violates
+row-level security policy". `db:verify` and the deployed site were unchanged
+throughout. Negative control: removing one `ENABLE ROW LEVEL SECURITY`
+statement from the migration turned the test red; restored.
+
+**Status:** verified 2026-09-17.
 
 ### D13. Query tests run against a real Postgres in memory
 

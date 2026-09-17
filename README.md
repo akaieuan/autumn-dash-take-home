@@ -10,6 +10,86 @@ hotel-marketing data.
 - Stack: Next.js 16 (App Router, Server Components), React 19, TypeScript,
   Tailwind 4, shadcn/ui, Recharts, Drizzle ORM, Supabase Postgres, Vitest, Vercel.
 
+## Start here if you are reviewing this
+
+- **[The decision log](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/decisions.md)** —
+  every decision in this repo, the alternative it was chosen over, the reason
+  argued from the hotel owner and the data, and the test that would fail if it
+  were silently reversed. Grouped by theme: what the owner sees, the data
+  and how it is generated, and how the code is put together, with superseded
+  rulings and rejected approaches kept at the end with the number that
+  decided each. This is the document to read for "why".
+- **[The operating contract](https://github.com/akaieuan/autumn-dash-take-home/blob/main/CLAUDE.md)** —
+  how work was done: what a change must prove before it is called done, and
+  the invariants the codebase keeps.
+- **[The brief](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/reference/take-home-brief.txt)**
+  as received, for reference.
+- **[The design system](https://autumn-dash-take-home.vercel.app/design-system)**,
+  live: every token, primitive, atom, molecule and organism rendered from the
+  real components with fixture data, so the pieces can be judged on their own
+  before they are judged in the page.
+
+## Before and after
+
+The screens Autumn gave in the brief, beside the redesign of each. The
+originals are unedited in `docs/reference/`; the new ones are the deployed
+site.
+
+| The current marketing dashboard | The new Overview |
+|---|---|
+| ![Current Autumn marketing dashboard](docs/reference/current-dashboard-overview.png) | ![New Overview](public/screenshots/overview-desktop.png) |
+
+| The current website-traffic tab | The new Website traffic |
+|---|---|
+| ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) | ![New Website traffic](public/screenshots/traffic-desktop-dark.png) |
+
+## Designing for a hotel owner
+
+The brief asks for judgment on eight things. Here is the call made on each,
+with the decision-log entry that records the alternative and the reason.
+
+- **What the owner sees first.** One sentence: how many direct bookings
+  Autumn brought, what they were worth, and what the owner kept after
+  Autumn's fee, with the change since the previous period in words. Not a
+  row of equal stat cards; the answer to "is this working?" comes before any
+  number that supports it (D1).
+- **What belongs on the main screen.** Only what answers the owner's six
+  questions: the headline, four quick stats, one trend chart, the insights,
+  where guests come from, and what each campaign is doing. Everything on it
+  reconciles to the headline, so the page argues one case rather than
+  listing facts (D5, D18).
+- **What belongs on the second screen.** The "why" behind the headline:
+  which days visitors arrive, which campaigns produce them, what Autumn
+  changed and what happened after, and where the next dollar would do the
+  most good. It exists to help decide the next campaign, and it repeats
+  nothing from the Overview (D31).
+- **Which metrics get emphasis.** Direct bookings, booking value, and net
+  after the fee, in that order, always with two comparisons: the period
+  before and the same period last year, so "down" can be read as "the
+  season" when that is what it is (D1, D3). Impressions and clicks are
+  demoted to quick stats and the funnel; they explain, they do not lead.
+- **Which metrics get plain-language explanation.** All of them. Every
+  metric is named in plain words first ("Saw your hotel", "Clicked through",
+  "What you kept", "Commission you avoided"); the industry term appears once
+  in parentheses with a tooltip, and click-through rate reads as "1 in N
+  people clicked". A test fails if any label carries a bare acronym (D4).
+- **Which details are available but not dominant.** The funnel from seen to
+  booked starts collapsed. The glossary is a panel, visible but at the foot
+  of the page (D34). Devices, weekday rhythm and cost per visit live on the
+  second screen. The chart can be restyled or read as a table, but it is one
+  chart, not six (D5).
+- **How progress, wins, problems and next steps are shown.** The insights
+  are computed from the numbers on the page and tagged Win, Watch, or
+  "Autumn is on it". Each carries its own small bar chart as evidence, and a
+  Watch is paired with what Autumn does about it, so a problem is never
+  shown without a next step (D24, D33). On the traffic screen, "What Autumn
+  did" shows each change with the days before and after it (D26, D38).
+- **Useful without feeling like homework.** Nothing needs decoding, nothing
+  needs clicking to be understood, and nothing floats over the page. Changing
+  the range keeps the owner's place on the page (D32). The default range is
+  the last 30 days, the span an owner-operator actually thinks in (D3). The
+  palette is the warm paper of Autumn's own site, not an ad platform's (D7).
+
 ## Run it locally
 
 Requires Node 24 and a Postgres database. The instructions assume Supabase's
@@ -50,7 +130,7 @@ two foreign keys, two check constraints).
 npm run db:seed
 ```
 
-Wipes both tables and inserts a deterministic two-year dataset. It prints one
+Wipes all four tables and inserts a deterministic two-year dataset. It prints one
 line that a partial or wrong run could not produce:
 
 ```
@@ -75,6 +155,52 @@ dimension does not reconcile.
 
 ```bash
 npm run dev
+```
+
+## Repo structure
+
+Pages compose, components render, queries fetch. That rule decides where
+everything lives.
+
+```
+src/
+  app/
+    (dashboard)/            the product; the group's layout owns the sidebar frame
+      page.tsx              Overview
+      website-traffic/      the second screen
+      loading.tsx, error.tsx
+    design-system/          every token, primitive and component, from the real code
+    layout.tsx, globals.css, not-found.tsx
+  components/
+    ui/                     shadcn primitives, owned by the CLI
+    layout/ copy/ charts/   atoms and molecules shared by both screens
+    dashboard/              the Overview's organisms
+    website-traffic/        the traffic screen's organisms
+    assistant/              the Ask Autumn popover
+    design-system/          the sections of the design-system page
+  lib/
+    db/
+      schema.ts             the four tables
+      client.ts             Supabase over postgres-js, opened on the first query
+      queries/              one module per screen; each returns typed view models
+    date-range.ts           a URL preset becomes dates, anchored on the last day with data
+    format.ts               the only place money, percentages and dates are formatted
+    glossary.ts             every plain-language label and definition
+    insights.ts             the "What's happening" rules; pure, no database
+    property.ts             the constants that are the owner's to change
+    activity.ts, navigation.ts, sidebar.ts, theme.ts   calendar, nav, sidebar state, theme
+scripts/
+  seed/                     the deterministic generator: profile, events, apportionment
+  db-migrate.ts             applies drizzle/ through the app's own client
+  db-verify.ts              re-measures the seed from the live database
+drizzle/                    generated migrations; never hand-edited
+tests/                      Vitest: pure logic, the seed, queries against an in-memory Postgres, component renders
+docs/
+  decisions.md              the decision log
+  reference/                the brief, findautumn.com notes, the before screenshots
+  superpowers/              the design spec and implementation plans
+public/screenshots/         the after screenshots
+CLAUDE.md                   the operating contract
 ```
 
 ## The data model
@@ -131,6 +257,142 @@ npm run typecheck && npm run lint && npm test && npm run build
 Query tests run against an in-process Postgres (PGlite) using the real
 migration and a hand-computed fixture, so no database is needed to run the
 suite.
+
+## The two screens
+
+Screenshots are of the deployed site, in `public/screenshots/`.
+
+### Overview · `/`
+
+One sentence answers the owner's question, and everything below it earns
+that sentence's trust.
+
+- **The headline.** Direct bookings, their value, and what the owner kept after
+  Autumn's 15% fee, with the fee itself stated and two comparisons: the
+  previous period and the same period last year.
+- **Four quick stats** with sparklines: direct bookings, booking value, visited
+  your site, saw your hotel.
+- **Day by day.** One trend chart, this period in green and the period before
+  in amber, last year dashed. Area, bars or line; chart or table; any metric.
+- **What's happening.** Insights computed at render time from the same numbers
+  on the page, tagged Win, Watch, or Autumn is on it, each with its own
+  evidence bars so nothing is asserted without being shown.
+- **Where your guests come from.** Cities ranked by bookings, with drive times.
+- **What each campaign is doing.** A plain purpose line per campaign, "1 in N"
+  instead of a click-through rate, and a footer that reconciles to the headline.
+- **From seen to booked**, the glossary in plain words, and **Ask Autumn**.
+- Light and dark themes; a phone layout that keeps the sentence first.
+
+![Overview on desktop](public/screenshots/overview-desktop.png)
+
+| Phone: the headline | Phone: what's happening |
+|---|---|
+| ![Overview on a phone, headline](public/screenshots/overview-mobile-headline.png) | ![Overview on a phone, insights](public/screenshots/overview-mobile-insights.png) |
+
+![Day by day beside what's happening](public/screenshots/overview-trend-and-insights.png)
+
+![Day by day as bars, with the three-period tooltip](public/screenshots/overview-trend-bars-tooltip.png)
+
+![Where guests come from, and what each campaign is doing](public/screenshots/overview-markets-and-campaigns.png)
+
+![From seen to booked, the glossary, and Ask Autumn](public/screenshots/overview-funnel-glossary-ask-autumn.png)
+
+### Website traffic · `/website-traffic`
+
+Traffic explained through the campaigns that produce it, so an owner can
+decide the next campaign rather than read analytics.
+
+- **Every day people visited.** A year of days as a calendar; point at a day to
+  read it, click to keep it open, and see it against a typical weekday.
+- **Visits by campaign.** Visits stacked by campaign, with each change Autumn
+  made marked on the day it happened.
+- **What Autumn did.** Each change with the days before and after it: visits,
+  how many clicked, bookings, value.
+- **Where the next dollar goes.** Cost per visit, cost per booking, how many
+  booked, and value per visit, per campaign; the total row reads the daily
+  totals, never a sum of the rows.
+- **Which days are busiest**, and **what they visit on, and what books.**
+
+![Website traffic, dark theme](public/screenshots/traffic-desktop-dark.png)
+
+![Visits by campaign, and what Autumn did](public/screenshots/traffic-visits-by-campaign.png)
+
+![Where the next dollar goes](public/screenshots/traffic-next-dollar.png)
+
+![Which days are busiest, and what they visit on](public/screenshots/traffic-weekdays-and-devices.png)
+
+## Design process
+
+The first sketch was drawn in [Blockpad](https://github.com/akaieuan/blockpad),
+my own storyboard tool. It fixed the shape before any component existed: a
+sentence, a row of cards kept close to the current product, and one main chart
+the owner can restyle.
+
+![Wireframe sketch, drawn in Blockpad](public/screenshots/design-wireframe.png)
+
+Two artboards then grew it into a user story, the data contract, an atomic
+component library, and each page at three widths. The second board also holds
+the anatomy of the activity calendar and the seven components that only make
+sense on the traffic screen.
+
+| Overview artboard | Website traffic artboard |
+|---|---|
+| ![Overview design artboard](public/screenshots/design-artboard.png) | ![Website traffic design artboard](public/screenshots/design-artboard-traffic.png) |
+
+## What I learned, and what I would do next
+
+The full record is in [docs/decisions.md](docs/decisions.md); these are the
+parts I would bring up first.
+
+**What I learned**
+
+- **A before-and-after comparison is not proof of cause.** The first
+  causality test compared the weeks either side of an ad-copy refresh. An
+  untouched control campaign moved 2.8% across the same date while the
+  campaign with the real effect moved 0.6%: the test was reading season and
+  weekday mix, and it broke the moment the random stream shifted. The fix
+  was to regenerate the dataset with one effect switched off and compare the
+  two runs (D30). Every "what Autumn did" card on the traffic screen rests on
+  that.
+- **Small counts break the obvious sampling.** With about one booking a day,
+  a coin-flip per day hid a 22% annual trend behind noise (D25), and
+  largest-remainder rounding handed every single booking to the biggest
+  market, leaving eight of ten at zero over a month (D22). Both were caught
+  by tests that pin a shape ("July beats January", "no market is empty")
+  rather than a number.
+- **A rate stored without its denominator cannot be re-aggregated.** Pages
+  per visit was an average of daily averages until a test showed 3.5 where
+  the true figure was 3.68 (D29). The daily table now stores both counts.
+- **Derived facts belong in code, not in tables.** The spec started with
+  eight tables including a stored insights table. Two metric tables at two
+  grains, with insights computed at render time, removed every way the
+  numbers could disagree with the sentence beside them (D21, D24).
+- **A seed that prints a derived line is worth more than a green check.**
+  The acceptance line the seed prints and the verify script recomputes from
+  the live database caught a partial insert on the first hosted run.
+
+**What I would do next, with more time**
+
+- **A per-booking grain.** The two-table model gave up lead time, booking
+  hour and a recent-bookings list (D21). Those are the owner's "who booked
+  last night?" questions and would be the first table added.
+- **Real traffic sources.** Channels, page paths and time of day are on the
+  reference product but not in this data, and were not faked (D31). With a
+  real analytics feed the traffic screen gains a "where visits come from"
+  section without changing its shape.
+- **Ask Autumn as a working assistant.** The popover is an honest preview
+  of the interaction, wired to nothing. The next step is a model that
+  answers over the same query layer the screens use, so it can never quote
+  a number the page does not show.
+- **Measured performance on the deployed URL.** Query timings are recorded
+  (32 to 69 ms warm); Lighthouse scores and time to first byte are not yet,
+  and the operating contract asks for both.
+- **Negative controls for every decision.** Eleven decisions are marked
+  "tested" rather than "verified": the proving test exists but has not been
+  deliberately broken once. Finishing that pass is a morning's work and would
+  make the log fully falsified.
+- **The fee rate as a per-property setting** (D6), the first step toward the
+  multi-property switching the contract keeps out of scope.
 
 ## Docs
 

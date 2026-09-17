@@ -65,7 +65,7 @@ async function TrafficContent({ range, metric, dataThrough, span }: { range: Dat
   ]);
   return (
     <>
-      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
+      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, allVisits: totals.siteSessions, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
       <Suspense fallback={<TrafficBodySkeleton />}>
         <TrafficBody range={range} metric={metric} dataThrough={dataThrough} span={span} />
       </Suspense>

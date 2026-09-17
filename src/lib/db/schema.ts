@@ -10,7 +10,9 @@ import { sql } from "drizzle-orm";
  * bid changes, copy refreshes, seasonal pushes), so before/after comparisons
  * have something to anchor on. Insights are not stored: they are computed at
  * render time, so they can never disagree with the numbers underneath them.
- * See docs/decisions.md D21–D28.
+ * Row security is enabled on every table with no policies (D39): the app reads through the
+ * postgres role, which bypasses it, and Supabase's public REST API then returns nothing.
+ * See docs/decisions.md D21–D28, D39.
  */
 export const dailyMetrics = pgTable("daily_metrics", {
   date: date("date").primaryKey(),
@@ -31,7 +33,7 @@ export const dailyMetrics = pgTable("daily_metrics", {
   pagesPerSession: numeric("pages_per_session", { precision: 4, scale: 2, mode: "number" }).notNull(),
   /** What Autumn spent on ads that day, in dollars. Autumn funds it; the owner sees it for the cost-vs-return story. */
   spend: numeric("spend", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),
-});
+}).enableRLS();
 
 export const DIMENSIONS = ["campaign", "device", "feeder_market"] as const;
 export type Dimension = (typeof DIMENSIONS)[number];
@@ -49,7 +51,7 @@ export const breakdowns = pgTable("breakdowns", {
 }, (t) => [
   index("idx_breakdowns_date_dimension").on(t.date, t.dimension),
   check("breakdowns_dimension_check", sql`${t.dimension} in ('campaign', 'device', 'feeder_market')`),
-]);
+]).enableRLS();
 
 /** One row per campaign. `name` matches `breakdowns.dimension_value` where `dimension = 'campaign'`. */
 export const campaigns = pgTable("campaigns", {
@@ -59,7 +61,7 @@ export const campaigns = pgTable("campaigns", {
   launchedOn: date("launched_on").notNull(),
   status: text("status").$type<"live" | "paused">().notNull(),
   monthlyBudget: numeric("monthly_budget", { precision: 10, scale: 2, mode: "number" }).notNull(),
-});
+}).enableRLS();
 
 export const EVENT_KINDS = ["launched", "budget_change", "copy_refresh", "bid_change", "seasonal_push"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -74,8 +76,9 @@ export const campaignEvents = pgTable("campaign_events", {
   note: text("note").notNull(),
 }, (t) => [
   index("idx_campaign_events_date").on(t.date),
+  index("idx_campaign_events_campaign").on(t.campaignName),
   check("campaign_events_kind_check", sql`${t.kind} in ('launched', 'budget_change', 'copy_refresh', 'bid_change', 'seasonal_push')`),
-]);
+]).enableRLS();
 
 export const schema = { dailyMetrics, breakdowns, campaigns, campaignEvents };
 export type DailyMetricRow = typeof dailyMetrics.$inferInsert;
