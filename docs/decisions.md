@@ -750,9 +750,12 @@ together on desktop.
 
 **How we know it holds:** both page files follow this shape; the loading
 skeleton reserves the chart height so the page does not shift
-(`tests/components/dashboard.test.tsx`).
+(`tests/components/dashboard.test.tsx`). Measured with Lighthouse on the
+deployed site on 2026-09-17: performance 100 on desktop and 91 on the
+throttled mobile profile for both screens, layout shift at or near zero,
+server response 20 to 60 ms warm and about 1.7 s on a cold function.
 
-**Status:** tested.
+**Status:** verified 2026-09-17 (measured, not falsified).
 
 ### D36. A design-system page outside the product
 

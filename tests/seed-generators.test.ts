@@ -93,7 +93,7 @@ describe("seed generators", () => {
     // `spend` is priced from campaign clicks and written back after the whole daily pass, so it inherits the
     // shifted random stream on every day. Everything generateDaily itself produced must be untouched.
     const before = (d: typeof data, date: string) =>
-      d.daily.filter((x) => x.date < date).map(({ spend: _spend, ...rest }) => rest);
+      d.daily.filter((x) => x.date < date).map((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== "spend")));
 
     // Event 22: Discovery ad copy refreshed on 2026-08-03, click-through x1.15.
     const noRefresh = generateWithout(22, "ctr");
