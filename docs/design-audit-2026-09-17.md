@@ -44,6 +44,15 @@ Verdict in one line: the architecture is sound and enforced (pages compose, comp
 - No `any`, no `TODO`, no `console.log` in `src`.
 - Every test file names what it pins with the live literal, and every new assertion this week was falsified once (negative controls named in the commits).
 
+## Measured after the consolidation pass (2026-09-17, production build, `next start`, Lighthouse 13.4 desktop preset)
+
+| Route | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS |
+|---|---|---|---|---|---|---|---|---|
+| `/` | 100 | 100 | 100 | 100 | 0.3 s | 0.8 s | 0 ms | 0 |
+| `/website-traffic` | 100 | 100 | 100 | 100 | 0.3 s | 0.8 s | 0 ms | 0 |
+
+The dev-server run the owner saw earlier (70 / 89 / 100 / 91) was dominated by unminified and devtools JavaScript; its real findings (the 0.19 layout shift from the calendar span, the ARIA grid without rows, the low-contrast status text and tile numbers, the invalid `dl`, the missing robots.txt) are fixed in the commits of the same day.
+
 ## Not measured here
 
 Lighthouse on the deployed URL (needs the migration applied and a deploy), colour contrast of the heat ramp's middle steps under text (no text sits on them), and the Overview's total SQL statement count per request (needs query logging).
