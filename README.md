@@ -6,7 +6,7 @@ and revenue?** Two connected screens, an Overview and a Bookings detail, read
 live from a hosted Postgres database seeded with two years of believable
 hotel-marketing data.
 
-- Live: _(URL added at deploy)_
+- Live: https://autumn-dash-take-home.vercel.app (Overview at `/`, second screen at `/website-traffic`)
 - Stack: Next.js 16 (App Router, Server Components), React 19, TypeScript,
   Tailwind 4, shadcn/ui, Recharts, Drizzle ORM, Supabase Postgres, Vitest, Vercel.
 
