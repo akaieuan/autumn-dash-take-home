@@ -48,7 +48,7 @@ not copied from a plan. On that date the gates read: typecheck clean, 31
 test files and 241 tests passing, seed and verify agreeing on
 `730 days, 730 daily rows, 12,286 breakdown rows, 918 bookings, $408,745.44
 booking value, $29,521.54 ad spend, 4 campaigns, 24 events, 1,503 direct
-bookings in all` (last segment added 2026-09-17, D40).
+bookings in all` (last segment added 2026-09-17, D42).
 
 Identifiers (D1, D2, ...) are shared with the design spec in
 `docs/superpowers/specs/` and with the project's operating contract in
@@ -614,7 +614,7 @@ first.
 
 ---
 
-### D40. All direct bookings are stored beside Autumn's
+### D42. All direct bookings are stored beside Autumn's
 
 **We chose:** a column on `daily_metrics`, `all_direct_bookings`: every
 direct booking the property took that day, from any source. Autumn's

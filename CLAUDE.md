@@ -267,7 +267,7 @@ voice, with the date. No emojis; absolute dates, never "last week".
 | `npm run lint` | `eslint .` exits 0 |
 | `npm test` | Vitest: `Test Files  N passed` and `Tests  M passed`, exit 0; N and M re-measured from the run |
 | `npm run build` | `next build` exits 0; both routes listed; no unintended dynamic-usage warnings |
-| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events, <n> direct bookings in all` with days ≥ 720 (the last segment added 2026-09-17, D40) |
+| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events, <n> direct bookings in all` with days ≥ 720 (the last segment added 2026-09-17, D42) |
 | `npm run db:verify` | reads the live database and prints the same line from `count(*)`/`MIN`/`MAX`/`SUM`, then `campaign|device|feeder_market reconciles with daily totals: yes` ×3; exit 1 otherwise |
 | deployed URL | `/` and `/website-traffic` render with data; the headline value equals the value a one-off query computes for the same window |
 
@@ -439,7 +439,7 @@ live in `docs/decisions.md` under the same identifier.
   the device or an explicit toggle was added the same day, on the same tokens,
   and `tests/architecture.test.ts` requires the dark block. Light remains the
   default.
-- **2026-09-17 — All direct bookings are stored beside Autumn's (D40).**
+- **2026-09-17 — All direct bookings are stored beside Autumn's (D42).**
   `daily_metrics.all_direct_bookings` is every direct booking the property
   took that day; `bookings` (Autumn's) is a subset, enforced by a check
   constraint and re-measured by `db:verify`. The headline reads "80 of your

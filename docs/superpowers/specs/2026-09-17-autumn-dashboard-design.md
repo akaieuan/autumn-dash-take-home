@@ -159,7 +159,7 @@ follow-up if timings say otherwise.
 > - `daily_metrics` — one row per day, `date` primary key: `impressions`,
 >   `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`,
 >   `new_visitors`, `pages_per_session numeric(4,2)`.
->   Corrected 2026-09-17 (D40): also `all_direct_bookings`, every direct
+>   Corrected 2026-09-17 (D42): also `all_direct_bookings`, every direct
 >   booking the property took, with `all_direct_bookings >= bookings` checked.
 > - `breakdowns` — one row per day per dimension value, `dimension` ∈
 >   `campaign | device | feeder_market` (check constraint), `dimension_value`
