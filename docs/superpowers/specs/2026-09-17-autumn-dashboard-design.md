@@ -28,6 +28,9 @@ app structure with clean imports; shadcn + Tailwind; plan first.
 
 ## 2. Decisions (product-judgment values, the owner's to change)
 
+Short form. The reasoning and the proving test for every row, plus the
+engineering decisions D11–D20, live in `docs/decisions.md` under the same IDs.
+
 | # | Decision | Chosen | Why | Alternative considered |
 |---|---|---|---|---|
 | D1 | Headline of screen 1 | "Autumn brought you **N direct bookings** worth **$X** this period — you kept **$Y** after Autumn's fee" | Answers Q1 and Q2 in one sentence; the fee is the thing the current dashboard hides and the thing an owner paying 11–19% actually wants to see | Gross booking value only (current product) |
