@@ -7,13 +7,6 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
-    },
-    {
-      "name": "overview",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/ieuanking/Documents/workspaces/autumn-dash-take-home/.claude/worktrees/overview && npm run dev"],
-      "port": 3000,
-      "autoPort": true
     }
   ]
 }

@@ -104,14 +104,14 @@ describe("ActivityCalendar", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Every day people visited" })).toBeInTheDocument();
     expect(container.querySelectorAll("[data-date]")).toHaveLength(182); // 26 columns
     expect(tile(container, "2026-03-07")).toBeNull();                    // the Saturday before the half-year window
-    fireEvent.click(screen.getByRole("radio", { name: "Year" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Year/ }));
     expect(container.querySelectorAll("[data-date]")).toHaveLength(371); // all 53 columns
     expect(document.cookie).toContain("autumn-calendar-span=year"); // the server reads this next time, so the first paint matches
   });
 
   it("13 weeks draws thirteen columns and writes the number inside each tile", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
-    fireEvent.click(screen.getByRole("radio", { name: "13 weeks" }));
+    fireEvent.click(screen.getByRole("radio", { name: /13 weeks/ }));
     const tiles = container.querySelectorAll("[data-date]");
     expect(tiles).toHaveLength(91);
     expect(Math.ceil(tiles.length / 7)).toBe(13);
@@ -163,7 +163,7 @@ describe("ActivityCalendar", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
     for (const t of container.querySelectorAll("[data-date]")) expect(t.className).not.toContain("inset");
     expect(tile(container, "2026-08-12")?.className).toContain("rounded-(--radius-min)"); // half span
-    fireEvent.click(screen.getByRole("radio", { name: "Year" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Year/ }));
     expect(tile(container, "2026-08-12")?.className).toContain("rounded-(--radius-tile)"); // a 4px corner on a 10px tile reads as a circle
     for (const t of container.querySelectorAll("[data-date]")) expect(t.className).not.toContain("inset");
   });

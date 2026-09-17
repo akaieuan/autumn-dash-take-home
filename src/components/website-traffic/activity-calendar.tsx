@@ -134,7 +134,8 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                 <ToggleGroupItem
                   key={s}
                   value={s}
-                  aria-label={SPAN_LABEL[s]}
+                  // The accessible name carries both the short and the long label, so the visible text is always part of it.
+                  aria-label={`${SPAN_SHORT[s]} ${SPAN_LABEL[s]}`}
                   className="h-7 rounded-full px-2.5 text-xs font-medium text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-card sm:px-3"
                 >
                   <span className="sm:hidden">{SPAN_SHORT[s]}</span>
