@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
+import { makeTestDb, countingDb, type TestDb } from "./setup";
 import { loadFixture, FIXTURE_RANGE } from "./fixture";
 import { getCampaignMeta, getEvents, getEventImpact, getRecentEventImpacts } from "@/lib/db/queries";
 
@@ -54,5 +54,44 @@ describe("getEventImpact", () => {
     expect(list.map((x) => x.event.id)).toEqual([1, 2]);
     expect(list[0].after.to).toBe("2026-09-10");
     expect(list[0].days).toBe(6);
+  });
+});
+
+// The fixture holds three events inside this window: two campaign-scoped (ids 1 and 3, read from
+// `breakdowns`) and one program-wide (id 2, read from `daily_metrics`), so the grouped statements
+// cover both scopes.
+const ALL_EVENTS = { ...FIXTURE_RANGE, from: "2026-07-01", to: "2026-09-16" };
+
+describe("getRecentEventImpacts in two grouped statements", () => {
+  it("returns exactly what mapping getEventImpact over the events returns", async () => {
+    const events = await getEvents(db, ALL_EVENTS, 5);
+    expect(events.map((e) => e.campaign === null)).toEqual([false, true, false]);
+    const oneByOne = await Promise.all(events.map((e) => getEventImpact(db, e, 28, ALL_EVENTS.to)));
+    expect(await getRecentEventImpacts(db, ALL_EVENTS, 5, 28)).toEqual(oneByOne);
+    // A shorter window exercises the clip and the actual compared length.
+    const short = { ...ALL_EVENTS, to: "2026-09-07" };
+    const shortEvents = await getEvents(db, short, 5);
+    expect(await getRecentEventImpacts(db, short, 5, 6)).toEqual(
+      await Promise.all(shortEvents.map((e) => getEventImpact(db, e, 6, short.to))),
+    );
+  });
+  it("costs the events list plus one statement per scope, not two per event", async () => {
+    const counted = countingDb(db);
+    // Before: the events list plus two window queries per event. Measured 2026-09-17: 7 for
+    // three events, which is where a five-event Website Traffic range spent 11.
+    const events = await getEvents(counted.db, ALL_EVENTS, 5);
+    await Promise.all(events.map((e) => getEventImpact(counted.db, e, 28, ALL_EVENTS.to)));
+    const before = counted.statements();
+    counted.reset();
+    await getRecentEventImpacts(counted.db, ALL_EVENTS, 5, 28);
+    expect(before).toBe(1 + 2 * events.length);
+    expect(counted.statements()).toBeLessThanOrEqual(3);
+    counted.reset();
+    // A window whose events are all campaign-scoped skips the daily_metrics statement entirely.
+    await getRecentEventImpacts(counted.db, { ...FIXTURE_RANGE, from: "2026-09-01", to: "2026-09-10" }, 5, 28);
+    expect(counted.statements()).toBe(2);
+    counted.reset();
+    await getRecentEventImpacts(counted.db, { ...FIXTURE_RANGE, from: "2026-01-01", to: "2026-01-31" }, 5, 28);
+    expect(counted.statements()).toBe(1); // no events: nothing to group
   });
 });

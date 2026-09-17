@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
+import { makeTestDb, countingDb, type TestDb } from "./setup";
 import { loadFixture, FIXTURE_RANGE, SEGMENT_RANGE } from "./fixture";
-import { getTrafficByCampaign, getCampaignEfficiency, bucketEnd } from "@/lib/db/queries";
+import { getTrafficByCampaign, getCampaignEfficiency, getBreakdownBundle, bucketEnd } from "@/lib/db/queries";
 
 let db: TestDb; let close: () => Promise<void>;
 beforeAll(async () => { ({ db, close } = await makeTestDb()); await loadFixture(db); });
@@ -50,6 +50,15 @@ describe("getCampaignEfficiency", () => {
     const e = await getCampaignEfficiency(db, SEGMENT_RANGE);
     expect(e.rows.reduce((s, r) => s + r.visits, 0)).toBe(300); // campaign rows: 07-09 and 07-15 only
     expect(e.total.visits).toBe(380);                            // daily_metrics: 200 + 100 + 80 (07-13 has no breakdown rows)
+  });
+  it("derives the same rows and total from a shared breakdown bundle, with no query of its own", async () => {
+    const counted = countingDb(db);
+    const bundle = await getBreakdownBundle(counted.db, SEGMENT_RANGE);
+    counted.reset();
+    const fromBundle = await getCampaignEfficiency(counted.db, SEGMENT_RANGE, bundle);
+    expect(counted.statements()).toBe(0);
+    expect(fromBundle).toEqual(await getCampaignEfficiency(db, SEGMENT_RANGE));
+    expect(fromBundle.total.visits).toBe(380); // still daily_metrics, not the 300 the campaign rows sum to
   });
   it("nulls the per-unit figures instead of dividing by zero", async () => {
     const e = await getCampaignEfficiency(db, { ...FIXTURE_RANGE, from: "2026-09-10", to: "2026-09-10", comparison: null });

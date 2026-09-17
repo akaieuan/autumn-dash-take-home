@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
+import { makeTestDb, countingDb, type TestDb } from "./setup";
 import { loadFixture, FIXTURE_RANGE, SEGMENT_RANGE } from "./fixture";
-import { getBreakdown, getAllBreakdowns, getMarkets, getCampaigns, getFunnel } from "@/lib/db/queries";
+import { getBreakdown, getAllBreakdowns, getBreakdownBundle, getMarkets, getCampaigns, getFunnel, getTrend } from "@/lib/db/queries";
+import { DIMENSIONS } from "@/lib/db/schema";
 
 let db: TestDb; let close: () => Promise<void>;
 beforeAll(async () => { ({ db, close } = await makeTestDb()); await loadFixture(db); });
@@ -101,5 +102,76 @@ describe("getFunnel", () => {
     expect(f.steps.map((s) => s.people)).toEqual([0, 0, 0]);
     expect(f.steps.map((s) => s.onwardRatio)).toEqual([null, null, null]);
     expect(f.devices).toEqual([]);
+  });
+});
+
+describe("getBreakdownBundle", () => {
+  it("derives every dimension in one pass, identical to a per-dimension getBreakdown", async () => {
+    const bundle = await getBreakdownBundle(db, SEGMENT_RANGE);
+    expect(bundle.rows.campaign).toEqual(await getBreakdown(db, SEGMENT_RANGE, "campaign"));
+    expect(bundle.rows.device).toEqual(await getBreakdown(db, SEGMENT_RANGE, "device"));
+    expect(bundle.rows.feeder_market).toEqual(await getBreakdown(db, SEGMENT_RANGE, "feeder_market"));
+    expect(bundle.rows.campaign.map((r) => r.value)).toEqual(["Brand Protection", "Google Hotel Ads", "Summer Newsletter"]);
+  });
+  it("totals come from daily_metrics, never from the rows it just aggregated", async () => {
+    const bundle = await getBreakdownBundle(db, SEGMENT_RANGE);
+    // 2026-07-13 (500 / 80 / 2 / 300.00) has no breakdown rows: summing the campaign rows would read 3000 / 300 / 10.
+    expect(bundle.totals).toMatchObject({ impressions: 3500, clicks: 380, bookings: 12, bookingValueCents: 230000 });
+    expect(bundle.previousTotals).toBeNull();
+  });
+  it("fetches the comparison window's daily totals only when a caller asks for them", async () => {
+    const bundle = await getBreakdownBundle(db, SEGMENT_RANGE, 1500, true);
+    expect(bundle.previousTotals).toMatchObject({ impressions: 800, clicks: 80, bookings: 3 }); // the 2026-07-03 row
+    const none = await getBreakdownBundle(db, { ...SEGMENT_RANGE, comparison: null }, 1500, true);
+    expect(none.previousTotals).toBeNull();
+    expect(none.rows.campaign[0].previous).toBeNull();
+  });
+  it("keys every dimension even when a dimension has no rows in the window", async () => {
+    const bundle = await getBreakdownBundle(db, FIXTURE_RANGE);
+    expect(Object.keys(bundle.rows).sort()).toEqual(["campaign", "device", "feeder_market"]);
+    expect(bundle.rows.feeder_market).toEqual([]);
+    expect(bundle.rows).toEqual(await getAllBreakdowns(db, FIXTURE_RANGE));
+  });
+  it("feeds the four Overview consumers the same DTOs they fetch on their own", async () => {
+    const bundle = await getBreakdownBundle(db, SEGMENT_RANGE);
+    expect(await getMarkets(db, SEGMENT_RANGE, 5, bundle)).toEqual(await getMarkets(db, SEGMENT_RANGE, 5));
+    expect(await getMarkets(db, SEGMENT_RANGE, 1, bundle)).toEqual(await getMarkets(db, SEGMENT_RANGE, 1));
+    expect(await getCampaigns(db, SEGMENT_RANGE, bundle)).toEqual(await getCampaigns(db, SEGMENT_RANGE));
+    const funnel = await getFunnel(db, SEGMENT_RANGE, bundle);
+    expect(funnel).toEqual(await getFunnel(db, SEGMENT_RANGE));
+    // The bundled funnel still chains daily_metrics: 380 clicks, not the 300 the breakdown rows sum to.
+    expect(funnel.steps.map((s) => s.people)).toEqual([3500, 380, 12]);
+    expect((await getCampaigns(db, SEGMENT_RANGE, bundle)).total).toMatchObject({ visits: 380, bookings: 12 });
+  });
+});
+
+describe("the Overview body's statement count", () => {
+  it("collapses the breakdown fan-out: one pass per window instead of one per dimension", async () => {
+    const counted = countingDb(db);
+    // The fan-out as the page ran it: getTrend (3 series) + getMarkets (2) + getCampaigns
+    // (2 + 1 live + 1 totals) + getFunnel (1 totals + 2) + one getBreakdown per dimension
+    // for the insight input (3 x 2). Measured 2026-09-17: 18 statements.
+    await Promise.all([
+      getTrend(counted.db, SEGMENT_RANGE, "bookings"),
+      getMarkets(counted.db, SEGMENT_RANGE),
+      getCampaigns(counted.db, SEGMENT_RANGE),
+      getFunnel(counted.db, SEGMENT_RANGE),
+      Promise.all(DIMENSIONS.map((d) => getBreakdown(counted.db, SEGMENT_RANGE, d))),
+    ]);
+    const before = counted.statements();
+    counted.reset();
+    // After: getTrend (3) + bundle current + bundle previous + daily totals + the campaign
+    // live window. Measured 2026-09-17: 7 statements, and one scan of `breakdowns` per
+    // window instead of thirteen.
+    const [, bundle] = await Promise.all([getTrend(counted.db, SEGMENT_RANGE, "bookings"), getBreakdownBundle(counted.db, SEGMENT_RANGE)]);
+    await Promise.all([
+      getMarkets(counted.db, SEGMENT_RANGE, 5, bundle),
+      getCampaigns(counted.db, SEGMENT_RANGE, bundle),
+      getFunnel(counted.db, SEGMENT_RANGE, bundle),
+    ]);
+    const after = counted.statements();
+    expect(before).toBeGreaterThan(8);
+    expect(after).toBeLessThanOrEqual(7);
+    expect(after).toBeLessThan(before);
   });
 });

@@ -4,7 +4,7 @@ import { addDays, type DateRange } from "@/lib/date-range";
 import { DIMENSIONS, type Dimension } from "../schema";
 import { PROPERTY } from "@/lib/property";
 import { campaignKey, deviceKey, glossary, valueLabel, MARKET_HINTS, type CampaignKey, type DeviceKey, type GlossaryKey } from "@/lib/glossary";
-import { getPeriodTotals } from "./overview";
+import { getPeriodTotals, type PeriodTotals } from "./overview";
 
 export interface BreakdownRowDto {
   value: string;
@@ -16,21 +16,27 @@ export interface BreakdownRowDto {
 }
 
 interface Agg { value: string; impressions: unknown; clicks: unknown; bookings: unknown; v: unknown; s: unknown }
+interface DimAgg extends Agg { dimension: Dimension }
+
+const SUMS = sql`sum(impressions) as impressions, sum(clicks) as clicks, sum(bookings) as bookings, sum(booking_value)::float8 as v, sum(spend)::float8 as s`;
 
 async function aggregate(db: AnyDb, dimension: Dimension, from: string, to: string): Promise<Agg[]> {
   return rowsOf<Agg>(await db.execute(sql`
-    select dimension_value as value, sum(impressions) as impressions, sum(clicks) as clicks, sum(bookings) as bookings, sum(booking_value)::float8 as v, sum(spend)::float8 as s
+    select dimension_value as value, ${SUMS}
     from breakdowns where dimension = ${dimension} and date between ${from} and ${to}
     group by dimension_value`));
 }
 
-/** One dimension over the range, ranked by bookings then value, each row with its share and its previous-period figures. */
-export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimension, feeRateBps = PROPERTY.feeRateBps): Promise<BreakdownRowDto[]> {
-  const c = range.comparison;
-  const [cur, prev] = await Promise.all([
-    aggregate(db, dimension, range.from, range.to),
-    c ? aggregate(db, dimension, c.prevFrom, c.prevTo) : null,
-  ]);
+/** Every dimension of a window in one pass; the caller splits the rows by `dimension`. */
+async function aggregateEveryDimension(db: AnyDb, from: string, to: string): Promise<DimAgg[]> {
+  return rowsOf<DimAgg>(await db.execute(sql`
+    select dimension, dimension_value as value, ${SUMS}
+    from breakdowns where date between ${from} and ${to}
+    group by dimension, dimension_value`));
+}
+
+/** Ranking, shares, fee and previous-period figures for one dimension's aggregated rows. Pure. */
+function toRows(cur: Agg[], prev: Agg[] | null, feeRateBps: number): BreakdownRowDto[] {
   const totalBookings = cur.reduce((s, r) => s + n(r.bookings), 0) || 1;
   const totalClicks = cur.reduce((s, r) => s + n(r.clicks), 0) || 1;
   const prevBy = new Map((prev ?? []).map((r) => [r.value, r]));
@@ -49,9 +55,47 @@ export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimen
     .sort((a, b) => b.bookings - a.bookings || b.bookingValueCents - a.bookingValueCents || b.clicks - a.clicks || a.value.localeCompare(b.value));
 }
 
+/** One dimension over the range, ranked by bookings then value, each row with its share and its previous-period figures. */
+export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimension, feeRateBps = PROPERTY.feeRateBps): Promise<BreakdownRowDto[]> {
+  const c = range.comparison;
+  const [cur, prev] = await Promise.all([
+    aggregate(db, dimension, range.from, range.to),
+    c ? aggregate(db, dimension, c.prevFrom, c.prevTo) : null,
+  ]);
+  return toRows(cur, prev, feeRateBps);
+}
+
+export interface BreakdownBundle {
+  rows: Record<Dimension, BreakdownRowDto[]>;
+  totals: PeriodTotals;
+  /** The comparison window's daily totals, fetched only when a caller asks (`includePreviousTotals`). */
+  previousTotals: PeriodTotals | null;
+}
+
+/**
+ * Every dimension for the range in ONE pass over `breakdowns` (plus one for the comparison
+ * window), and the daily totals once. The Overview's four breakdown consumers used to scan
+ * that table thirteen times per request because each fetched its own dimension; they now
+ * share this. `totals` still comes from `daily_metrics`, never from the rows above it: a day
+ * with no breakdown rows must still count (CLAUDE.md §2).
+ */
+export async function getBreakdownBundle(db: AnyDb, range: DateRange, feeRateBps = PROPERTY.feeRateBps, includePreviousTotals = false): Promise<BreakdownBundle> {
+  const c = range.comparison;
+  const [cur, prev, totals, previousTotals] = await Promise.all([
+    aggregateEveryDimension(db, range.from, range.to),
+    c ? aggregateEveryDimension(db, c.prevFrom, c.prevTo) : null,
+    getPeriodTotals(db, range.from, range.to, feeRateBps),
+    c && includePreviousTotals ? getPeriodTotals(db, c.prevFrom, c.prevTo, feeRateBps) : null,
+  ]);
+  const of = (list: DimAgg[], d: Dimension) => list.filter((r) => r.dimension === d);
+  const rows = Object.fromEntries(
+    DIMENSIONS.map((d) => [d, toRows(of(cur, d), prev ? of(prev, d) : null, feeRateBps)]),
+  ) as Record<Dimension, BreakdownRowDto[]>;
+  return { rows, totals, previousTotals };
+}
+
 export async function getAllBreakdowns(db: AnyDb, range: DateRange, feeRateBps = PROPERTY.feeRateBps): Promise<Record<Dimension, BreakdownRowDto[]>> {
-  const results = await Promise.all(DIMENSIONS.map((d) => getBreakdown(db, range, d, feeRateBps)));
-  return Object.fromEntries(DIMENSIONS.map((d, i) => [d, results[i]])) as Record<Dimension, BreakdownRowDto[]>;
+  return (await getBreakdownBundle(db, range, feeRateBps)).rows;
 }
 
 /** The seed's catch-all feeder market. It is never ranked; it joins the fold row at the bottom. */
@@ -64,9 +108,12 @@ export interface MarketDto { name: string; hint: string | null; visits: number; 
  * The cities guests searched from, longest tail folded away. `share` is against the
  * top row rather than the total, so the bars read as "how this city compares with the
  * best one" — the comparison an owner actually makes.
+ *
+ * `bundle` is the shared aggregation when the page already has one; without it this
+ * fetches its own, so a caller that wants one market list is unchanged.
  */
-export async function getMarkets(db: AnyDb, range: DateRange, limit = 5): Promise<MarketDto[]> {
-  const rows = await getBreakdown(db, range, "feeder_market");
+export async function getMarkets(db: AnyDb, range: DateRange, limit = 5, bundle?: BreakdownBundle): Promise<MarketDto[]> {
+  const rows = bundle ? bundle.rows.feeder_market : await getBreakdown(db, range, "feeder_market");
   if (rows.length === 0) return [];
   const named = rows.filter((r) => r.value !== OTHER_MARKET);
   const tail = [...named.slice(limit), ...rows.filter((r) => r.value === OTHER_MARKET)];
@@ -100,14 +147,15 @@ const LIVE_WINDOW_DAYS = 7;
  * footer (CLAUDE.md §2). `visits` is clicks on both the rows and the total, so the
  * column adds up against its own footer.
  */
-export async function getCampaigns(db: AnyDb, range: DateRange): Promise<CampaignSummaryDto> {
+export async function getCampaigns(db: AnyDb, range: DateRange, bundle?: BreakdownBundle): Promise<CampaignSummaryDto> {
   const earliestLive = addDays(range.to, -(LIVE_WINDOW_DAYS - 1));
   const liveFrom = range.from > earliestLive ? range.from : earliestLive;
   const [rows, recent, totals] = await Promise.all([
-    getBreakdown(db, range, "campaign"),
-    // The live flag only needs this period's rows, so the comparison query is skipped.
+    bundle ? bundle.rows.campaign : getBreakdown(db, range, "campaign"),
+    // The live flag reads a shorter window than the bundle covers, so it stays its own
+    // query: one seven-day scan, and the comparison window is skipped.
     getBreakdown(db, { ...range, from: liveFrom, comparison: null }, "campaign"),
-    getPeriodTotals(db, range.from, range.to),
+    bundle ? bundle.totals : getPeriodTotals(db, range.from, range.to),
   ]);
   const live = new Set(recent.filter((r) => r.impressions > 0).map((r) => r.value));
   return {
@@ -127,10 +175,10 @@ export interface FunnelStepDto { key: GlossaryKey; people: number; onwardRatio: 
 export interface FunnelDto { steps: FunnelStepDto[]; newVisitors: number; pagesPerSession: number; devices: { key: DeviceKey; share: number }[] }
 
 /** Saw the ad → clicked it → booked. Each ratio is computed from the two figures above it, in the same rows. */
-export async function getFunnel(db: AnyDb, range: DateRange): Promise<FunnelDto> {
+export async function getFunnel(db: AnyDb, range: DateRange, bundle?: BreakdownBundle): Promise<FunnelDto> {
   const [t, devices] = await Promise.all([
-    getPeriodTotals(db, range.from, range.to),
-    getBreakdown(db, range, "device"),
+    bundle ? bundle.totals : getPeriodTotals(db, range.from, range.to),
+    bundle ? bundle.rows.device : getBreakdown(db, range, "device"),
   ]);
   return {
     steps: [

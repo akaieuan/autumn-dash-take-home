@@ -4,7 +4,7 @@ import { parseRange, type DateRange } from "@/lib/date-range";
 import { weekdayAverages } from "@/lib/activity";
 import {
   getActivity,
-  getBreakdown,
+  getBreakdownBundle,
   getCampaignEfficiency,
   getDataBounds,
   getPeriodTotals,
@@ -57,15 +57,19 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
   );
 }
 
-/** Everything below the headline, streamed behind one boundary; five queries in one round trip. */
+/**
+ * Everything below the headline, streamed behind one boundary. The efficiency table and the
+ * device split read the same `breakdowns` rows, so they share one bundle rather than
+ * aggregating that table twice (audit item 7).
+ */
 async function TrafficBody({ range, metric, dataThrough }: { range: DateRange; metric: TrafficMetric; dataThrough: string }) {
-  const [activity, series, impacts, efficiency, devices] = await Promise.all([
+  const [activity, series, impacts, bundle] = await Promise.all([
     getActivity(db, dataThrough, "website_visits"),
     getTrafficByCampaign(db, range, metric),
     getRecentEventImpacts(db, range, 5),
-    getCampaignEfficiency(db, range),
-    getBreakdown(db, range, "device"),
+    getBreakdownBundle(db, range),
   ]);
+  const efficiency = await getCampaignEfficiency(db, range, bundle);
   return (
     <Stack>
       <ActivityCalendar activity={activity} />
@@ -74,7 +78,7 @@ async function TrafficBody({ range, metric, dataThrough }: { range: DateRange; m
       {/* Nothing here repeats the Overview: markets and the glossary live there (owner's ruling 2026-09-17). */}
       <Grid variant="two">
         <WeekdayRhythm averages={weekdayAverages(activity.days)} />
-        <DeviceConversion devices={devices} />
+        <DeviceConversion devices={bundle.rows.device} />
       </Grid>
     </Stack>
   );

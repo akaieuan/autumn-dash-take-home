@@ -3,7 +3,7 @@ import { n, rowsOf, toCents, type AnyDb } from "./types";
 import { addDays, type DateRange, type Granularity } from "@/lib/date-range";
 import { valueLabel } from "@/lib/glossary";
 import { bucketStarts, getPeriodTotals } from "./overview";
-import { getBreakdown } from "./breakdowns";
+import { getBreakdown, type BreakdownBundle } from "./breakdowns";
 import { getEvents, type EventDto } from "./events";
 
 /**
@@ -67,9 +67,14 @@ const per = (cents: number, count: number) => (count ? Math.round(cents / count)
  * "Where the next dollar goes": what each campaign costs per visit and per
  * booking, and what a visit is worth, ranked by value per visit. The total row
  * comes from `daily_metrics`, never from summing the campaigns (CLAUDE.md §2).
+ * `bundle` is the screen's shared aggregation when it has one: with it this reads the
+ * campaign rows and the daily totals the bundle already fetched and runs no query at all.
  */
-export async function getCampaignEfficiency(db: AnyDb, range: DateRange): Promise<CampaignEfficiencyDto> {
-  const [rows, t] = await Promise.all([getBreakdown(db, range, "campaign"), getPeriodTotals(db, range.from, range.to)]);
+export async function getCampaignEfficiency(db: AnyDb, range: DateRange, bundle?: BreakdownBundle): Promise<CampaignEfficiencyDto> {
+  const [rows, t] = await Promise.all([
+    bundle ? bundle.rows.campaign : getBreakdown(db, range, "campaign"),
+    bundle ? bundle.totals : getPeriodTotals(db, range.from, range.to),
+  ]);
   const totalVisits = rows.reduce((s, r) => s + r.clicks, 0) || 1;
   const out: CampaignEfficiencyRow[] = rows.map((r) => ({
     name: r.value, label: r.label,

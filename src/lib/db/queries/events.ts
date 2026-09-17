@@ -30,14 +30,74 @@ export async function getEvents(db: AnyDb, range: DateRange, limit = 10): Promis
 export interface WindowTotals { from: string; to: string; impressions: number; clicks: number; bookings: number; bookingValueCents: number; spendCents: number; ctr: number; conversion: number }
 export interface EventImpactDto { event: EventDto; days: number; before: WindowTotals; after: WindowTotals }
 
+interface Sums { i: unknown; c: unknown; b: unknown; v: unknown; s: unknown }
+
+/** The five figures a window reports, from whichever table the event's scope reads. */
+const SUMS = sql`coalesce(sum(t.impressions),0) as i, coalesce(sum(t.clicks),0) as c, coalesce(sum(t.bookings),0) as b, coalesce(sum(t.booking_value),0)::float8 as v, coalesce(sum(t.spend),0)::float8 as s`;
+
+const windowOf = (r: Sums | undefined, from: string, to: string): WindowTotals => {
+  const impressions = n(r?.i), clicks = n(r?.c), bookings = n(r?.b);
+  return { from, to, impressions, clicks, bookings, bookingValueCents: toCents(r?.v), spendCents: toCents(r?.s), ctr: impressions ? clicks / impressions : 0, conversion: clicks ? bookings / clicks : 0 };
+};
+
 async function windowTotals(db: AnyDb, campaign: string | null, from: string, to: string): Promise<WindowTotals> {
-  const [r] = rowsOf(
+  const [r] = rowsOf<Sums>(
     campaign === null
-      ? await db.execute(sql`select coalesce(sum(impressions),0) as i, coalesce(sum(clicks),0) as c, coalesce(sum(bookings),0) as b, coalesce(sum(booking_value),0)::float8 as v, coalesce(sum(spend),0)::float8 as s from daily_metrics where date between ${from} and ${to}`)
-      : await db.execute(sql`select coalesce(sum(impressions),0) as i, coalesce(sum(clicks),0) as c, coalesce(sum(bookings),0) as b, coalesce(sum(booking_value),0)::float8 as v, coalesce(sum(spend),0)::float8 as s from breakdowns where dimension = 'campaign' and dimension_value = ${campaign} and date between ${from} and ${to}`),
+      ? await db.execute(sql`select ${SUMS} from daily_metrics t where t.date between ${from} and ${to}`)
+      : await db.execute(sql`select ${SUMS} from breakdowns t where t.dimension = 'campaign' and t.dimension_value = ${campaign} and t.date between ${from} and ${to}`),
   );
-  const impressions = n(r.i), clicks = n(r.c), bookings = n(r.b);
-  return { from, to, impressions, clicks, bookings, bookingValueCents: toCents(r.v), spendCents: toCents(r.s), ctr: impressions ? clicks / impressions : 0, conversion: clicks ? bookings / clicks : 0 };
+  return windowOf(r, from, to);
+}
+
+/**
+ * The two windows an impact compares, and the length actually compared: `days` from the
+ * event (clipped to `clipTo`, normally the last day with data) against the same number of
+ * days before it. One definition, shared by the single lookup and the grouped one, so the
+ * two can never drift apart.
+ */
+function impactWindows(date: string, days: number, clipTo?: string): { days: number; before: { from: string; to: string }; after: { from: string; to: string } } {
+  let afterTo = addDays(date, days - 1);
+  if (clipTo && afterTo > clipTo) afterTo = clipTo;
+  const actual = Math.max(1, Math.round((Date.parse(afterTo) - Date.parse(date)) / 86_400_000) + 1);
+  return { days: actual, before: { from: addDays(date, -actual), to: addDays(date, -1) }, after: { from: date, to: afterTo } };
+}
+
+type Side = "before" | "after";
+interface WindowSpec { eventId: number; side: Side; campaign: string | null; from: string; to: string }
+
+/**
+ * Every window of one scope in a single statement: the list travels as a parameterised
+ * `values` table joined to the metric rows it selects, so five events cost one statement
+ * instead of ten. Keyed `<event id>|<side>`; a window with no matching rows still comes
+ * back (left join + coalesce), exactly as a single lookup would.
+ */
+async function groupedWindows(db: AnyDb, specs: WindowSpec[], scope: "campaign" | "program"): Promise<Map<string, Sums>> {
+  const values = sql.join(
+    specs.map((s, i) =>
+      scope === "campaign"
+        ? i === 0
+          ? sql`(${s.eventId}::int, ${s.side}::text, ${s.campaign}::text, ${s.from}::date, ${s.to}::date)`
+          : sql`(${s.eventId}, ${s.side}, ${s.campaign}, ${s.from}, ${s.to})`
+        : i === 0
+          ? sql`(${s.eventId}::int, ${s.side}::text, ${s.from}::date, ${s.to}::date)`
+          : sql`(${s.eventId}, ${s.side}, ${s.from}, ${s.to})`,
+    ),
+    sql`, `,
+  );
+  const rows = rowsOf<Sums & { event_id: number; side: Side }>(
+    await db.execute(
+      scope === "campaign"
+        ? sql`select w.event_id, w.side, ${SUMS}
+            from (values ${values}) as w(event_id, side, campaign, from_date, to_date)
+            left join breakdowns t on t.dimension = 'campaign' and t.dimension_value = w.campaign and t.date between w.from_date and w.to_date
+            group by w.event_id, w.side`
+        : sql`select w.event_id, w.side, ${SUMS}
+            from (values ${values}) as w(event_id, side, from_date, to_date)
+            left join daily_metrics t on t.date between w.from_date and w.to_date
+            group by w.event_id, w.side`,
+    ),
+  );
+  return new Map(rows.map((r) => [`${Number(r.event_id)}|${r.side}`, r]));
 }
 
 /**
@@ -47,18 +107,39 @@ async function windowTotals(db: AnyDb, campaign: string | null, from: string, to
  * after-window for recent events; `days` reports the length actually compared.
  */
 export async function getEventImpact(db: AnyDb, event: EventDto, days = 28, clipTo?: string): Promise<EventImpactDto> {
-  let afterTo = addDays(event.date, days - 1);
-  if (clipTo && afterTo > clipTo) afterTo = clipTo;
-  const actual = Math.max(1, Math.round((Date.parse(afterTo) - Date.parse(event.date)) / 86_400_000) + 1);
+  const w = impactWindows(event.date, days, clipTo);
   const [before, after] = await Promise.all([
-    windowTotals(db, event.campaign, addDays(event.date, -actual), addDays(event.date, -1)),
-    windowTotals(db, event.campaign, event.date, afterTo),
+    windowTotals(db, event.campaign, w.before.from, w.before.to),
+    windowTotals(db, event.campaign, w.after.from, w.after.to),
   ]);
-  return { event, days: actual, before, after };
+  return { event, days: w.days, before, after };
 }
 
-/** The most recent events in the range, each with its before/after windows. */
+/**
+ * The most recent events in the range, each with its before/after windows, newest first.
+ * Two statements at most instead of two per event: the windows are built here and both
+ * scopes are aggregated in one grouped pass each. `getEventImpact` stays the single lookup.
+ */
 export async function getRecentEventImpacts(db: AnyDb, range: DateRange, count = 3, days = 28): Promise<EventImpactDto[]> {
   const events = await getEvents(db, range, count);
-  return Promise.all(events.map((e) => getEventImpact(db, e, days, range.to)));
+  if (events.length === 0) return [];
+  const windows = events.map((event) => ({ event, ...impactWindows(event.date, days, range.to) }));
+  const specs: WindowSpec[] = windows.flatMap((w) => [
+    { eventId: w.event.id, side: "before" as const, campaign: w.event.campaign, ...w.before },
+    { eventId: w.event.id, side: "after" as const, campaign: w.event.campaign, ...w.after },
+  ]);
+  const scoped = specs.filter((s) => s.campaign !== null);
+  const program = specs.filter((s) => s.campaign === null);
+  const [byCampaign, byProgram] = await Promise.all([
+    scoped.length > 0 ? groupedWindows(db, scoped, "campaign") : null,
+    program.length > 0 ? groupedWindows(db, program, "program") : null,
+  ]);
+  const sums = (w: (typeof windows)[number], side: Side) =>
+    (w.event.campaign !== null ? byCampaign : byProgram)?.get(`${w.event.id}|${side}`);
+  return windows.map((w) => ({
+    event: w.event,
+    days: w.days,
+    before: windowOf(sums(w, "before"), w.before.from, w.before.to),
+    after: windowOf(sums(w, "after"), w.after.from, w.after.to),
+  }));
 }

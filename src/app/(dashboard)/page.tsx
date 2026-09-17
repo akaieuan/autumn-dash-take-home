@@ -4,7 +4,7 @@ import { parseRange, type DateRange } from "@/lib/date-range";
 import { PROPERTY } from "@/lib/property";
 import { computeInsights } from "@/lib/insights";
 import {
-  getAllBreakdowns,
+  getBreakdownBundle,
   getCampaigns,
   getDataBounds,
   getFunnel,
@@ -61,7 +61,12 @@ export default async function OverviewPage({ searchParams }: { searchParams: Sea
   );
 }
 
-/** The slower half of the page, streamed behind one Suspense boundary; five queries in one round trip. */
+/**
+ * The slower half of the page, streamed behind one Suspense boundary. Markets, campaigns,
+ * the funnel and the insight input all read the same breakdown rows, so they share one
+ * `getBreakdownBundle` instead of re-aggregating that table per dimension (audit item 7):
+ * 18 statements per request before, 7 after, measured 2026-09-17 in tests/queries/breakdowns.test.ts.
+ */
 async function OverviewBody({
   range,
   metric,
@@ -71,19 +76,18 @@ async function OverviewBody({
   metric: TrendMetric;
   overview: OverviewDto;
 }) {
-  const [trend, markets, campaigns, funnel, breakdowns] = await Promise.all([
-    getTrend(db, range, metric),
-    getMarkets(db, range),
-    getCampaigns(db, range),
-    getFunnel(db, range),
-    getAllBreakdowns(db, range),
+  const [trend, bundle] = await Promise.all([getTrend(db, range, metric), getBreakdownBundle(db, range)]);
+  const [markets, campaigns, funnel] = await Promise.all([
+    getMarkets(db, range, 5, bundle),
+    getCampaigns(db, range, bundle),
+    getFunnel(db, range, bundle),
   ]);
-  const insights = computeInsights({ overview, breakdowns, range }, 3);
+  const insights = computeInsights({ overview, breakdowns: bundle.rows, range }, 3);
   const { prevLabel, lastYearLabel } = comparisonLabels(range);
   return (
     <Stack>
       <Grid variant="sidebar">
-        <Panel id="trend" className="scroll-mt-20 h-full">
+        <Panel id="trend" className="h-full">
           <PanelHeader
             headingId="trend-h"
             title="Day by day"
