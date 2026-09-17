@@ -1,10 +1,14 @@
 import type { Granularity } from "./date-range";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const usdExact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const int = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /** Whole dollars from integer cents: 1868500 → "$18,685". */
 export const money = (cents: number) => usd.format(Math.round(cents / 100));
+
+/** Cents to the cent: "$0.07", "$8.50". For per-unit money, where rounding to a dollar would say "$0". */
+export const moneyExact = (cents: number) => usdExact.format(cents / 100);
 
 /** A whole count with thousands separators: 12345 → "12,345". */
 export const count = (n: number) => int.format(Math.round(n));

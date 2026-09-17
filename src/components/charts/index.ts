@@ -9,7 +9,7 @@ export {
 } from "./chart-config";
 export { Meter } from "./meter";
 export { ShareBar, ShareLegend, type ShareSegment } from "./share-bar";
-export { SERIES_COLORS, OTHER_COLOR, seriesColor } from "./series";
+export { SERIES_COLORS, OTHER_COLOR, seriesColor, campaignColor, campaignKeyColor, deviceColor, deviceKeyColor } from "./series";
 export { Sparkline } from "./sparkline";
 export { ChartLegend, type LegendItem } from "./chart-legend";
 export { useChartStyle, CHART_STYLES, type ChartStyle } from "./use-chart-style";

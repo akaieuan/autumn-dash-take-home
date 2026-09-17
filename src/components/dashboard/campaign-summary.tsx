@@ -2,14 +2,15 @@ import type { CampaignSummaryDto } from "@/lib/db/queries";
 import { count, money, oneIn } from "@/lib/format";
 import { Panel, PanelHeader, PanelBody, EmptyState } from "@/components/layout";
 import { LiveDot } from "@/components/copy";
-import { ShareBar, ShareLegend, seriesColor } from "@/components/charts";
+import { ShareBar, ShareLegend, campaignKeyColor } from "@/components/charts";
 import { CampaignRow, CAMPAIGN_COLS } from "./campaign-row";
 
 const th = "text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
 
 export function CampaignSummary({ summary: s }: { summary: CampaignSummaryDto }) {
   const live = s.campaigns.filter((c) => c.live).length;
-  const segments = s.campaigns.map((c, i) => ({ label: c.name, share: c.share, color: seriesColor(i) }));
+  // Colour is the campaign's identity, not its rank here: the same amber follows Discovery onto the traffic screen, where the rows are ranked by visits instead of bookings.
+  const segments = s.campaigns.map((c) => ({ label: c.name, share: c.share, color: campaignKeyColor(c.key) }));
   return (
     <Panel id="campaigns" className="@container scroll-mt-20">
       <PanelHeader
@@ -39,8 +40,8 @@ export function CampaignSummary({ summary: s }: { summary: CampaignSummaryDto })
                 <span role="columnheader" className={`hidden text-right @lg:block ${th}`} title="How many people who saw the ad clicked it">Clicked</span>
                 <span role="columnheader" className={`text-right ${th}`}>Bookings</span>
               </div>
-              {s.campaigns.map((c, i) => (
-                <CampaignRow key={c.name} campaign={c} color={seriesColor(i)} />
+              {s.campaigns.map((c) => (
+                <CampaignRow key={c.name} campaign={c} color={campaignKeyColor(c.key)} />
               ))}
               <div role="row" aria-label="All campaigns" className={`grid items-center gap-x-4 pt-3 ${CAMPAIGN_COLS}`}>
                 <span role="cell" className="text-sm font-semibold">All campaigns</span>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { money, moneyCompact, compact, count, pct, delta, deltaText, oneIn, shortDate, longDate, bucketLabel, rangeLabel } from "@/lib/format";
+import { money, moneyExact, moneyCompact, compact, count, pct, delta, deltaText, oneIn, shortDate, longDate, bucketLabel, rangeLabel } from "@/lib/format";
 
 describe("format", () => {
   it("money renders whole dollars from cents", () => {
@@ -8,6 +8,12 @@ describe("format", () => {
     expect(money(0)).toBe("$0");
     expect(money(-125000)).toBe("-$1,250");
     expect(money(44450)).toBe("$445");
+  });
+  it("moneyExact keeps the cents, so a per-visit price never reads $0", () => {
+    expect(moneyExact(7)).toBe("$0.07");
+    expect(moneyExact(850)).toBe("$8.50");
+    expect(moneyExact(36600)).toBe("$366.00");
+    expect(moneyExact(0)).toBe("$0.00");
   });
   it("compact forms abbreviate and count keeps thousands separators", () => {
     expect(moneyCompact(1868500)).toBe("$18.7k");
