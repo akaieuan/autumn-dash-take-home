@@ -89,6 +89,13 @@ describe("DayCard height", () => {
 });
 
 describe("ActivityCalendar", () => {
+  it("keeps the header readout at one width so the span toggle never moves while hovering", () => {
+    const { container } = render(<ActivityCalendar activity={activity} />);
+    const readout = container.querySelector("#activity p[aria-live]") as HTMLElement;
+    expect(readout.className).toContain("w-52");
+    expect(readout.className).toContain("justify-end");
+  });
+
   it("shows fewer weeks in a narrow column so a tile never shrinks below a thumb: old weeks carry the container-gated classes", () => {
     const { container } = render(<ActivityCalendar activity={activity} initialSpan="year" />);
     const tiles = [...container.querySelectorAll<HTMLElement>("[data-date]")];

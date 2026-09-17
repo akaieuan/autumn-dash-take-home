@@ -110,7 +110,8 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         description="Darker is busier. Point at a day to read it, click to keep it open."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <p aria-live="polite" className="flex h-8 items-center whitespace-nowrap tabular-nums text-muted-foreground">
+            {/* Fixed width, text kept to the right: the day under the pointer changes length, the toggle beside it must not move. */}
+            <p aria-live="polite" className="flex h-8 w-52 items-center justify-end truncate whitespace-nowrap tabular-nums text-muted-foreground">
               {shown ? (
                 <>
                   <span className="text-foreground">{weekdayDate(shown.date)}</span>
