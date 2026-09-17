@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { PanelLeft } from "lucide-react";
+import { Menu, PanelLeft, X } from "lucide-react";
 import { NAV_GROUPS, type NavGroup } from "@/lib/navigation";
 import { PROPERTY } from "@/lib/property";
 import { cn } from "@/lib/utils";
@@ -73,7 +73,9 @@ export function Sidebar() {
             }
             className="rounded-(--r-in)"
           >
-            <PanelLeft className="size-4" aria-hidden="true" />
+            {/* Under sm the panel is a drawer, so the button reads as a menu: three lines to open, an X to close. From sm it is the panel-collapse icon. CSS picks; nothing measures the window. */}
+            {drawerOpen ? <X className="size-4 sm:hidden" aria-hidden="true" /> : <Menu className="size-4 sm:hidden" aria-hidden="true" />}
+            <PanelLeft className="hidden size-4 sm:block" aria-hidden="true" />
           </IconButton>
         </div>
 
