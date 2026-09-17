@@ -45,7 +45,7 @@ Each entry ends with a status:
 
 Numbers quoted here were measured on 2026-09-17 against the live database,
 not copied from a plan. On that date the gates read: typecheck clean, 28
-test files and 191 tests passing, seed and verify agreeing on
+test files and 193 tests passing, seed and verify agreeing on
 `730 days, 730 daily rows, 12,286 breakdown rows, 918 bookings, $408,745.44
 booking value, $29,521.54 ad spend, 4 campaigns, 24 events`.
 
