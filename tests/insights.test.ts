@@ -5,9 +5,9 @@ import type { BreakdownRowDto } from "@/lib/db/queries/breakdowns";
 import { parseRange } from "@/lib/date-range";
 
 const range = parseRange("30d", "2024-09-17", "2026-09-16");
-const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, ...o });
+const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, spendCents: 150000, ...o });
 const overview = (o: Partial<OverviewDto> = {}): OverviewDto => ({ current: totals(), previous: totals(), lastYear: totals(), feeRateBps: 1500, costPerBookingCents: 7500, otaCommissionPerBookingCents: 9000, commissionAvoidedCents: 360000, ...o });
-const row = (value: string, o: Partial<BreakdownRowDto> = {}): BreakdownRowDto => ({ value, label: value, impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, feeCents: 37500, ctr: 0.1, conversion: 0.05, shareOfBookings: 0.5, shareOfClicks: 0.5, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000 }, ...o });
+const row = (value: string, o: Partial<BreakdownRowDto> = {}): BreakdownRowDto => ({ value, label: value, impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, feeCents: 37500, spendCents: 10000, ctr: 0.1, conversion: 0.05, shareOfBookings: 0.5, shareOfClicks: 0.5, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, spendCents: 0 }, ...o });
 const none = { campaign: [], device: [], feeder_market: [] };
 
 describe("computeInsights", () => {
@@ -32,8 +32,8 @@ describe("computeInsights", () => {
   });
   it("campaign riser and click-through drop, with an action paired to the watch, watches first", () => {
     const campaign = [
-      row("Brand Protection", { bookings: 9, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000 } }),
-      row("Discovery & Competitors", { impressions: 4000, clicks: 200, ctr: 0.05, previous: { impressions: 4000, clicks: 300, bookings: 5, bookingValueCents: 250000 } }),
+      row("Brand Protection", { bookings: 9, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, spendCents: 0 } }),
+      row("Discovery & Competitors", { impressions: 4000, clicks: 200, ctr: 0.05, previous: { impressions: 4000, clicks: 300, bookings: 5, bookingValueCents: 250000, spendCents: 0 } }),
     ];
     const out = computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: { ...none, campaign }, range });
     expect(out.map((i) => i.kind)).toEqual(["watch", "win", "action"]);
@@ -43,13 +43,23 @@ describe("computeInsights", () => {
   it("new market and phone share, and the limit holds", () => {
     const out = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000, bookings: 60 }) }), breakdowns: {
       campaign: [row("A", { bookings: 8 })],
-      feeder_market: [row("Milwaukee, WI", { bookings: 3, previous: { impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0 } })],
+      feeder_market: [row("Milwaukee, WI", { bookings: 3, previous: { impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0, spendCents: 0 } })],
       device: [row("Mobile", { shareOfClicks: 0.61 })],
     }, range }, 3);
     expect(out).toHaveLength(3);
-    const all = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000, bookings: 60 }) }), breakdowns: { campaign: [], feeder_market: [row("Milwaukee, WI", { bookings: 3, previous: { impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0 } })], device: [row("Mobile", { shareOfClicks: 0.61 })] }, range }, 10);
+    const all = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000, bookings: 60 }) }), breakdowns: { campaign: [], feeder_market: [row("Milwaukee, WI", { bookings: 3, previous: { impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0, spendCents: 0 } })], device: [row("Mobile", { shareOfClicks: 0.61 })] }, range }, 10);
     expect(all.map((i) => i.id)).toEqual(["value-up", "yoy-up", "cheaper-than-ota", "new-market", "mobile"]);
     expect(all.find((i) => i.id === "mobile")?.title).toBe("61% of visitors arrive on a phone");
+  });
+  it("names the most recent thing Autumn did with its before/after, as an action", () => {
+    const impact = { event: { id: 22, date: "2026-08-03", campaign: "Discovery & Competitors", campaignLabel: "Discovery", kind: "copy_refresh" as const, kindLabel: "Ads refreshed", title: "Discovery ad copy refreshed", note: "n" }, days: 28,
+      before: { from: "", to: "", impressions: 3000, clicks: 300, bookings: 9, bookingValueCents: 400000, spendCents: 50000, ctr: 0.1, conversion: 0.03 },
+      after: { from: "", to: "", impressions: 3000, clicks: 375, bookings: 14, bookingValueCents: 650000, spendCents: 60000, ctr: 0.125, conversion: 0.037 } };
+    const out = computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range, events: [impact] });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: "event-22", kind: "action", title: "Ads refreshed: Discovery ad copy refreshed", anchor: "campaigns" });
+    expect(out[0].body).toBe("On Aug 3, 2026. In the 28 days since, Discovery ads brought 14 bookings worth $6,500, against 9 in the 28 days before. 1 in 8 clicked, against 1 in 10 before.");
+    expect(computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range, events: [{ ...impact, days: 3 }] })).toEqual([]);
   });
   it("returns nothing when there is no comparison and no fee advantage", () => {
     expect(computeInsights({ overview: overview({ previous: null, lastYear: null, costPerBookingCents: 9500 }), breakdowns: none, range: { ...range, comparison: null } })).toEqual([]);

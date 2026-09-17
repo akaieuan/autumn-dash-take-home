@@ -31,3 +31,17 @@ files, 53 tests.
 ## Nothing exists yet under
 
 `src/components/**` (only `ui/` from shadcn), `src/app/{loading,error,not-found}.tsx`, `tests/components/**`, `tests/architecture.test.ts`. Those are yours.
+
+## Added 2026-09-17 (branch `feat/campaign-events`): events, campaign metadata, spend
+
+| Export | Shape | Use |
+|---|---|---|
+| `PeriodTotals.spendCents`, `BreakdownRowDto.spendCents` (+ `previous.spendCents`), `CampaignDto.spendCents` | integer cents | "What Autumn spent" beside fee and value; per-campaign cost |
+| `getCampaignMeta(db)` → `CampaignMetaDto[]` | `{ name, label, objective, focus, launchedOn, status, monthlyBudgetCents }` | campaign cards: what it is for, where it is pointed |
+| `getEvents(db, range, limit=10)` → `EventDto[]` | `{ id, date, campaign, campaignLabel, kind, kindLabel, title, note }`, newest first | "What Autumn did" timeline |
+| `getEventImpact(db, event, days=28, clipTo?)` → `EventImpactDto` | `{ event, days, before: WindowTotals, after: WindowTotals }`; `WindowTotals = { from, to, impressions, clicks, bookings, bookingValueCents, spendCents, ctr, conversion }` | the before/after card; pass `clipTo = bounds.max` |
+| `getRecentEventImpacts(db, range, count=3, days=28)` | the above for the newest events in range | feed `computeInsights({ …, events })` and the timeline in one call |
+| `computeInsights` input gains optional `events?: EventImpactDto[]` | rule 7 emits one `action` card for the newest event with ≥ 7 days after it | already wired if the page passes `events` |
+| `glossary.spend`, `glossary.events`, `EVENT_KIND_LABELS` | copy | labels for the new panels |
+
+Seed totals changed (events lift the numbers): 916 bookings, $407,167 value, $29,490 spend. Component fixtures that build `PeriodTotals`, `BreakdownRowDto` or `CampaignDto` literals need `spendCents`; the two under `tests/components` were updated with zeros on this branch.

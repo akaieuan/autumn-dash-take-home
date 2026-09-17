@@ -40,8 +40,7 @@ const totals: PeriodTotals = {
   pagesPerSession: 3.6,
   ctr: 1020 / 6400,
   conversion: 41 / 1020,
-  avgBookingValueCents: 44488,
-};
+  avgBookingValueCents: 44488, spendCents: 0, };
 const overview: OverviewDto = {
   current: totals,
   previous: { ...totals, bookings: 35, bookingValueCents: 1508000 },

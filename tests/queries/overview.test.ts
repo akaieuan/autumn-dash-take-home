@@ -24,7 +24,7 @@ describe("getOverview", () => {
     expect(o.current).toMatchObject({
       days: 3, impressions: 5000, clicks: 600, websiteVisits: 582, bookings: 3,
       bookingValueCents: 125050, feeCents: 18758, netCents: 106292, newVisitors: 2700, pagesPerSession: 3.5,
-      avgBookingValueCents: 41683,
+      avgBookingValueCents: 41683, spendCents: 4500,
     });
     expect(o.current.ctr).toBeCloseTo(0.12, 6);
     expect(o.current.conversion).toBeCloseTo(0.005, 6);

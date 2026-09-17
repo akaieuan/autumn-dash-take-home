@@ -1,5 +1,5 @@
 import type { TestDb } from "./setup";
-import { breakdowns, dailyMetrics } from "@/lib/db/schema";
+import { breakdowns, campaignEvents, campaigns, dailyMetrics } from "@/lib/db/schema";
 
 /**
  * Hand-built days. Current window 2026-09-01..09-10; previous 2026-08-22..08-31; last year 2025-09-01..09-10.
@@ -26,17 +26,28 @@ export const SEGMENT_RANGE = {
   comparison: { prevFrom: "2026-06-28", prevTo: "2026-07-07", prevLabel: "prev", lastYearFrom: "2025-07-08", lastYearTo: "2025-07-17", lastYearLabel: "ly" },
 };
 
-const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, pagesPerSession: number) =>
-  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, pagesPerSession });
-const bd = (date: string, dimension: "campaign" | "device" | "feeder_market", dimensionValue: string, impressions: number, clicks: number, bookings: number, bookingValue: number) =>
-  ({ date, dimension, dimensionValue, impressions, clicks, bookings, bookingValue });
+const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, pagesPerSession: number, spend = 0) =>
+  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, pagesPerSession, spend });
+const bd = (date: string, dimension: "campaign" | "device" | "feeder_market", dimensionValue: string, impressions: number, clicks: number, bookings: number, bookingValue: number, spend = 0) =>
+  ({ date, dimension, dimensionValue, impressions, clicks, bookings, bookingValue, spend });
 
 export async function loadFixture(db: TestDb) {
+  await db.insert(campaigns).values([
+    { name: "Brand Protection", objective: "Keep you first on your name.", focus: "Your name.", launchedOn: "2024-09-17", status: "live", monthlyBudget: 350 },
+    { name: "Discovery & Competitors", objective: "Reach new travellers.", focus: "Lake stays.", launchedOn: "2024-09-17", status: "live", monthlyBudget: 900 },
+  ]);
+  await db.insert(campaignEvents).values([
+    // Impact (days = 6) hand-computed from the Brand Protection rows below: before 08-30..09-04 = 09-02 row; after 09-05..09-10 = 09-05 + 09-10 rows.
+    { id: 1, date: "2026-09-05", campaignName: "Brand Protection", kind: "copy_refresh", title: "Brand ads refreshed", note: "New headline." },
+    // Program-wide: impact (days = 7) reads daily_metrics: before 08-18..08-24 = the 08-21 row; after 08-25..08-31 = the 08-25 row.
+    { id: 2, date: "2026-08-25", campaignName: null, kind: "seasonal_push", title: "Late-summer push", note: "Budgets raised." },
+    { id: 3, date: "2026-07-09", campaignName: "Discovery & Competitors", kind: "bid_change", title: "Chicago weekend bids", note: "Raised." },
+  ]);
   await db.insert(dailyMetrics).values([
     // current: imp 5000, clk 600, visits 582, bookings 3, value 1250.50, new 2700, pps mean 3.5
-    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 3.0),
-    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 4.0),
-    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 3.5),
+    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 3.0, 10.0),
+    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 4.0, 30.0),
+    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 3.5, 5.0),
     // previous
     day("2026-08-25", 500, 50, 50, 1, 300.0, 200, 3.2),
     // last year
@@ -53,9 +64,9 @@ export async function loadFixture(db: TestDb) {
   ]);
   await db.insert(breakdowns).values([
     // campaign, current: Brand Protection imp 1500 clk 260 bk 2 val 950.50 · Discovery imp 3500 clk 340 bk 1 val 300.00
-    bd("2026-09-02", "campaign", "Brand Protection", 300, 60, 1, 500.0), bd("2026-09-02", "campaign", "Discovery & Competitors", 700, 40, 1, 300.0),
-    bd("2026-09-05", "campaign", "Brand Protection", 1000, 150, 1, 450.5), bd("2026-09-05", "campaign", "Discovery & Competitors", 2000, 150, 0, 0),
-    bd("2026-09-10", "campaign", "Brand Protection", 200, 50, 0, 0), bd("2026-09-10", "campaign", "Discovery & Competitors", 800, 150, 0, 0),
+    bd("2026-09-02", "campaign", "Brand Protection", 300, 60, 1, 500.0, 4.0), bd("2026-09-02", "campaign", "Discovery & Competitors", 700, 40, 1, 300.0, 6.0),
+    bd("2026-09-05", "campaign", "Brand Protection", 1000, 150, 1, 450.5, 12.0), bd("2026-09-05", "campaign", "Discovery & Competitors", 2000, 150, 0, 0, 18.0),
+    bd("2026-09-10", "campaign", "Brand Protection", 200, 50, 0, 0, 1.0), bd("2026-09-10", "campaign", "Discovery & Competitors", 800, 150, 0, 0, 4.0),
     // campaign, previous: only Brand Protection ran
     bd("2026-08-25", "campaign", "Brand Protection", 500, 50, 1, 300.0),
     // device, current (one day only)

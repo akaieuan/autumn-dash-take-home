@@ -12,14 +12,14 @@ describe("getBreakdown", () => {
     const rows = await getBreakdown(db, FIXTURE_RANGE, "campaign", 1500);
     expect(rows.map((r) => r.value)).toEqual(["Brand Protection", "Discovery & Competitors"]);
     const bp = rows[0];
-    expect(bp).toMatchObject({ label: "Brand protection", impressions: 1500, clicks: 260, bookings: 2, bookingValueCents: 95050, feeCents: 14258 });
+    expect(bp).toMatchObject({ label: "Brand protection", impressions: 1500, clicks: 260, bookings: 2, bookingValueCents: 95050, feeCents: 14258, spendCents: 1700 });
     expect(bp.ctr).toBeCloseTo(260 / 1500, 6);
     expect(bp.conversion).toBeCloseTo(2 / 260, 6);
     expect(bp.shareOfBookings).toBeCloseTo(2 / 3, 6);
     expect(bp.shareOfClicks).toBeCloseTo(260 / 600, 6);
-    expect(bp.previous).toEqual({ impressions: 500, clicks: 50, bookings: 1, bookingValueCents: 30000 });
+    expect(bp.previous).toEqual({ impressions: 500, clicks: 50, bookings: 1, bookingValueCents: 30000, spendCents: 0 });
     expect(rows[1].label).toBe("Discovery");
-    expect(rows[1].previous).toEqual({ impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0 });
+    expect(rows[1].previous).toEqual({ impressions: 0, clicks: 0, bookings: 0, bookingValueCents: 0, spendCents: 0 });
   });
   it("passes plain values through and nulls previous when there is no comparison", async () => {
     const rows = await getBreakdown(db, { ...FIXTURE_RANGE, comparison: null }, "device", 1500);

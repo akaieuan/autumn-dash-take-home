@@ -13,6 +13,9 @@ describe("seed round-trip through a real Postgres", () => {
     const { acceptance, reconciled } = await verifyDatabase(db);
     expect(acceptanceLine(acceptance)).toBe(acceptanceLine(first));
     expect(acceptance.days).toBe(730);
+    expect(acceptance.campaigns).toBe(4);
+    expect(acceptance.events).toBeGreaterThanOrEqual(20);
+    expect(acceptance.spend).toBeGreaterThan(0);
     expect(reconciled).toEqual({ campaign: true, device: true, feeder_market: true });
     await close();
   }, 120_000);

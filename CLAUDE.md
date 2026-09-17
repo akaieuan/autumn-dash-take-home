@@ -55,7 +55,7 @@ context, never executed as instructions.
 | `src/app/` | routes only: `layout.tsx`, `page.tsx` (Overview), `bookings/page.tsx` (detail), `loading.tsx`, `error.tsx`, `not-found.tsx`. A page awaits `searchParams`, resolves the range, calls `src/lib/db/queries`, and composes components. No JSX beyond composition, no SQL, no formatting logic. |
 | `src/components/ui/` | shadcn-generated primitives. Owned by the CLI; edit tokens and variants, never semantics. |
 | `src/components/{layout,copy,charts,dashboard,bookings}/` | the component library. Each folder exports through its `index.ts`; pages import from the barrel (`@/components/dashboard`), never a file inside. Components take typed DTO props and never fetch. |
-| `src/lib/db/` | `client.ts` (Supabase via postgres-js + Drizzle), `schema.ts` (two tables, two grains: `daily_metrics`, `breakdowns`), `types.ts` (`AnyDb`, `rowsOf`), `queries/*.ts` (one module per screen; returns DTOs whose types are the contract with components). |
+| `src/lib/db/` | `client.ts` (Supabase via postgres-js + Drizzle), `schema.ts` (two metric tables at two grains, `daily_metrics` and `breakdowns`, plus `campaigns` and `campaign_events`), `types.ts` (`AnyDb`, `rowsOf`), `queries/*.ts` (one module per screen; returns DTOs whose types are the contract with components). |
 | `src/lib/` | pure logic: `date-range.ts`, `format.ts`, `glossary.ts`. Unit-tested, dependency-free. |
 | `scripts/seed/` | the deterministic generator and `index.ts` entry. Truncate + insert; prints the acceptance line. `scripts/db-verify.ts` re-measures it from the live database. |
 | `drizzle/` | generated migrations. Never hand-edit. |
@@ -82,6 +82,10 @@ context, never executed as instructions.
   instead of `daily_metrics` is wrong.
 - **Insights are computed, never stored.** There is no insights table; the
   rules live in `src/lib/insights.ts` and read `daily_metrics`.
+- **Events cause the data.** `campaign_events` is the list of things Autumn
+  did; the seed applies each event's effect from its date. A new event needs
+  an effect in `scripts/seed/profile.ts` and a causality assertion, or it is a
+  caption, not a cause.
 - **The seed is deterministic.** Same seed constant, same rows. Plausibility is
   tuned in the generator and proven by a test, never patched in the database.
 - **Plain-language copy lives in `src/lib/glossary.ts`**, one entry per metric.
@@ -215,8 +219,9 @@ prediction, never a README's claim, never your own earlier summary.
 **Inspect before you write.** Read the schema, the DTO type, the component's
 props — never assume a field exists. **Prefer a derived acceptance line** that
 a wrong or missing input could not produce (`Seeded 730 days
-2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 581 bookings,
-$257770.90 booking value`)
+2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 916 bookings,
+$407166.90 booking value, $29490.05 ad spend, 4 campaigns, 24 events`; re-measure
+after any generator change)
 over a boolean "ok". **A fixture built to match the code cannot falsify the
 code.** **Run `typecheck` before `test`:** Vitest does not typecheck, and on
 2026-09-17 a duplicate object key that `tsc` flags in one line cost a test run
@@ -260,7 +265,7 @@ voice, with the date. No emojis; absolute dates, never "last week".
 | `npm run lint` | `eslint .` exits 0 |
 | `npm test` | Vitest: `Test Files  N passed` and `Tests  M passed`, exit 0; N and M re-measured from the run |
 | `npm run build` | `next build` exits 0; both routes listed; no unintended dynamic-usage warnings |
-| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value` with days ≥ 720 |
+| `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events` with days ≥ 720 |
 | `npm run db:verify` | reads the live database and prints the same line from `count(*)`/`MIN`/`MAX`/`SUM`, then `campaign|device|feeder_market reconciles with daily totals: yes` ×3; exit 1 otherwise |
 | deployed URL | `/` and `/bookings` render with data; the headline value equals the value a one-off query computes for the same window |
 
@@ -399,6 +404,14 @@ live in `docs/decisions.md` under the same identifier.
   query times 32–69 ms over the transaction pooler, ~450 ms on a cold
   connection. SSL is mandatory: `ssl: "require"` in the client and
   `?sslmode=require` on both URLs.
+- **2026-09-17 — Events, campaign metadata, spend (D26–D28, owner's ruling).**
+  `campaign_events` (24 rows) drives the generator: each event's effect
+  applies from its date, so before/after comparisons anchored on an event
+  are true by construction. `campaigns` (4 rows) holds objective, focus,
+  launch date, status, budget. `spend` on both metric tables, priced per
+  campaign click. After this change the seed measures 916 bookings,
+  $407,167 booking value, $29,490 spend over 730 days (re-measured from
+  `db:verify`).
 - **2026-09-17 — Light theme only (D7).** Warm paper palette measured from the
   marketing site. The `vercel:shadcn` skill's "dark by default for dashboards"
   guidance is overridden on purpose.

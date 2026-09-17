@@ -9,17 +9,17 @@ import { getPeriodTotals } from "./overview";
 export interface BreakdownRowDto {
   value: string;
   label: string;
-  impressions: number; clicks: number; bookings: number; bookingValueCents: number; feeCents: number;
+  impressions: number; clicks: number; bookings: number; bookingValueCents: number; feeCents: number; spendCents: number;
   ctr: number; conversion: number;
   shareOfBookings: number; shareOfClicks: number;
-  previous: { impressions: number; clicks: number; bookings: number; bookingValueCents: number } | null;
+  previous: { impressions: number; clicks: number; bookings: number; bookingValueCents: number; spendCents: number } | null;
 }
 
-interface Agg { value: string; impressions: unknown; clicks: unknown; bookings: unknown; v: unknown }
+interface Agg { value: string; impressions: unknown; clicks: unknown; bookings: unknown; v: unknown; s: unknown }
 
 async function aggregate(db: AnyDb, dimension: Dimension, from: string, to: string): Promise<Agg[]> {
   return rowsOf<Agg>(await db.execute(sql`
-    select dimension_value as value, sum(impressions) as impressions, sum(clicks) as clicks, sum(bookings) as bookings, sum(booking_value)::float8 as v
+    select dimension_value as value, sum(impressions) as impressions, sum(clicks) as clicks, sum(bookings) as bookings, sum(booking_value)::float8 as v, sum(spend)::float8 as s
     from breakdowns where dimension = ${dimension} and date between ${from} and ${to}
     group by dimension_value`));
 }
@@ -40,10 +40,10 @@ export async function getBreakdown(db: AnyDb, range: DateRange, dimension: Dimen
       const p = prevBy.get(r.value);
       return {
         value: r.value, label: valueLabel(r.value),
-        impressions, clicks, bookings, bookingValueCents, feeCents: Math.round((bookingValueCents * feeRateBps) / 10000),
+        impressions, clicks, bookings, bookingValueCents, feeCents: Math.round((bookingValueCents * feeRateBps) / 10000), spendCents: toCents(r.s),
         ctr: impressions ? clicks / impressions : 0, conversion: clicks ? bookings / clicks : 0,
         shareOfBookings: bookings / totalBookings, shareOfClicks: clicks / totalClicks,
-        previous: prev ? { impressions: n(p?.impressions), clicks: n(p?.clicks), bookings: n(p?.bookings), bookingValueCents: toCents(p?.v) } : null,
+        previous: prev ? { impressions: n(p?.impressions), clicks: n(p?.clicks), bookings: n(p?.bookings), bookingValueCents: toCents(p?.v), spendCents: toCents(p?.s) } : null,
       };
     })
     .sort((a, b) => b.bookings - a.bookings || b.bookingValueCents - a.bookingValueCents || b.clicks - a.clicks || a.value.localeCompare(b.value));
@@ -88,7 +88,7 @@ export async function getMarkets(db: AnyDb, range: DateRange, limit = 5): Promis
   return out.map((m) => ({ ...m, share: top ? m.bookings / top : 0 }));
 }
 
-export interface CampaignDto { key: CampaignKey | null; name: string; live: boolean; shown: number; visits: number; ctr: number; bookings: number; bookingValueCents: number; share: number }
+export interface CampaignDto { key: CampaignKey | null; name: string; live: boolean; shown: number; visits: number; ctr: number; bookings: number; bookingValueCents: number; spendCents: number; share: number }
 export interface CampaignSummaryDto { campaigns: CampaignDto[]; total: { shown: number; visits: number; ctr: number; bookings: number; bookingValueCents: number } }
 
 /** A campaign counts as live when it was still being shown in the last seven days of the range. */
@@ -116,7 +116,7 @@ export async function getCampaigns(db: AnyDb, range: DateRange): Promise<Campaig
       return {
         key, name: key ? glossary[key].label : r.label, live: live.has(r.value),
         shown: r.impressions, visits: r.clicks, ctr: r.ctr,
-        bookings: r.bookings, bookingValueCents: r.bookingValueCents, share: r.shareOfBookings,
+        bookings: r.bookings, bookingValueCents: r.bookingValueCents, spendCents: r.spendCents, share: r.shareOfBookings,
       };
     }),
     total: { shown: totals.impressions, visits: totals.clicks, ctr: totals.ctr, bookings: totals.bookings, bookingValueCents: totals.bookingValueCents },

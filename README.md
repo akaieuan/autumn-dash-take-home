@@ -41,8 +41,8 @@ connections.
 npm run db:migrate
 ```
 
-Applies the generated migration in `drizzle/` (two tables, one index, one
-foreign key, one check constraint).
+Applies the generated migrations in `drizzle/` (four tables, two indexes,
+two foreign keys, two check constraints).
 
 **4. Seed 730 days of data**
 
@@ -54,7 +54,7 @@ Wipes both tables and inserts a deterministic two-year dataset. It prints one
 line that a partial or wrong run could not produce:
 
 ```
-Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 581 bookings, $257770.90 booking value
+Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 916 bookings, $407166.90 booking value, $29490.05 ad spend, 4 campaigns, 24 events
 ```
 
 Running it again produces byte-identical rows; the generator is seeded with a
@@ -79,13 +79,15 @@ npm run dev
 
 ## The data model
 
-Two tables at two grains. The full reasoning is in
-[docs/decisions.md](docs/decisions.md) (D21–D25).
+Two metric tables at two grains, plus two small reference tables. The full
+reasoning is in [docs/decisions.md](docs/decisions.md) (D21–D28).
 
 | Table | Grain | Columns |
 |---|---|---|
-| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `pages_per_session numeric(4,2)` |
-| `breakdowns` | one row per day per dimension value | `date` (FK), `dimension` ∈ `campaign` \| `device` \| `feeder_market` (check constraint), `dimension_value`, `impressions`, `clicks`, `bookings`, `booking_value`; index on `(date, dimension)` |
+| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `pages_per_session numeric(4,2)`, `spend numeric(10,2)` |
+| `breakdowns` | one row per day per dimension value | `date` (FK), `dimension` ∈ `campaign` \| `device` \| `feeder_market` (check constraint), `dimension_value`, `impressions`, `clicks`, `bookings`, `booking_value`, `spend`; index on `(date, dimension)` |
+| `campaigns` | one row per campaign | `name` (matches `dimension_value`), `objective`, `focus`, `launched_on`, `status`, `monthly_budget` |
+| `campaign_events` | one row per thing Autumn did | `date`, `campaign_name` (FK, null = whole program), `kind` ∈ launched \| budget_change \| copy_refresh \| bid_change \| seasonal_push, `title`, `note` |
 
 - `daily_metrics` is the source of truth; every headline and trend reads it.
 - `breakdowns` is derived from each day's totals by exact apportionment, so
@@ -95,6 +97,10 @@ Two tables at two grains. The full reasoning is in
 - There is no insights table. Insights are computed at render time from
   `daily_metrics` (`src/lib/insights.ts`), so they can never disagree with the
   numbers beside them.
+- Events cause the data: the seed applies each `campaign_events` effect (a
+  budget raise, a copy refresh, a seasonal push) to the generator from that
+  date, so "the four weeks since the refresh vs the four weeks before" is a
+  real comparison, not a caption.
 
 ## How the seed stays believable
 
@@ -102,10 +108,13 @@ Generated in `scripts/seed/`, daily totals first, then breakdowns.
 
 - **Seasonality:** a Lake Michigan inn's demand curve (July 1.0, January 0.42,
   a fall-colour bump in October), weekday effects, and holiday spikes.
-- **Program shape:** an eight-week ramp to full delivery, then +22% per year
-  compounding. July 2025 to July 2026 bookings go 39 → 46.
+- **Program shape:** an eight-week ramp to full delivery, +22% per year
+  compounding, and 24 dated events (launches, budget and bid changes, ad
+  refreshes, seasonal pushes) whose effects the generator applies from their
+  dates. July 2025 to July 2026 bookings go 57 → 80.
 - **Rates in the reference dashboard's bands:** blended click-through 16%,
-  conversion 4%, average booking $444, rising with the season.
+  conversion 4%, average booking about $445, rising with the season; ad spend
+  about 7% of booking value against Autumn's 15% fee.
 - **Campaign character:** Brand Protection clicks through about twice as well
   as Discovery; Google Hotel Ads and Retargeting launch in stages.
 - **Guests:** ten feeder markets weighted toward Chicago (heavier on weekends);
