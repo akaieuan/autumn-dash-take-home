@@ -1,10 +1,8 @@
 import { sql } from "drizzle-orm";
-import { rowsOf, type AnyDb } from "../types";
+import { chunkSums, n, rowsOf, toCents, type AnyDb } from "./types";
 import { addDays, type DateRange, type Granularity } from "@/lib/date-range";
 import { PROPERTY, OTA_COMMISSION_RATE } from "@/lib/property";
-
-const n = (v: unknown) => Number(v ?? 0);
-const toCents = (dollars: unknown) => Math.round(n(dollars) * 100);
+import type { GlossaryKey } from "@/lib/glossary";
 
 export interface PeriodTotals {
   from: string; to: string; days: number;
@@ -101,4 +99,43 @@ export async function getTrend(db: AnyDb, range: DateRange, metric: TrendMetric)
     c ? series(db, c.lastYearFrom, c.lastYearTo, g, metric) : null,
   ]);
   return bucketStarts(range.from, range.to, g).map((bucket, i) => ({ bucket, current: cur[i], previous: prev ? (prev[i] ?? 0) : null, lastYear: ly ? (ly[i] ?? 0) : null }));
+}
+
+export const isTrendMetric = (v: unknown): v is TrendMetric => typeof v === "string" && (TREND_METRICS as readonly string[]).includes(v);
+
+/** One value per day of [from, to], in day order; cents for booking_value, counts otherwise; 0 for a day with no row. */
+export async function getDailySeries(db: AnyDb, from: string, to: string, metric: TrendMetric): Promise<number[]> {
+  return series(db, from, to, "day", metric);
+}
+
+export interface QuickStatDto { key: GlossaryKey; kind: "count" | "money"; value: number; previous: number | null; spark: number[] }
+export interface QuickAnalyticsDto { stats: QuickStatDto[] }
+
+/** The four figures the owner scans first, in the order they are read. */
+const QUICK_STATS: { key: GlossaryKey; metric: TrendMetric; kind: "count" | "money"; of: (t: PeriodTotals) => number }[] = [
+  { key: "direct_bookings", metric: "bookings", kind: "count", of: (t) => t.bookings },
+  { key: "booking_value", metric: "booking_value", kind: "money", of: (t) => t.bookingValueCents },
+  { key: "website_visits", metric: "website_visits", kind: "count", of: (t) => t.websiteVisits },
+  { key: "impressions", metric: "impressions", kind: "count", of: (t) => t.impressions },
+];
+
+/**
+ * Value and sparkline come from the same daily series, so a card's number can never
+ * disagree with the shape drawn under it. `previous` is the same figure over the
+ * comparison window, null when the range has no comparison.
+ */
+export async function getQuickAnalytics(db: AnyDb, range: DateRange): Promise<QuickAnalyticsDto> {
+  const c = range.comparison;
+  const [dailies, previous] = await Promise.all([
+    Promise.all(QUICK_STATS.map((s) => getDailySeries(db, range.from, range.to, s.metric))),
+    c ? getPeriodTotals(db, c.prevFrom, c.prevTo) : null,
+  ]);
+  return {
+    stats: QUICK_STATS.map((s, i) => ({
+      key: s.key, kind: s.kind,
+      value: dailies[i].reduce((a, b) => a + b, 0),
+      previous: previous ? s.of(previous) : null,
+      spark: chunkSums(dailies[i], 4),
+    })),
+  };
 }
