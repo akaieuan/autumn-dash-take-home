@@ -1,5 +1,6 @@
 export { getDataBounds } from "./meta";
-export { getOverview, getPeriodTotals, getTrend, bucketStarts, TREND_METRICS } from "./overview";
-export type { OverviewDto, PeriodTotals, TrendMetric, TrendPoint } from "./overview";
-export { getBreakdown, getAllBreakdowns } from "./breakdowns";
-export type { BreakdownRowDto } from "./breakdowns";
+export { chunkSums, n, toCents } from "./types";
+export { getOverview, getPeriodTotals, getTrend, bucketStarts, TREND_METRICS, isTrendMetric, getDailySeries, getQuickAnalytics } from "./overview";
+export type { OverviewDto, PeriodTotals, TrendMetric, TrendPoint, QuickStatDto, QuickAnalyticsDto } from "./overview";
+export { getBreakdown, getAllBreakdowns, getMarkets, getCampaigns, getFunnel } from "./breakdowns";
+export type { BreakdownRowDto, MarketDto, CampaignDto, CampaignSummaryDto, FunnelStepDto, FunnelDto } from "./breakdowns";
