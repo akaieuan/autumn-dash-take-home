@@ -12,8 +12,10 @@ import {
   StyleSegment,
   METRIC_ORDER,
   METRIC_LABELS,
+  GLOSSARY_KEY,
 } from "@/components/charts";
 import type { ChartMetric, ChartPoint } from "@/components/charts";
+import { glossary } from "@/lib/glossary";
 import { TREND_METRICS } from "@/lib/db/queries";
 import type { TrendMetric, TrendPoint } from "@/lib/db/queries";
 
@@ -93,6 +95,16 @@ describe("the chart layer's copy of the trend contract", () => {
   });
   it("every metric the query layer can return has a plain-language label", () => {
     for (const m of TREND_METRICS) expect(METRIC_LABELS[m]).toBeTruthy();
+  });
+  // The chart writes no copy of its own: the labels are the glossary's words, so the picker and the
+  // "What these numbers mean" panel cannot disagree (design audit 2026-09-17, item 6). The literals
+  // are the glossary's live wording — rewording an entry without meaning to turns this red.
+  it("METRIC_LABELS are the glossary's own words", () => {
+    for (const m of TREND_METRICS) expect(METRIC_LABELS[m]).toBe(glossary[GLOSSARY_KEY[m]].label);
+    expect(METRIC_LABELS.impressions).toBe("Saw your hotel");
+    expect(METRIC_LABELS.clicks).toBe("Clicked through");
+    expect(METRIC_LABELS.website_visits).toBe("Visited your site");
+    expect(METRIC_LABELS.bookings).toBe("Direct bookings from Autumn");
   });
   it("ChartMetric and ChartPoint are exactly TrendMetric and TrendPoint (checked by tsc)", () => {
     const sameMetric: Exact<ChartMetric, TrendMetric> = true;

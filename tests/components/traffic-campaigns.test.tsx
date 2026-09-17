@@ -13,10 +13,12 @@ import { CampaignTrafficChart } from "@/components/website-traffic/campaign-traf
 import { EventImpactCard } from "@/components/website-traffic/event-impact-card";
 import { WhatAutumnDid } from "@/components/website-traffic/what-autumn-did";
 import { CampaignEfficiencyTable } from "@/components/website-traffic/campaign-efficiency-table";
+import { chartRows, marksByBucket, highlightSpan } from "@/components/website-traffic/campaign-traffic-data";
 import { DeviceConversion } from "@/components/website-traffic/device-conversion";
 import { TRAFFIC_METRICS, TRAFFIC_METRIC_LABELS, isTrafficMetric } from "@/components/website-traffic/traffic-config";
 import type { BreakdownRowDto, CampaignEfficiencyDto, CampaignSeriesDto, CampaignSeriesMetric, CampaignSummaryDto, EventImpactDto } from "@/lib/db/queries";
 import type { TrafficMetric } from "@/components/website-traffic/traffic-config";
+import { glossary } from "@/lib/glossary";
 
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
@@ -114,6 +116,10 @@ describe("traffic-config", () => {
   it("lists the three metrics an owner can plot, in plain words", () => {
     expect([...TRAFFIC_METRICS]).toEqual(["clicks", "impressions", "bookings"]);
     expect(TRAFFIC_METRIC_LABELS.clicks).toBe("Visits");
+    // The traffic screen writes its own words for "clicks" ("Visits", the thing the owner counts here),
+    // but "Saw your hotel" is the glossary's phrase and must stay word-for-word the same one, or the
+    // picker and the glossary panel say two different things about impressions (design audit item 6/10).
+    expect(TRAFFIC_METRIC_LABELS.impressions).toBe(glossary.impressions.label);
     expect(isTrafficMetric("impressions")).toBe(true);
     expect(isTrafficMetric("booking_value")).toBe(false);
   });
@@ -256,5 +262,47 @@ describe("DeviceConversion", () => {
   it("says so plainly when nobody has visited", () => {
     wrap(<DeviceConversion devices={[]} />);
     expect(screen.getByText("No visits in this period yet")).toBeInTheDocument();
+  });
+});
+
+describe("campaign-traffic-data", () => {
+  // The chart's arithmetic, lifted out of the component on 2026-09-17 (design audit item 9) so each
+  // rule is proved on values rather than on a rendered Recharts SVG.
+  it("shapes one row per bucket, with the bucket's span and the all-campaigns total", () => {
+    const rows = chartRows(series, range.to);
+    expect(rows).toHaveLength(10);
+    expect(rows[1]).toMatchObject({ label: "Sep 2", span: "Sep 2", total: 100, s0: 60, s1: 40 });
+    // A week bucket names the days it covers; the last one stops at the range's own end.
+    const weekly = { ...series, granularity: "week" as const, buckets: ["2026-09-01", "2026-09-08"], series: series.series.map((s) => ({ ...s, values: [1, 2] })) };
+    const weeks = chartRows(weekly, "2026-09-10");
+    expect(weeks[0].span).toBe("Sep 1 – Sep 7");
+    expect(weeks[1].span).toBe("Sep 8 – Sep 10");
+  });
+
+  it("gives several changes on one bucket a single mark", () => {
+    const two = [
+      { ...series.events[0], id: 1 },
+      { ...series.events[0], id: 2, title: "Weekend bids raised" },
+      { ...series.events[0], id: 3, date: "2026-09-02", bucket: "2026-09-02" },
+    ];
+    const marks = marksByBucket(two);
+    expect(marks).toHaveLength(2);
+    const [bucket, events] = marks.find(([b]) => b === "2026-09-05")!;
+    expect(bucket).toBe("2026-09-05");
+    expect(events).toHaveLength(2);
+    expect(events.map((e) => e.id)).toEqual([1, 2]);
+  });
+
+  it("clips a highlight window to the range's last bucket", () => {
+    // The after-window runs a month past the chart; the shaded band must stop at the last bucket.
+    expect(highlightSpan(series.buckets, { from: "2026-09-05", to: "2026-10-02" }, range.to)).toEqual({
+      from: "2026-09-05",
+      to: "2026-09-10",
+    });
+    // Inside the range it keeps its own end, and a date before the first bucket falls on the first.
+    expect(highlightSpan(series.buckets, { from: "2026-08-01", to: "2026-09-03" }, range.to)).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-03",
+    });
   });
 });

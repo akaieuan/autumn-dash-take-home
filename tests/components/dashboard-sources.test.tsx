@@ -51,7 +51,10 @@ describe("FeederMarkets", () => {
     const row = screen.getByRole("row", { name: "Chicago, IL" });
     expect(row).toHaveTextContent("2 h 15 drive");
     expect(within(row).getByRole("meter", { name: "Chicago, IL share of bookings" }).getAttribute("aria-valuenow")).toBe("1");
-    expect(within(row).getByText("377").className).toContain("@md:block");
+    // 2026-09-17: the markets list moved from a `div role="table"` grid onto the shared `DataTable`
+    // (design audit item 2), so the gate is the table dialect's `@md:table-cell` rather than the
+    // grid's `@md:block`. The rule it pins is unchanged: Clicks appears only once the panel is wide.
+    expect(within(row).getByText("377").className).toContain("hidden @md:table-cell");
     expect(within(row).getByText("$6,300")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /All markets/ }).getAttribute("href")).toBe("/website-traffic#markets");
   });

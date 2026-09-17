@@ -1,15 +1,16 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, ReferenceLine, XAxis, YAxis } from "recharts";
-import { bucketLabel, compact, count, shortDate } from "@/lib/format";
+import { bucketLabel, compact, count } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EmptyState } from "@/components/layout";
 import { ChartLegend, campaignColor, usePrefersReducedMotion } from "@/components/charts";
 import { TRAFFIC_METRIC_LABELS } from "./traffic-config";
-import { EventMarker, type MarkerEvent } from "./event-marker";
-import { CampaignTrafficTable, bucketSpan, type CampaignTrafficProps } from "./campaign-traffic-table";
+import { EventMarker } from "./event-marker";
+import { CampaignTrafficTable, type CampaignTrafficProps } from "./campaign-traffic-table";
+import { chartRows, highlightSpan, keyOf, marksByBucket } from "./campaign-traffic-data";
 
 const GRAN = { day: "day by day", week: "week by week", month: "month by month" } as const;
 type View = "chart" | "table";
@@ -26,9 +27,6 @@ const ANIM_MS = 450;
 /** The change the owner has picked in the list beside the chart: its id and the after-window it is measured on. */
 export interface EventHighlight { id: number; from: string; to: string }
 
-/** Bucket start containing a date, from the chart's own bucket list. */
-const bucketOf = (buckets: string[], date: string) => buckets.reduce((hit, b) => (b <= date ? b : hit), buckets[0]);
-
 export function CampaignTrafficChart({ data, range, highlight = null, onPickEvent }: CampaignTrafficProps & { highlight?: EventHighlight | null; onPickEvent?: (id: number) => void }) {
   const [view, setView] = useState<View>("chart");
   const reducedMotion = usePrefersReducedMotion();
@@ -42,31 +40,16 @@ export function CampaignTrafficChart({ data, range, highlight = null, onPickEven
 
   const { buckets, series, granularity, metric } = data;
   const title = `${TRAFFIC_METRIC_LABELS[metric]} by campaign, ${GRAN[granularity]}`;
-  const keyOf = (i: number) => `s${i}`;
 
   const config = useMemo<ChartConfig>(
     () => Object.fromEntries(series.map((s, i) => [keyOf(i), { label: s.label, color: campaignColor(s.name) }])),
     [series],
   );
-  const rows = useMemo(
-    () =>
-      buckets.map((b, i) => {
-        const end = bucketSpan(buckets, i, range.to);
-        return {
-          label: bucketLabel(b, granularity),
-          span: granularity === "day" || end === b ? shortDate(b) : `${shortDate(b)} – ${shortDate(end)}`,
-          total: series.reduce((s, c) => s + (c.values[i] ?? 0), 0),
-          ...Object.fromEntries(series.map((s, si) => [keyOf(si), s.values[i] ?? 0])),
-        };
-      }),
-    [buckets, series, granularity, range.to],
-  );
-  // Several changes on one bucket share one line; the marker then carries their count.
-  const marks = useMemo(() => {
-    const byBucket = new Map<string, MarkerEvent[]>();
-    for (const e of data.events) byBucket.set(e.bucket, [...(byBucket.get(e.bucket) ?? []), { id: e.id, kindLabel: e.kindLabel, title: e.title }]);
-    return [...byBucket.entries()];
-  }, [data.events]);
+  // The shaping, the grouping and the clipping are arithmetic, proved in
+  // tests/components/traffic-campaigns.test.tsx; this component keeps the Recharts markup.
+  const rows = useMemo(() => chartRows(data, range.to), [data, range.to]);
+  const marks = useMemo(() => marksByBucket(data.events), [data.events]);
+  const band = highlight && buckets.length > 0 ? highlightSpan(buckets, highlight, range.to) : null;
 
   const anim = { isAnimationActive: firstDraw && !reducedMotion, animationDuration: ANIM_MS, animationEasing: "ease-out" as const, animationBegin: 0 };
   const stacked = buckets.length >= AREA_FROM_BUCKETS;
@@ -138,10 +121,10 @@ export function CampaignTrafficChart({ data, range, highlight = null, onPickEven
               ),
             )}
             {/* The picked change's after-window, shaded, so "after" on the card is a region on the chart. */}
-            {highlight && buckets.length > 0 ? (
+            {band ? (
               <ReferenceArea
-                x1={bucketLabel(bucketOf(buckets, highlight.from), granularity)}
-                x2={bucketLabel(bucketOf(buckets, highlight.to < range.to ? highlight.to : range.to), granularity)}
+                x1={bucketLabel(band.from, granularity)}
+                x2={bucketLabel(band.to, granularity)}
                 fill="var(--chart-2)"
                 fillOpacity={0.1}
                 stroke="none"

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns, type DayLike } from "@/lib/activity";
+import {
+  weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns,
+  visibleWindow, dayRank, monthContext, weekContext, type DayLike,
+} from "@/lib/activity";
 
 /** A local date walker, so the fixtures below never borrow the helper under test. */
 const addUtcDays = (iso: string, n: number) => {
@@ -118,5 +121,62 @@ describe("heatLevel and monthColumns still live here", () => {
     const threeWeeks = Array.from({ length: 21 }, (_, i) => ({ date: addUtcDays("2026-08-23", i), value: 1 }));
     expect(monthColumns(threeWeeks)).toEqual([{ column: 3, label: "Sep" }]);
     expect(monthColumns(DAYS)).toEqual([]); // two August columns only: nothing to label
+  });
+});
+
+/**
+ * Thirty whole weeks, Sunday 2026-02-22 through Saturday 2026-09-19, so a span can actually cut
+ * something: the two-week DAYS fixture is shorter than every window the toggle offers.
+ */
+const LONG: DayLike[] = Array.from({ length: 210 }, (_, i) => ({ date: addUtcDays("2026-02-22", i), value: i }));
+
+describe("visibleWindow", () => {
+  it("draws the whole year, the last 26 weeks, or the last 13", () => {
+    expect(visibleWindow(LONG, "year")).toHaveLength(210);
+    const half = visibleWindow(LONG, "half");
+    expect(half).toHaveLength(182);                 // 26 columns
+    expect(half[0].date).toBe("2026-03-22");
+    const quarter = visibleWindow(LONG, "quarter");
+    expect(quarter).toHaveLength(91);               // 13 columns
+    expect(quarter[0].date).toBe("2026-06-21");
+    expect(weekdayOf(quarter[0].date)).toBe(0);     // every window starts on a Sunday
+  });
+  it("never trims data shorter than the window", () => {
+    expect(visibleWindow(DAYS, "quarter")).toHaveLength(14);
+  });
+});
+
+describe("dayRank", () => {
+  it("places a day among every day with data, and among its own weekday", () => {
+    // 290 on Saturday 2026-09-05 is the busiest of the twelve days that have data, and the busier
+    // of the two Saturdays (the other is 8).
+    expect(dayRank(DAYS, "2026-09-05")).toEqual({ day: 1, days: 12, weekday: 1, weekdays: 2 });
+    // 10 on Monday 2026-08-24: five days beat it (50, 20, 30, 97, 290), and the other Monday (20) does.
+    expect(dayRank(DAYS, "2026-08-24")).toEqual({ day: 6, days: 12, weekday: 2, weekdays: 2 });
+  });
+  it("has nothing to say about a day with no data, or a day it has never seen", () => {
+    expect(dayRank(DAYS, "2026-08-23")).toBeNull(); // null value
+    expect(dayRank(DAYS, "2025-01-01")).toBeNull();
+  });
+});
+
+describe("monthContext", () => {
+  it("names the month, ranks it in the year and compares it with the month before", () => {
+    // Aug 98, Sep 425 (monthTotals above): September is the busier and grew 334%.
+    expect(monthContext(DAYS, "2026-09-02")).toEqual({ label: "Sep 2026", total: 425, rank: 1, count: 2, deltaPct: 334 });
+    expect(monthContext(DAYS, "2026-08-24")).toEqual({ label: "Aug 2026", total: 98, rank: 2, count: 2, deltaPct: null });
+  });
+  it("is null with no day picked, or for a month outside the data", () => {
+    expect(monthContext(DAYS, null)).toBeNull();
+    expect(monthContext(DAYS, "2025-12-01")).toBeNull();
+  });
+});
+
+describe("weekContext", () => {
+  it("is the week around the picked day, and nothing at all when none is picked", () => {
+    expect(weekContext(DAYS, "2026-09-02").map((d) => d?.date)).toEqual([
+      "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05",
+    ]);
+    expect(weekContext(DAYS, null)).toEqual([]);
   });
 });

@@ -93,3 +93,60 @@ export function lastWeeks<T extends DayLike>(days: T[], weeks: number): T[] {
   while (start + 7 < days.length && Math.ceil((days.length - start) / 7) > weeks) start += 7;
   return days.slice(start);
 }
+
+/** How far back the calendar draws. The toggle's own type lives beside the hook; this is its arithmetic. */
+export type ActivitySpan = "year" | "half" | "quarter";
+const SPAN_WEEKS: Record<ActivitySpan, number> = { year: 0, half: 26, quarter: 13 };
+
+/** The days a span shows: the year is everything, the others are the last whole 26 or 13 columns. */
+export function visibleWindow<T extends DayLike>(days: T[], span: ActivitySpan): T[] {
+  return span === "year" ? days : lastWeeks(days, SPAN_WEEKS[span]);
+}
+
+/** Where a day sits among every day with data, and among its own weekday; 1 is the busiest. */
+export interface DayRank {
+  day: number;
+  days: number;
+  weekday: number;
+  weekdays: number;
+}
+
+export function dayRank(days: DayLike[], date: string): DayRank | null {
+  const picked = days.find((d) => d.date === date);
+  if (picked === undefined || picked.value === null) return null;
+  const value = picked.value;
+  const withData = days.filter((d) => d.value !== null);
+  const sameWeekday = withData.filter((d) => weekdayOf(d.date) === weekdayOf(date));
+  const above = (xs: DayLike[]) => xs.filter((d) => (d.value as number) > value).length + 1;
+  return { day: above(withData), days: withData.length, weekday: above(sameWeekday), weekdays: sameWeekday.length };
+}
+
+/** The month a day belongs to, ranked in the year and compared with the month before it. */
+export interface MonthContext {
+  label: string;
+  total: number;
+  rank: number;
+  count: number;
+  deltaPct: number | null;
+}
+
+export function monthContext(days: DayLike[], date: string | null): MonthContext | null {
+  if (date === null) return null;
+  const months = monthTotals(days);
+  const at = months.findIndex((m) => m.key === date.slice(0, 7));
+  if (at === -1) return null;
+  const month = months[at];
+  const before = at > 0 ? months[at - 1] : null;
+  return {
+    label: `${monthShort(`${month.key}-01`)} ${month.key.slice(0, 4)}`,
+    total: month.total,
+    rank: months.filter((m) => m.total > month.total).length + 1,
+    count: months.length,
+    deltaPct: before === null || before.total === 0 ? null : Math.round(((month.total - before.total) / before.total) * 100),
+  };
+}
+
+/** The week around the picked day, or nothing at all while no day is picked. */
+export function weekContext<T extends DayLike>(days: T[], date: string | null): (T | null)[] {
+  return date === null ? [] : weekOf(days, date);
+}

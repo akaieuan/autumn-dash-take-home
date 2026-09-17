@@ -1,8 +1,8 @@
 "use client";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState } from "react";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
-import { count, longDate, monthShort, weekdayDate, weekdayShort } from "@/lib/format";
-import { heatLevel, lastWeeks, monthColumns, monthTotals, weekOf, weekdayAverages, weekdayOf } from "@/lib/activity";
+import { count, longDate, weekdayDate, weekdayShort } from "@/lib/format";
+import { dayRank, heatLevel, monthColumns, monthContext, visibleWindow, weekContext, weekdayAverages, weekdayOf } from "@/lib/activity";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,6 @@ const EMPTY = "bg-transparent";
 const SPAN_LABEL: Record<CalendarSpan, string> = { year: "Year", half: "6 months", quarter: "13 weeks" };
 /** Narrow screens get the same three choices in two characters; the long label stays in `aria-label`. */
 const SPAN_SHORT: Record<CalendarSpan, string> = { year: "1y", half: "6m", quarter: "13w" };
-const SPAN_WEEKS: Record<CalendarSpan, number> = { year: 0, half: 26, quarter: 13 };
 const STEP: Record<string, number> = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1, PageDown: 28, PageUp: -28 };
 
 const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: ${day.value === null ? "no data" : `${count(day.value)} ${unit}`}`;
@@ -38,7 +37,7 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const gridRef = useRef<HTMLDivElement>(null);
   const { days, total, from, to } = activity;
 
-  const visible = span === "year" ? days : lastWeeks(days, SPAN_WEEKS[span]);
+  const visible = visibleWindow(days, span);
   const visibleMax = Math.max(0, ...visible.map((d) => d.value ?? 0));
   const weeks = Math.max(1, Math.ceil(visible.length / 7));
   const busiest = visible.reduce<ActivityDay | null>((b, d) => (d.value !== null && (b === null || d.value > (b.value ?? 0)) ? d : b), null);
@@ -49,22 +48,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const hovered = hover === null ? null : byDate.get(hover) ?? null;
   const shown = hovered ?? pinned;
 
-  const averages = weekdayAverages(days);
-  const typical = shown === null ? null : averages[weekdayOf(shown.date)].average;
-  const rank = useMemo(() => {
-    if (shown === null || shown.value === null) return null;
-    const withData = days.filter((d) => d.value !== null);
-    const sameWeekday = withData.filter((d) => weekdayOf(d.date) === weekdayOf(shown.date));
-    const above = (xs: typeof withData) => xs.filter((d) => (d.value as number) > (shown.value as number)).length + 1;
-    return { day: above(withData), days: withData.length, weekday: above(sameWeekday), weekdays: sameWeekday.length };
-  }, [days, shown]);
-
-  const months = monthTotals(days);
-  const monthIndex = pinnedDate === null ? -1 : months.findIndex((m) => m.key === pinnedDate.slice(0, 7));
-  const month = monthIndex === -1 ? null : months[monthIndex];
-  const monthRank = month === null ? 0 : months.filter((m) => m.total > month.total).length + 1;
-  const monthBefore = monthIndex > 0 ? months[monthIndex - 1] : null;
-  const monthDelta = month === null || monthBefore === null || monthBefore.total === 0 ? null : Math.round(((month.total - monthBefore.total) / monthBefore.total) * 100);
+  // Every figure below is arithmetic on the days, proved in tests/activity.test.ts: this component
+  // keeps the state, the handlers and the markup, and asks @/lib/activity for the rest.
+  const typical = shown === null ? null : weekdayAverages(days)[weekdayOf(shown.date)].average;
+  const rank = shown === null ? null : dayRank(days, shown.date);
+  const month = monthContext(days, pinnedDate);
 
   const columns = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
@@ -100,7 +88,7 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   };
 
   return (
-    <Panel id="activity" className="scroll-mt-20">
+    <Panel id="activity">
       <PanelHeader
         headingId="activity-h"
         title={title}
@@ -223,18 +211,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
 
             <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 md:grid-cols-[minmax(0,1fr)_15rem]">
               <div className="min-w-0">
-                <WeekStrip days={pinnedDate === null ? [] : weekOf(days, pinnedDate)} pinned={pinnedDate} onPick={pick} unit={unit} />
+                <WeekStrip days={weekContext(days, pinnedDate)} pinned={pinnedDate} onPick={pick} unit={unit} />
               </div>
               {month ? (
                 <div className="min-w-0 md:border-l md:border-border md:pl-4">
-                  <MonthSummary
-                    label={`${monthShort(`${month.key}-01`)} ${month.key.slice(0, 4)}`}
-                    total={month.total}
-                    rank={monthRank}
-                    count={months.length}
-                    deltaPct={monthDelta}
-                    unit={unit}
-                  />
+                  <MonthSummary {...month} unit={unit} />
                 </div>
               ) : null}
             </div>

@@ -1,18 +1,59 @@
-import type { CampaignSummaryDto } from "@/lib/db/queries";
+import type { CampaignDto, CampaignSummaryDto } from "@/lib/db/queries";
+import { glossary } from "@/lib/glossary";
 import { count, money, oneIn } from "@/lib/format";
 import { Panel, PanelHeader, PanelBody, EmptyState } from "@/components/layout";
 import { LiveDot } from "@/components/copy";
-import { ShareBar, ShareLegend, campaignKeyColor } from "@/components/charts";
-import { CampaignRow, CAMPAIGN_COLS } from "./campaign-row";
+import { ShareBar, ShareLegend, Meter, DataTable, campaignKeyColor, type DataColumn } from "@/components/charts";
 
-const th = "text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
+/** Bookings and what they were worth, stacked, because the pair is one answer. */
+const booked = (bookings: number, valueCents: number) => (
+  <span className="flex flex-col items-end">
+    <span className="font-semibold">{count(bookings)}</span>
+    <span className="text-muted-foreground">{money(valueCents)}</span>
+  </span>
+);
 
 export function CampaignSummary({ summary: s }: { summary: CampaignSummaryDto }) {
   const live = s.campaigns.filter((c) => c.live).length;
   // Colour is the campaign's identity, not its rank here: the same amber follows Discovery onto the traffic screen, where the rows are ranked by visits instead of bookings.
   const segments = s.campaigns.map((c) => ({ label: c.name, share: c.share, color: campaignKeyColor(c.key) }));
+
+  const columns: DataColumn<CampaignDto>[] = [
+    {
+      key: "campaign",
+      header: "Campaign",
+      cell: (c) => {
+        const purpose = c.key ? glossary[c.key].purpose : undefined;
+        return (
+          <span className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex items-center gap-2">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: campaignKeyColor(c.key) }} />
+              <span className="truncate font-medium">{c.name}</span>
+              {c.live ? <LiveDot /> : null}
+            </span>
+            {purpose ? <span className="block leading-snug text-muted-foreground">{purpose}</span> : null}
+            <Meter share={c.share} label={`${c.name} share of bookings`} color={campaignKeyColor(c.key)} />
+          </span>
+        );
+      },
+      foot: "All campaigns",
+    },
+    { key: "shown", header: "Shown", align: "right", hideBelow: "lg", className: "text-muted-foreground", cell: (c) => count(c.shown), foot: count(s.total.shown) },
+    { key: "visits", header: "Clicks", align: "right", hideBelow: "lg", className: "text-muted-foreground", cell: (c) => count(c.visits), foot: count(s.total.visits) },
+    {
+      key: "ctr",
+      header: <span title="How many people who saw the ad clicked it">Clicked</span>,
+      align: "right",
+      hideBelow: "lg",
+      className: "text-muted-foreground",
+      cell: (c) => oneIn(c.ctr),
+      foot: oneIn(s.total.ctr),
+    },
+    { key: "bookings", header: "Bookings", align: "right", cell: (c) => booked(c.bookings, c.bookingValueCents), foot: booked(s.total.bookings, s.total.bookingValueCents) },
+  ];
+
   return (
-    <Panel id="campaigns" className="@container scroll-mt-20">
+    <Panel id="campaigns" className="@container">
       <PanelHeader
         headingId="campaigns-h"
         title="What each campaign is doing"
@@ -32,28 +73,14 @@ export function CampaignSummary({ summary: s }: { summary: CampaignSummaryDto })
               <ShareBar segments={segments} label="Share of bookings by campaign" />
               <ShareLegend segments={segments} />
             </div>
-            <div role="table" aria-labelledby="campaigns-h" className="divide-y divide-border">
-              <div role="row" className={`grid items-end gap-x-4 pb-2 ${CAMPAIGN_COLS}`}>
-                <span role="columnheader" className={th}>Campaign</span>
-                <span role="columnheader" className={`hidden text-right @lg:block ${th}`}>Shown</span>
-                <span role="columnheader" className={`hidden text-right @lg:block ${th}`}>Clicks</span>
-                <span role="columnheader" className={`hidden text-right @lg:block ${th}`} title="How many people who saw the ad clicked it">Clicked</span>
-                <span role="columnheader" className={`text-right ${th}`}>Bookings</span>
-              </div>
-              {s.campaigns.map((c) => (
-                <CampaignRow key={c.name} campaign={c} color={campaignKeyColor(c.key)} />
-              ))}
-              <div role="row" aria-label="All campaigns" className={`grid items-center gap-x-4 pt-3 ${CAMPAIGN_COLS}`}>
-                <span role="cell" className="text-sm font-semibold">All campaigns</span>
-                <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{count(s.total.shown)}</span>
-                <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{count(s.total.visits)}</span>
-                <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{oneIn(s.total.ctr)}</span>
-                <span role="cell" className="flex flex-col items-end text-right text-sm tabular-nums">
-                  <span className="font-semibold">{count(s.total.bookings)}</span>
-                  <span className="text-xs text-muted-foreground">{money(s.total.bookingValueCents)}</span>
-                </span>
-              </div>
-            </div>
+            <DataTable
+              label="Bookings by campaign"
+              columns={columns}
+              rows={s.campaigns}
+              rowKey={(c) => c.name}
+              rowLabel={(c) => c.name}
+              footLabel="All campaigns"
+            />
           </>
         )}
       </PanelBody>
