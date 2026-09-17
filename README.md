@@ -132,6 +132,23 @@ Query tests run against an in-process Postgres (PGlite) using the real
 migration and a hand-computed fixture, so no database is needed to run the
 suite.
 
+## Screenshots
+
+**Before: the current Autumn dashboard**, as given in the brief. Extracted
+from the take-home PDF and kept unedited in `docs/reference/`.
+
+| Marketing dashboard | Website traffic |
+|---|---|
+| ![Current Autumn marketing dashboard](docs/reference/current-dashboard-overview.png) | ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) |
+
+**After: the redesign**, in `docs/screenshots/`. Both screens, both themes,
+desktop and phone.
+
+| | Light | Dark |
+|---|---|---|
+| Overview | `overview-desktop.png` · `overview-mobile.png` | `overview-desktop-dark.png` · `overview-mobile-dark.png` |
+| Website traffic | `traffic-desktop.png` · `traffic-mobile.png` | `traffic-desktop-dark.png` · `traffic-mobile-dark.png` |
+
 ## Docs
 
 - [CLAUDE.md](CLAUDE.md) — operating contract for any session working here.
