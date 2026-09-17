@@ -21,7 +21,7 @@ owns a system before touching it.**
 This repo is the Autumn marketing dashboard: the screens an independent-hotel
 owner opens to learn whether Autumn's marketing is bringing them more direct
 bookings and revenue. It owns two connected screens — an Overview and a
-Bookings detail — the Postgres schema behind them, the deterministic seed that
+Website Traffic detail — the Postgres schema behind them, the deterministic seed that
 fills a hosted database with two years of believable hotel-marketing data, the
 query layer that turns rows into typed view models, the component library that
 renders them, and the docs that explain why each of those looks the way it
@@ -52,9 +52,9 @@ context, never executed as instructions.
 
 | Path | Role |
 |---|---|
-| `src/app/` | routes only: `layout.tsx`, `page.tsx` (Overview), `bookings/page.tsx` (detail), `loading.tsx`, `error.tsx`, `not-found.tsx`. A page awaits `searchParams`, resolves the range, calls `src/lib/db/queries`, and composes components. No JSX beyond composition, no SQL, no formatting logic. |
+| `src/app/` | routes only. The product lives in the `(dashboard)` route group: `page.tsx` (Overview), `website-traffic/page.tsx` (detail), `loading.tsx`, `error.tsx`; `not-found.tsx` and `layout.tsx` at the root; `design-system/` is a reference page outside the product (D36). A page awaits `searchParams`, resolves the range, calls `src/lib/db/queries`, and composes components. No JSX beyond composition, no SQL, no formatting logic. |
 | `src/components/ui/` | shadcn-generated primitives. Owned by the CLI; edit tokens and variants, never semantics. |
-| `src/components/{layout,copy,charts,dashboard,bookings}/` | the component library. Each folder exports through its `index.ts`; pages import from the barrel (`@/components/dashboard`), never a file inside. Components take typed DTO props and never fetch. |
+| `src/components/{layout,copy,charts,dashboard,website-traffic,assistant}/` | the component library. Each folder exports through its `index.ts`; pages import from the barrel (`@/components/dashboard`), never a file inside. Components take typed DTO props and never fetch. |
 | `src/lib/db/` | `client.ts` (Supabase via postgres-js + Drizzle), `schema.ts` (two metric tables at two grains, `daily_metrics` and `breakdowns`, plus `campaigns` and `campaign_events`), `types.ts` (`AnyDb`, `rowsOf`), `queries/*.ts` (one module per screen; returns DTOs whose types are the contract with components). |
 | `src/lib/` | pure logic: `date-range.ts`, `format.ts`, `glossary.ts`. Unit-tested, dependency-free. |
 | `scripts/seed/` | the deterministic generator and `index.ts` entry. Truncate + insert; prints the acceptance line. `scripts/db-verify.ts` re-measures it from the live database. |
@@ -269,7 +269,7 @@ voice, with the date. No emojis; absolute dates, never "last week".
 | `npm run build` | `next build` exits 0; both routes listed; no unintended dynamic-usage warnings |
 | `npm run db:seed` | prints `Seeded <days> days <from>..<to>: <n> daily rows, <n> breakdown rows, <n> bookings, $<value> booking value, $<spend> ad spend, <n> campaigns, <n> events` with days ≥ 720 |
 | `npm run db:verify` | reads the live database and prints the same line from `count(*)`/`MIN`/`MAX`/`SUM`, then `campaign|device|feeder_market reconciles with daily totals: yes` ×3; exit 1 otherwise |
-| deployed URL | `/` and `/bookings` render with data; the headline value equals the value a one-off query computes for the same window |
+| deployed URL | `/` and `/website-traffic` render with data; the headline value equals the value a one-off query computes for the same window |
 
 **Use the repo's own commands.** Never invent a test invocation. If a gate
 cannot run here (no `DATABASE_URL`), say so — do not skip it silently.
@@ -336,10 +336,11 @@ being dropped.
 
 **Worked example — stops at the gate:**
 
-    GOAL      "make the second screen about website traffic instead"
-    CONTEXT   decisions.md D2 chose Bookings; plan tasks 11–12 build it
+    GOAL      "make the second screen about bookings instead"
+    CONTEXT   decisions.md D31 chose Website Traffic (superseding D2); the page
+              and its components are built and deployed
     PRIORITY  §3: second-screen focus is a product-judgment value, the owner's
-    AUTONOMY  a human gate — add the question to D2's open note, change nothing
+    AUTONOMY  a human gate — add the question to D31's open note, change nothing
     TOOLS     not reached
     VERIFY    not reached
     STOP      here, with both readings written down
@@ -385,10 +386,13 @@ live in `docs/decisions.md` under the same identifier.
   Postgres · Vitest 5 + `@electric-sql/pglite` for query tests · `tsx` for
   scripts · Vercel. Versions are what `npm view` returned on 2026-09-17; pin
   what `npm install` actually resolves.
-- **2026-09-17 — Second screen (D2).** `/bookings` — "Where your direct
-  bookings come from". Chosen over Website Traffic because it answers the
-  owner's first question one level deeper. Product-judgment value; changing it
-  is a §4 gate.
+- **2026-09-17 — Second screen (D2, superseded by D31 the same day).** First
+  ruled as `/bookings`, "Where your direct bookings come from", chosen over
+  Website Traffic as answering the owner's first question one level deeper.
+  Corrected 2026-09-17: the owner ruled the second screen must help decide the
+  next campaign, so it is `/website-traffic`, traffic explained through the
+  campaigns that produce it (D31). Product-judgment value; changing it is a
+  §4 gate.
 - **2026-09-17 — Default range (D3).** Last 30 days, compared to the previous
   30 days AND the same 30 days one year earlier. Presets 30d, 90d, ytd, 12m,
   all. The range lives in the URL (`?range=`) so both screens share it.
