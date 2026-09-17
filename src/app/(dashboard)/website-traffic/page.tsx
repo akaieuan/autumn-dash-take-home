@@ -1,11 +1,11 @@
 import { db } from "@/lib/db/client";
 import { parseRange } from "@/lib/date-range";
-import { getDataBounds, getFunnel, getMarkets, getTrend } from "@/lib/db/queries";
+import { getActivity, getDataBounds, getFunnel, getMarkets, getTrend } from "@/lib/db/queries";
 import { AppShell, Grid, Panel, PanelHeader } from "@/components/layout";
 import { FeederMarkets } from "@/components/dashboard";
 import { TrendChart, comparisonLabels } from "@/components/charts";
 import { AssistantPopover } from "@/components/assistant";
-import { TrafficIntro, SectionPlaceholder, DeviceSplit } from "@/components/website-traffic";
+import { TrafficIntro, SectionPlaceholder, DeviceSplit, ActivityCalendar } from "@/components/website-traffic";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +16,18 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
   const { range: rangeParam } = await searchParams;
   const bounds = await getDataBounds(db);
   const range = parseRange(rangeParam, bounds.min, bounds.max);
-  const [visits, markets, funnel] = await Promise.all([
+  const [visits, markets, funnel, activity] = await Promise.all([
     getTrend(db, range, "website_visits"),
     getMarkets(db, range, 8),
     getFunnel(db, range),
+    getActivity(db, bounds.max, "website_visits"),
   ]);
   const { prevLabel, lastYearLabel } = comparisonLabels(range);
 
   return (
     <AppShell active="website-traffic" range={range.preset} dataThrough={bounds.max} basePath="/website-traffic">
       <TrafficIntro range={range} />
+      <ActivityCalendar activity={activity} />
       <Grid variant="sidebar">
         <Panel id="visits" className="scroll-mt-20 h-full">
           <PanelHeader title="Visits to your site" description="This period in green, the one before it in amber." />

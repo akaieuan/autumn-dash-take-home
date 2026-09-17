@@ -88,6 +88,12 @@
   --series-3: #3b73c9;
   --series-4: #b0508f;
   --series-other: #b9b7b0;
+  /* Activity calendar: one hue, five steps from the surface to --chart-1, mixed in oklab so the ramp is even in both themes. */
+  --heat-0: var(--muted);
+  --heat-1: color-mix(in oklab, var(--chart-1) 22%, var(--card));
+  --heat-2: color-mix(in oklab, var(--chart-1) 45%, var(--card));
+  --heat-3: color-mix(in oklab, var(--chart-1) 70%, var(--card));
+  --heat-4: var(--chart-1);
   --positive: #6f8b7a;
   --watch: #c48a3a;
   --negative: #b5563f;

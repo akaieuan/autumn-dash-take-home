@@ -46,6 +46,12 @@ const parts = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); r
 /** US date voice throughout, the way the seeded property's owner reads a date: "Sep 1". */
 export const shortDate = (iso: string) => { const { m, d } = parts(iso); return `${MONTHS[m - 1]} ${d}`; };
 export const longDate = (iso: string) => { const { y, m, d } = parts(iso); return `${MONTHS[m - 1]} ${d}, ${y}`; };
+/** "Sep" — the month a calendar column starts in. */
+export const monthShort = (iso: string) => MONTHS[parts(iso).m - 1];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** "Tue, Sep 1" — how a hovered calendar day reads. Weekday from the ISO date in UTC, never the wall clock. */
+export const weekdayDate = (iso: string) => { const { y, m, d } = parts(iso); return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${shortDate(iso)}`; };
+export const weekdayShort = (row: number) => WEEKDAYS[row] ?? "";
 export function bucketLabel(iso: string, g: Granularity): string {
   const { y, m } = parts(iso);
   if (g === "month") return `${MONTHS[m - 1]} ${y}`;
