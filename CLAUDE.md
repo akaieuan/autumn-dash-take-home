@@ -229,6 +229,14 @@ evidence, what deliberately did NOT change and why, the gates run with their
 printed lines. Commit only when asked or when a plan task says to; never push
 without the §4 gate cleared.
 
+**Commit messages are public (rule added 2026-09-17).** They describe the
+correct state a change establishes, never an incident: no credential names,
+no "leak", no account of what was exposed or who must rotate what. A
+remediation commit reads like any other fix ("Restore placeholder values in
+.env.example"). Incident detail lives in the owner's private notes, not in
+the repo. Before staging anything that touches `.env*`, read the file and the
+staged diff; stage by explicit path, never `git add -A`.
+
 **Sign-off:** `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
 **Every new assertion is falsified once** — break the thing, watch it go red,
