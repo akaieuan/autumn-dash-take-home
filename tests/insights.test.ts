@@ -5,7 +5,7 @@ import type { BreakdownRowDto } from "@/lib/db/queries/breakdowns";
 import { parseRange } from "@/lib/date-range";
 
 const range = parseRange("30d", "2024-09-17", "2026-09-16");
-const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, spendCents: 150000, ...o });
+const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, siteSessions: 7142, pageviews: 24283, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, spendCents: 150000, ...o });
 const overview = (o: Partial<OverviewDto> = {}): OverviewDto => ({ current: totals(), previous: totals(), lastYear: totals(), feeRateBps: 1500, costPerBookingCents: 7500, otaCommissionPerBookingCents: 9000, commissionAvoidedCents: 360000, ...o });
 const row = (value: string, o: Partial<BreakdownRowDto> = {}): BreakdownRowDto => ({ value, label: value, impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, feeCents: 37500, spendCents: 10000, ctr: 0.1, conversion: 0.05, shareOfBookings: 0.5, shareOfClicks: 0.5, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, spendCents: 0 }, ...o });
 const none = { campaign: [], device: [], feeder_market: [] };

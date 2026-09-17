@@ -37,6 +37,8 @@ const totals: PeriodTotals = {
   feeCents: 273600,
   netCents: 1550400,
   newVisitors: 5210,
+  siteSessions: 7442,
+  pageviews: 26791,
   pagesPerSession: 3.6,
   ctr: 1020 / 6400,
   conversion: 41 / 1020,

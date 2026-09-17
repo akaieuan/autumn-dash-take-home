@@ -23,7 +23,8 @@ describe("getOverview", () => {
     const o = await getOverview(db, FIXTURE_RANGE, 1500);
     expect(o.current).toMatchObject({
       days: 3, impressions: 5000, clicks: 600, websiteVisits: 582, bookings: 3,
-      bookingValueCents: 125050, feeCents: 18758, netCents: 106292, newVisitors: 2700, pagesPerSession: 3.5,
+      bookingValueCents: 125050, feeCents: 18758, netCents: 106292, newVisitors: 2700,
+      siteSessions: 3600, pageviews: 13250, pagesPerSession: 3.68,
       avgBookingValueCents: 41683, spendCents: 4500,
     });
     expect(o.current.ctr).toBeCloseTo(0.12, 6);
@@ -33,6 +34,21 @@ describe("getOverview", () => {
     expect(o.costPerBookingCents).toBe(6253);              // 18758 / 3
     expect(o.otaCommissionPerBookingCents).toBe(7503);     // 0.18 × 125050 / 3
     expect(o.commissionAvoidedCents).toBe(22509);          // 0.18 × 125050
+  });
+  it("weights pages per visit by sessions, so a busy day counts more than a quiet one", async () => {
+    // 13250 pageviews over 3600 sessions = 3.68. Averaging the three daily rates (3.0, 4.0, 3.5) gives 3.5.
+    const o = await getOverview(db, FIXTURE_RANGE, 1500);
+    expect(o.current.pagesPerSession).toBe(3.68);
+    expect(o.current.pagesPerSession).not.toBe(3.5);
+  });
+  it("matches the stored daily rate when the range is a single day", async () => {
+    const o = await getOverview(db, { ...FIXTURE_RANGE, from: "2026-09-10", to: "2026-09-10", comparison: null }, 1500);
+    expect(o.current.pagesPerSession).toBe(3.5); // 3150 / 900, and the day's own stored rate
+    expect(o.current.siteSessions).toBe(900);
+  });
+  it("reports zero pages per visit rather than dividing by zero when a window has no sessions", async () => {
+    const o = await getOverview(db, { ...FIXTURE_RANGE, from: "2026-01-01", to: "2026-01-05", comparison: null }, 1500);
+    expect(o.current).toMatchObject({ siteSessions: 0, pageviews: 0, pagesPerSession: 0 });
   });
   it("has no comparison for the all-time preset and nulls where bookings are zero", async () => {
     const o = await getOverview(db, { ...FIXTURE_RANGE, from: "2026-09-10", to: "2026-09-10", comparison: null }, 1500);

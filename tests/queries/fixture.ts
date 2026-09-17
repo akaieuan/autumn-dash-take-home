@@ -17,7 +17,8 @@ export const FIXTURE_RANGE = {
  * 2026-06-28..07-07; last year 2025-07-08..07-17, which has no rows at all.
  *
  * Daily totals in the window: impressions 3500, clicks 380, website visits 361, bookings 12,
- * booking value 2300.00, new visitors 1500, pages per session (3.0 + 2.0 + 4.0) / 3 = 3.0.
+ * booking value 2300.00, new visitors 1500, pages per visit 5000 / 1600 = 3.13 (the unweighted
+ * average of the three daily rates would be 3.0, which is the bug this fixture guards).
  * Breakdown rows in the same window sum to 3000 / 300 / 10 / 2000.00 instead, because 2026-07-13
  * deliberately has no breakdown rows. That gap is what proves a total read from `daily_metrics`.
  */
@@ -26,8 +27,9 @@ export const SEGMENT_RANGE = {
   comparison: { prevFrom: "2026-06-28", prevTo: "2026-07-07", prevLabel: "prev", lastYearFrom: "2025-07-08", lastYearTo: "2025-07-17", lastYearLabel: "ly" },
 };
 
-const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, pagesPerSession: number, spend = 0) =>
-  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, pagesPerSession, spend });
+/** `pagesPerSession` is derived here, so the stored daily rate can never disagree with its own denominators. */
+const day = (date: string, impressions: number, clicks: number, websiteVisits: number, bookings: number, bookingValue: number, newVisitors: number, siteSessions: number, pageviews: number, spend = 0) =>
+  ({ date, impressions, clicks, websiteVisits, bookings, bookingValue, newVisitors, siteSessions, pageviews, pagesPerSession: Math.round((pageviews / siteSessions) * 100) / 100, spend });
 const bd = (date: string, dimension: "campaign" | "device" | "feeder_market", dimensionValue: string, impressions: number, clicks: number, bookings: number, bookingValue: number, spend = 0) =>
   ({ date, dimension, dimensionValue, impressions, clicks, bookings, bookingValue, spend });
 
@@ -44,23 +46,25 @@ export async function loadFixture(db: TestDb) {
     { id: 3, date: "2026-07-09", campaignName: "Discovery & Competitors", kind: "bid_change", title: "Chicago weekend bids", note: "Raised." },
   ]);
   await db.insert(dailyMetrics).values([
-    // current: imp 5000, clk 600, visits 582, bookings 3, value 1250.50, new 2700, pps mean 3.5
-    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 3.0, 10.0),
-    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 4.0, 30.0),
-    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 3.5, 5.0),
+    // current: imp 5000, clk 600, visits 582, bookings 3, value 1250.50, new 2700,
+    // sessions 3600, pageviews 13250 → 3.68 pages per visit. Daily rates 3.0 / 4.0 / 3.5 average to 3.5,
+    // so a test that reads 3.5 is reading an average of averages.
+    day("2026-09-02", 1000, 100, 97, 2, 800.0, 500, 700, 2100, 10.0),
+    day("2026-09-05", 3000, 300, 290, 1, 450.5, 1500, 2000, 8000, 30.0),
+    day("2026-09-10", 1000, 200, 195, 0, 0, 700, 900, 3150, 5.0),
     // previous
-    day("2026-08-25", 500, 50, 50, 1, 300.0, 200, 3.2),
+    day("2026-08-25", 500, 50, 50, 1, 300.0, 200, 300, 960),
     // last year
-    day("2025-09-03", 400, 40, 40, 2, 500.0, 150, 3.1),
+    day("2025-09-03", 400, 40, 40, 2, 500.0, 150, 200, 620),
     // outside every window
-    day("2026-08-21", 99999, 9999, 9999, 99, 99999.99, 9999, 4.9),
-    day("2026-09-11", 99999, 9999, 9999, 99, 99999.99, 9999, 4.9),
+    day("2026-08-21", 99999, 9999, 9999, 99, 99999.99, 9999, 20000, 98000),
+    day("2026-09-11", 99999, 9999, 9999, 99, 99999.99, 9999, 20000, 98000),
     // --- SEGMENT_RANGE (2026-07-08..07-17), added 2026-09-17 ---
-    day("2026-07-09", 2000, 200, 190, 6, 1200.0, 900, 3.0),  // apportioned across all three dimensions
-    day("2026-07-15", 1000, 100, 95, 4, 800.0, 400, 4.0),    // inside the last seven days of the range
-    day("2026-07-13", 500, 80, 76, 2, 300.0, 200, 2.0),      // NO breakdown rows: the daily/breakdown gap
+    day("2026-07-09", 2000, 200, 190, 6, 1200.0, 900, 1000, 3000),  // apportioned across all three dimensions
+    day("2026-07-15", 1000, 100, 95, 4, 800.0, 400, 400, 1600),     // inside the last seven days of the range
+    day("2026-07-13", 500, 80, 76, 2, 300.0, 200, 200, 400),        // NO breakdown rows: the daily/breakdown gap
     // SEGMENT_RANGE's previous window
-    day("2026-07-03", 800, 80, 76, 3, 600.0, 300, 3.5),
+    day("2026-07-03", 800, 80, 76, 3, 600.0, 300, 400, 1400),
   ]);
   await db.insert(breakdowns).values([
     // campaign, current: Brand Protection imp 1500 clk 260 bk 2 val 950.50 · Discovery imp 3500 clk 340 bk 1 val 300.00

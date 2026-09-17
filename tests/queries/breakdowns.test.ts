@@ -91,7 +91,7 @@ describe("getFunnel", () => {
     expect(f.steps[2].onwardRatio).toBeNull();
     expect(f.steps.map((s) => s.bookingValueCents)).toEqual([null, null, 230000]);
     expect(f.newVisitors).toBe(1500);   // 900 + 200 + 400
-    expect(f.pagesPerSession).toBe(3);  // (3.0 + 2.0 + 4.0) / 3
+    expect(f.pagesPerSession).toBe(3.13); // 5000 pageviews / 1600 sessions, not (3.0 + 2.0 + 4.0) / 3
     expect(f.devices.map((d) => d.key)).toEqual(["device_mobile", "device_desktop", "device_tablet"]);
     expect(f.devices.map((d) => d.share)).toEqual([160 / 300, 120 / 300, 20 / 300]);
     expect(f.devices.reduce((a, d) => a + d.share, 0)).toBeCloseTo(1, 9);

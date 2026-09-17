@@ -20,6 +20,14 @@ export const dailyMetrics = pgTable("daily_metrics", {
   bookings: integer("bookings").notNull(),
   bookingValue: numeric("booking_value", { precision: 10, scale: 2, mode: "number" }).notNull(),
   newVisitors: integer("new_visitors").notNull(),
+  /** Every session on the website that day, from any source. `website_visits` (paid) is a subset. */
+  siteSessions: integer("site_sessions").notNull().default(0),
+  pageviews: integer("pageviews").notNull().default(0),
+  /**
+   * That day's pages per session. Correct at this grain and only at this grain: averaging it across
+   * days weights a quiet Tuesday like a peak Saturday, so a range reads `pageviews / site_sessions`
+   * instead. Kept because a single-day view (the activity calendar) wants the day's own rate.
+   */
   pagesPerSession: numeric("pages_per_session", { precision: 4, scale: 2, mode: "number" }).notNull(),
   /** What Autumn spent on ads that day, in dollars. Autumn funds it; the owner sees it for the cost-vs-return story. */
   spend: numeric("spend", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),

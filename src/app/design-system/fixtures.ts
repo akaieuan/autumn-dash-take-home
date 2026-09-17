@@ -13,7 +13,7 @@ const totals = (p: Partial<PeriodTotals>): PeriodTotals => ({
   from: range.from, to: range.to, days: 30,
   impressions: 9366, clicks: 1568, websiteVisits: 1548, bookings: 78,
   bookingValueCents: 3799300, feeCents: 569895, netCents: 3229405,
-  newVisitors: 1116, pagesPerSession: 3.4, spendCents: 262000,
+  newVisitors: 1116, siteSessions: 1594, pageviews: 5420, pagesPerSession: 3.4, spendCents: 262000,
   ctr: 0.167, conversion: 0.05, avgBookingValueCents: 48709,
   ...p,
 });

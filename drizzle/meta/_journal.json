@@ -15,6 +15,13 @@
       "when": 1789667192174,
       "tag": "0001_nappy_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789674705954,
+      "tag": "0002_jittery_king_cobra",
+      "breakpoints": true
     }
   ]
 }
