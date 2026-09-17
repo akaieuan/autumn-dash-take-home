@@ -600,589 +600,98 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
 ---
-### Task 3: Query layer — meta, overview totals, quick analytics
+### Task 3 (revised 2026-09-17): Align the live query layer with the component contract
+
+> **Why revised.** Before this plan was committed, commit `f4dc290` on `main` added `src/lib/db/queries/{meta,overview,breakdowns,index}.ts`, `src/lib/insights.ts`, `src/lib/format.ts`, `src/lib/glossary.ts` and their tests, with a handoff note at `docs/superpowers/plans/2026-09-17-query-layer-handoff.md` ("extend them; do not recreate them"). The original Tasks 3–5 assumed empty files. This task extends the live layer to the contract the component tasks need. **Original Task 4 is folded in here; original Task 5 is dropped: the live `computeInsights` (six rules, `tests/insights.test.ts`) stays and the components adapt to its `Insight` type.** Ruling recorded in the SDD ledger.
 
 **Files:**
-- Create: `src/lib/db/queries/types.ts`, `meta.ts`, `overview.ts`
-- Test: `tests/queries/fixture.ts`, `tests/queries/overview.test.ts`
+- Read first: `docs/superpowers/plans/2026-09-17-query-layer-handoff.md`, `src/lib/db/queries/overview.ts`, `src/lib/db/queries/breakdowns.ts`, `tests/queries/fixture.ts` (the fixture rows and the hand-computed expectations documented in it).
+- Create: `src/lib/db/queries/types.ts`
+- Modify: `src/lib/db/queries/overview.ts`, `src/lib/db/queries/breakdowns.ts`, `src/lib/db/queries/index.ts`
+- Test: extend `tests/queries/overview.test.ts` and `tests/queries/breakdowns.test.ts`; extend `tests/queries/fixture.ts` only by adding rows (never change or remove existing rows: the existing tests depend on them).
 
-**Interfaces:**
-- Consumes: `AnyDb`, `rowsOf` from `src/lib/db/types.ts`; `DateRange`, `eachDay` from `src/lib/date-range.ts`; `GlossaryKey` from `src/lib/glossary.ts`.
-- Produces:
-  - `interface PeriodTotals { bookings: number; valueCents: number; impressions: number; clicks: number; websiteVisits: number; newVisitors: number; pagesPerSession: number }`
-  - `n(v: unknown): number`, `toCents(dollars: unknown): number`, `chunkSums(values: number[], chunks: number): number[]`
-  - `getDataBounds(db): Promise<{ min: string; max: string }>`
-  - `periodTotals(db, from, to): Promise<PeriodTotals>`
-  - `interface OverviewDto { from; to; days; prevLabel: string | null; lastYearLabel: string | null; current: PeriodTotals; previous: PeriodTotals | null; lastYear: PeriodTotals | null; feeRateBps: number; feeCents: number; netCents: number }`; `getOverview(db, range, feeRateBps): Promise<OverviewDto>`
-  - `interface QuickStatDto { key: GlossaryKey; kind: "count" | "money"; value: number; previous: number | null; spark: number[] }`; `interface QuickAnalyticsDto { stats: QuickStatDto[] }`; `getQuickAnalytics(db, range): Promise<QuickAnalyticsDto>`
-
-- [ ] **Step 1: The fixture, with every expected value derivable by hand**
-
-Windows: current `2026-09-01..2026-09-10` (10 days), previous `2026-08-22..2026-08-31`, last year `2025-09-01..2025-09-10`. Filler days are `100 impressions · 10 clicks · 10 visits · 0 bookings · $0 · 5 new · 3.0 pages`. Breakdown rows exist only for the three "event" days of the current window and one day of the previous window, on purpose: a total read from `breakdowns` instead of `daily_metrics` comes out wrong (5,500 shown instead of 6,200), which is exactly the invariant the tests guard.
-
-```ts
-// tests/queries/fixture.ts
-import type { TestDb } from "./setup";
-import { dailyMetrics, breakdowns } from "@/lib/db/schema";
-import { eachDay } from "@/lib/date-range";
-
-type DayOverride = Partial<{ impressions: number; clicks: number; websiteVisits: number; bookings: number; bookingValue: number; newVisitors: number; pagesPerSession: number }>;
-const day = (date: string, o: DayOverride = {}) => ({
-  date, impressions: 100, clicks: 10, websiteVisits: 10, bookings: 0, bookingValue: 0, newVisitors: 5, pagesPerSession: 3.0, ...o,
-});
-const br = (date: string, dimension: "campaign" | "device" | "feeder_market", dimensionValue: string, impressions: number, clicks: number, bookings: number, bookingValue: number) =>
-  ({ date, dimension, dimensionValue, impressions, clicks, bookings, bookingValue });
-
-export async function loadFixture(db: TestDb) {
-  const events: Record<string, DayOverride> = {
-    // current window
-    "2026-09-02": { impressions: 1000, clicks: 100, websiteVisits: 97, bookings: 1, bookingValue: 1000, newVisitors: 80, pagesPerSession: 3.0 },
-    "2026-09-05": { impressions: 4000, clicks: 200, websiteVisits: 195, bookings: 1, bookingValue: 500, newVisitors: 120, pagesPerSession: 3.5 },
-    "2026-09-09": { impressions: 500, clicks: 50, websiteVisits: 48, bookings: 1, bookingValue: 300, newVisitors: 40, pagesPerSession: 4.0 },
-    // previous window
-    "2026-08-25": { impressions: 500, clicks: 50, websiteVisits: 48, bookings: 1, bookingValue: 900, newVisitors: 30, pagesPerSession: 3.2 },
-    // last year
-    "2025-09-03": { impressions: 300, clicks: 30, websiteVisits: 29, bookings: 1, bookingValue: 200, newVisitors: 20 },
-    "2025-09-08": { impressions: 300, clicks: 30, websiteVisits: 29, bookings: 1, bookingValue: 200, newVisitors: 20 },
-    // outside every window (bounds and leakage checks)
-    "2026-08-21": { impressions: 99999, clicks: 9999, bookings: 9, bookingValue: 99999 },
-    "2026-09-11": { impressions: 99999, clicks: 9999, bookings: 9, bookingValue: 99999 },
-  };
-  const dates = [...eachDay("2025-09-01", "2025-09-10"), ...eachDay("2026-08-21", "2026-09-11")];
-  await db.insert(dailyMetrics).values(dates.map((d) => day(d, events[d] ?? {})));
-  await db.insert(breakdowns).values([
-    // campaign: sums equal the day's daily_metrics
-    br("2026-09-02", "campaign", "Brand Protection", 300, 60, 1, 1000), br("2026-09-02", "campaign", "Discovery & Competitors", 700, 40, 0, 0),
-    br("2026-09-05", "campaign", "Brand Protection", 1000, 100, 0, 0), br("2026-09-05", "campaign", "Discovery & Competitors", 3000, 100, 1, 500),
-    br("2026-09-09", "campaign", "Brand Protection", 100, 20, 1, 300), br("2026-09-09", "campaign", "Discovery & Competitors", 400, 30, 0, 0),
-    br("2026-08-25", "campaign", "Retargeting", 500, 50, 1, 900),
-    // feeder_market
-    br("2026-09-02", "feeder_market", "Chicago, IL", 600, 70, 1, 1000), br("2026-09-02", "feeder_market", "Detroit, MI", 400, 30, 0, 0),
-    br("2026-09-05", "feeder_market", "Chicago, IL", 2500, 120, 1, 500), br("2026-09-05", "feeder_market", "Detroit, MI", 1500, 80, 0, 0),
-    br("2026-09-09", "feeder_market", "Chicago, IL", 200, 20, 0, 0), br("2026-09-09", "feeder_market", "Detroit, MI", 300, 30, 1, 300),
-    br("2026-08-25", "feeder_market", "Chicago, IL", 300, 40, 1, 900), br("2026-08-25", "feeder_market", "Detroit, MI", 200, 10, 0, 0),
-    // device
-    br("2026-09-02", "device", "Mobile", 600, 60, 1, 1000), br("2026-09-02", "device", "Desktop", 400, 40, 0, 0),
-    br("2026-09-05", "device", "Mobile", 2000, 120, 1, 500), br("2026-09-05", "device", "Desktop", 2000, 80, 0, 0),
-    br("2026-09-09", "device", "Mobile", 300, 30, 0, 0), br("2026-09-09", "device", "Desktop", 200, 20, 1, 300),
-  ]);
-}
-
-/** Hand-computed totals for the current window (10 days: 3 event days + 7 filler days). */
-export const CURRENT = { bookings: 3, valueCents: 180000, impressions: 6200, clicks: 420, websiteVisits: 410, newVisitors: 275, pagesPerSession: 3.15 };
-export const PREVIOUS = { bookings: 1, valueCents: 90000, impressions: 1400, clicks: 140, websiteVisits: 138, newVisitors: 75, pagesPerSession: 3.02 };
-export const LAST_YEAR = { bookings: 2, valueCents: 40000, impressions: 1400, clicks: 140, websiteVisits: 138, newVisitors: 80, pagesPerSession: 3 };
-
-export const FIXTURE_RANGE = {
-  preset: "30d" as const, from: "2026-09-01", to: "2026-09-10", days: 10, granularity: "day" as const, label: "Test",
-  comparison: { prevFrom: "2026-08-22", prevTo: "2026-08-31", prevLabel: "the previous 10 days", lastYearFrom: "2025-09-01", lastYearTo: "2025-09-10", lastYearLabel: "this time last year" },
-};
-export const NO_COMPARISON_RANGE = { ...FIXTURE_RANGE, preset: "all" as const, comparison: null };
-```
-Arithmetic to check before trusting the constants: current impressions `1000 + 4000 + 500 + 7 × 100 = 6200`; clicks `100 + 200 + 50 + 70 = 420`; visits `97 + 195 + 48 + 70 = 410`; new visitors `80 + 120 + 40 + 35 = 275`; pages `(3.0 + 3.5 + 4.0 + 7 × 3.0) / 10 = 3.15`. Previous: `500 + 9 × 100 = 1400`, pages `(3.2 + 9 × 3.0) / 10 = 3.02`. Last year: `300 + 300 + 8 × 100 = 1400`, new `20 + 20 + 40 = 80`.
-
-- [ ] **Step 2: Failing overview tests**
-
-```ts
-// tests/queries/overview.test.ts
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
-import { loadFixture, FIXTURE_RANGE, NO_COMPARISON_RANGE, CURRENT, PREVIOUS, LAST_YEAR } from "./fixture";
-import { chunkSums } from "@/lib/db/queries/types";
-import { getDataBounds } from "@/lib/db/queries/meta";
-import { getOverview, getQuickAnalytics, periodTotals } from "@/lib/db/queries/overview";
-
-let db: TestDb; let close: () => Promise<void>;
-beforeAll(async () => { ({ db, close } = await makeTestDb()); await loadFixture(db); });
-afterAll(() => close());
-
-describe("chunkSums", () => {
-  it("splits into near-equal chunks, larger ones first", () => {
-    expect(chunkSums([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4)).toEqual([6, 15, 15, 19]);
-    expect(chunkSums(Array(30).fill(1), 4)).toEqual([8, 8, 7, 7]);
-    expect(chunkSums([5], 4)).toEqual([5, 0, 0, 0]);
-  });
-});
-
-describe("getDataBounds", () => {
-  it("reads MIN and MAX date from daily_metrics", async () => {
-    expect(await getDataBounds(db)).toEqual({ min: "2025-09-01", max: "2026-09-11" });
-  });
-});
-
-describe("periodTotals / getOverview", () => {
-  it("sums the window from daily_metrics only, converting dollars to cents once", async () => {
-    expect(await periodTotals(db, FIXTURE_RANGE.from, FIXTURE_RANGE.to)).toEqual(CURRENT);
-  });
-  it("computes fee and net from the same rows, with both comparisons", async () => {
-    const o = await getOverview(db, FIXTURE_RANGE, 1500);
-    expect(o.current).toEqual(CURRENT);
-    expect(o.previous).toEqual(PREVIOUS);
-    expect(o.lastYear).toEqual(LAST_YEAR);
-    expect(o.feeCents).toBe(27000);      // 180000 × 1500 / 10000
-    expect(o.netCents).toBe(153000);
-    expect(o).toMatchObject({ from: "2026-09-01", to: "2026-09-10", days: 10, prevLabel: "the previous 10 days", lastYearLabel: "this time last year", feeRateBps: 1500 });
-  });
-  it("has null comparisons and labels for the all-time range", async () => {
-    const o = await getOverview(db, NO_COMPARISON_RANGE, 1500);
-    expect(o.previous).toBeNull(); expect(o.lastYear).toBeNull(); expect(o.prevLabel).toBeNull();
-  });
-});
-
-describe("getQuickAnalytics", () => {
-  it("returns four stats with previous-period values and four-bucket sparklines", async () => {
-    const q = await getQuickAnalytics(db, FIXTURE_RANGE);
-    expect(q.stats.map((s) => s.key)).toEqual(["direct_bookings", "booking_value", "website_visits", "impressions"]);
-    expect(q.stats[0]).toEqual({ key: "direct_bookings", kind: "count", value: 3, previous: 1, spark: [1, 1, 0, 1] });
-    expect(q.stats[1]).toEqual({ key: "booking_value", kind: "money", value: 180000, previous: 90000, spark: [100000, 50000, 0, 30000] });
-    expect(q.stats[2]).toEqual({ key: "website_visits", kind: "count", value: 410, previous: 138, spark: [117, 215, 20, 58] });
-    expect(q.stats[3]).toEqual({ key: "impressions", kind: "count", value: 6200, previous: 1400, spark: [1200, 4200, 200, 600] });
-  });
-  it("has null previous when the range has no comparison", async () => {
-    const q = await getQuickAnalytics(db, NO_COMPARISON_RANGE);
-    expect(q.stats.every((s) => s.previous === null)).toBe(true);
-  });
-});
-```
-Spark arithmetic (chunks of days 1–3, 4–6, 7–8, 9–10): bookings `0+1+0 · 0+1+0 · 0+0 · 1+0`; value `100000 · 50000 · 0 · 30000`; visits `10+97+10 · 10+195+10 · 10+10 · 48+10`; impressions `100+1000+100 · 100+4000+100 · 100+100 · 500+100`.
-
-- [ ] **Step 3: Run red**
-
-Run: `npx vitest run tests/queries/overview.test.ts` — Expected: FAIL, modules missing.
-
-- [ ] **Step 4: Implement**
+**Interfaces (the contract; later tasks import exactly these names):**
 
 ```ts
 // src/lib/db/queries/types.ts
-import type { AnyDb } from "../types";
-export type { AnyDb };
+export type { AnyDb } from "../types";
 export { rowsOf } from "../types";
-
-/** Whole-period sums from daily_metrics. Money is integer cents (D14). */
-export interface PeriodTotals {
-  bookings: number; valueCents: number; impressions: number; clicks: number;
-  websiteVisits: number; newVisitors: number; pagesPerSession: number;
-}
-
 export const n = (v: unknown): number => Number(v ?? 0);
 /** numeric(10,2) dollars from the driver (string) → integer cents, once, at the query boundary. */
 export const toCents = (dollars: unknown): number => Math.round(n(dollars) * 100);
-
-/** Sums `values` into `chunks` groups of near-equal length, the first groups one longer when it does not divide. */
-export function chunkSums(values: number[], chunks: number): number[] {
-  const base = Math.floor(values.length / chunks), extra = values.length % chunks;
-  const out: number[] = []; let i = 0;
-  for (let c = 0; c < chunks; c++) {
-    const len = base + (c < extra ? 1 : 0);
-    out.push(values.slice(i, i + len).reduce((a, b) => a + b, 0)); i += len;
-  }
-  return out;
-}
+/** Sums `values` into `chunks` near-equal groups, the first groups one longer when it does not divide. */
+export function chunkSums(values: number[], chunks: number): number[]
+// chunkSums([1,2,3,4,5,6,7,8,9,10], 4) → [6, 15, 15, 19]; chunkSums(Array(30).fill(1), 4) → [8, 8, 7, 7]; chunkSums([5], 4) → [5, 0, 0, 0]
 ```
+`overview.ts` and `breakdowns.ts` switch their private `n`/`toCents` to these imports (no behaviour change).
 
 ```ts
-// src/lib/db/queries/meta.ts
-import { sql } from "drizzle-orm";
-import { rowsOf, type AnyDb } from "./types";
-
-/** "Today" is the last seeded day (D10). Throws a readable error on an empty database. */
-export async function getDataBounds(db: AnyDb): Promise<{ min: string; max: string }> {
-  const [r] = rowsOf<{ min: string | null; max: string | null }>(await db.execute(sql`select min(date)::text as min, max(date)::text as max from daily_metrics`));
-  if (!r?.min || !r.max) throw new Error("daily_metrics is empty. Run `npm run db:seed` first.");
-  return { min: r.min, max: r.max };
-}
-```
-
-```ts
-// src/lib/db/queries/overview.ts
-import { sql } from "drizzle-orm";
-import type { DateRange } from "@/lib/date-range";
-import { eachDay } from "@/lib/date-range";
-import type { GlossaryKey } from "@/lib/glossary";
-import { rowsOf, n, toCents, chunkSums, type AnyDb, type PeriodTotals } from "./types";
-
-export async function periodTotals(db: AnyDb, from: string, to: string): Promise<PeriodTotals> {
-  const [r] = rowsOf<Record<string, unknown>>(await db.execute(sql`
-    select coalesce(sum(impressions), 0) as impressions, coalesce(sum(clicks), 0) as clicks,
-           coalesce(sum(website_visits), 0) as website_visits, coalesce(sum(bookings), 0) as bookings,
-           coalesce(sum(booking_value), 0) as booking_value, coalesce(sum(new_visitors), 0) as new_visitors,
-           coalesce(avg(pages_per_session), 0) as pages_per_session
-    from daily_metrics where date between ${from} and ${to}`));
-  const row = r ?? {};
-  return {
-    bookings: n(row.bookings), valueCents: toCents(row.booking_value), impressions: n(row.impressions), clicks: n(row.clicks),
-    websiteVisits: n(row.website_visits), newVisitors: n(row.new_visitors), pagesPerSession: Math.round(n(row.pages_per_session) * 100) / 100,
-  };
-}
-
-export interface OverviewDto {
-  from: string; to: string; days: number;
-  prevLabel: string | null; lastYearLabel: string | null;
-  current: PeriodTotals; previous: PeriodTotals | null; lastYear: PeriodTotals | null;
-  feeRateBps: number; feeCents: number; netCents: number;
-}
-
-export async function getOverview(db: AnyDb, range: DateRange, feeRateBps: number): Promise<OverviewDto> {
-  const c = range.comparison;
-  const [current, previous, lastYear] = await Promise.all([
-    periodTotals(db, range.from, range.to),
-    c ? periodTotals(db, c.prevFrom, c.prevTo) : null,
-    c ? periodTotals(db, c.lastYearFrom, c.lastYearTo) : null,
-  ]);
-  const feeCents = Math.round((current.valueCents * feeRateBps) / 10000);
-  return {
-    from: range.from, to: range.to, days: range.days,
-    prevLabel: c?.prevLabel ?? null, lastYearLabel: c?.lastYearLabel ?? null,
-    current, previous, lastYear, feeRateBps, feeCents, netCents: current.valueCents - feeCents,
-  };
-}
-
+// src/lib/db/queries/overview.ts — existing exports stay exactly as they are; add:
+export const isTrendMetric = (v: unknown): v is TrendMetric;            // TREND_METRICS.includes
+/** One value per day of [from, to], in day order; cents for booking_value, counts otherwise; 0 for a day with no row. */
+export async function getDailySeries(db: AnyDb, from: string, to: string, metric: TrendMetric): Promise<number[]>;
 export interface QuickStatDto { key: GlossaryKey; kind: "count" | "money"; value: number; previous: number | null; spark: number[] }
 export interface QuickAnalyticsDto { stats: QuickStatDto[] }
-
-const SPARK_BUCKETS = 4;
-
-export async function getQuickAnalytics(db: AnyDb, range: DateRange): Promise<QuickAnalyticsDto> {
-  type Row = { date: string; bookings: unknown; booking_value: unknown; website_visits: unknown; impressions: unknown };
-  const [rows, previous] = await Promise.all([
-    rowsOf<Row>(await db.execute(sql`select date::text as date, bookings, booking_value, website_visits, impressions from daily_metrics where date between ${range.from} and ${range.to}`)),
-    range.comparison ? periodTotals(db, range.comparison.prevFrom, range.comparison.prevTo) : null,
-  ]);
-  const byDay = new Map(rows.map((r) => [r.date, r]));
-  const series = (f: (r: Row) => number) => eachDay(range.from, range.to).map((d) => { const r = byDay.get(d); return r ? f(r) : 0; });
-  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-  const stat = (key: GlossaryKey, kind: "count" | "money", xs: number[], prev: number | null): QuickStatDto =>
-    ({ key, kind, value: sum(xs), previous: prev, spark: chunkSums(xs, SPARK_BUCKETS) });
-  const bookings = series((r) => n(r.bookings)), value = series((r) => toCents(r.booking_value));
-  const visits = series((r) => n(r.website_visits)), impressions = series((r) => n(r.impressions));
-  return { stats: [
-    stat("direct_bookings", "count", bookings, previous?.bookings ?? null),
-    stat("booking_value", "money", value, previous?.valueCents ?? null),
-    stat("website_visits", "count", visits, previous?.websiteVisits ?? null),
-    stat("impressions", "count", impressions, previous?.impressions ?? null),
-  ] };
-}
+/** Four stats in this order: direct_bookings (metric "bookings"), booking_value, website_visits, impressions.
+ *  value = sum of the daily series; spark = chunkSums(daily, 4); previous = the same figure from getPeriodTotals over range.comparison's previous window, null when there is no comparison. */
+export async function getQuickAnalytics(db: AnyDb, range: DateRange): Promise<QuickAnalyticsDto>;
 ```
-
-- [ ] **Step 5: Run green; negative control; gates**
-
-Run: `npx vitest run tests/queries/overview.test.ts` — Expected: 8 passed.
-Negative control: change `toCents(row.booking_value)` to `n(row.booking_value)` in `periodTotals`, run, see `valueCents` fail (1800 ≠ 180000), restore.
-Run: `npm run typecheck && npm run lint && npm test`.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/lib/db/queries/types.ts src/lib/db/queries/meta.ts src/lib/db/queries/overview.ts tests/queries/fixture.ts tests/queries/overview.test.ts
-git commit -m "Add overview and quick-analytics queries with a hand-computed PGlite fixture
-
-Totals come from daily_metrics only; the fixture omits breakdown rows on
-filler days so a breakdown-derived total would read 5,500 instead of 6,200.
-Dollars become cents once, in the query. Sparklines are four near-equal
-day chunks. Negative control: dropping toCents reddened valueCents (restored).
-Gates: vitest <N> files passed; typecheck 0; lint 0.
-
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
-```
-
----
-
-### Task 4: Query layer — trend, markets, campaigns, funnel
-
-**Files:**
-- Create: `src/lib/db/queries/trend.ts`, `src/lib/db/queries/breakdowns.ts`
-- Test: `tests/queries/trend.test.ts`, `tests/queries/breakdowns.test.ts`
-
-**Interfaces:**
-- Consumes: Task 3's `periodTotals`, `rowsOf`, `n`, `toCents`; `campaignKey`, `deviceKey`, `glossary`, `MARKET_HINTS` from glossary; `addDays`, `eachDay`, `Granularity` from date-range.
-- Produces:
-  - `type TrendMetric = "booking_value" | "direct_bookings" | "website_visits"`; `TREND_METRICS: TrendMetric[]`; `isTrendMetric(v: unknown): v is TrendMetric`
-  - `interface TrendPoint { bucket: string; current: number; previous: number | null; lastYear: number | null }`; `interface TrendDto { metric: TrendMetric; granularity: Granularity; points: TrendPoint[] }`; `getTrend(db, range, metric): Promise<TrendDto>`
-  - `interface MarketDto { name: string; hint: string | null; visits: number; previousVisits: number | null; bookings: number; valueCents: number; share: number }`; `getMarkets(db, range, limit = 5): Promise<MarketDto[]>` (ranked by bookings; the tail and the seeded "Other" fold into one "Everywhere else" row; `share` = bookings ÷ top row's bookings)
-  - `interface CampaignDto { key: CampaignKey | null; name: string; live: boolean; shown: number; visits: number; ctr: number; bookings: number; valueCents: number; share: number }`; `interface CampaignSummaryDto { campaigns: CampaignDto[]; total: { shown: number; visits: number; ctr: number; bookings: number; valueCents: number } }`; `getCampaigns(db, range): Promise<CampaignSummaryDto>` (`total` from `daily_metrics`; `live` = impressions in the last 7 days of the range; `share` = bookings ÷ total bookings)
-  - `interface FunnelStepDto { key: GlossaryKey; people: number; onwardRatio: number | null; valueCents: number | null }`; `interface FunnelDto { steps: FunnelStepDto[]; newVisitors: number; pagesPerSession: number; devices: { key: DeviceKey; share: number }[] }`; `getFunnel(db, range): Promise<FunnelDto>` (device share by clicks)
-
-- [ ] **Step 1: Failing trend tests**
+(`getTrend` keeps returning `TrendPoint[]`; the chart takes `metric`, `granularity` and `points` as separate props, so no wrapper type is needed.)
 
 ```ts
-// tests/queries/trend.test.ts
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
-import { loadFixture, FIXTURE_RANGE, NO_COMPARISON_RANGE } from "./fixture";
-import { getTrend, bucketStarts, isTrendMetric } from "@/lib/db/queries/trend";
+// src/lib/db/queries/breakdowns.ts — existing exports stay; add, built on getBreakdown + getPeriodTotals (the SQL is already there):
+export interface MarketDto { name: string; hint: string | null; visits: number; previousVisits: number | null; bookings: number; bookingValueCents: number; share: number }
+/** getBreakdown(db, range, "feeder_market") is already ranked by bookings. Remove the seeded "Other" row from the ranking, keep `limit` rows, then fold the rest plus "Other" into one trailing row named "Everywhere else" (sums; hint null). visits = clicks; previousVisits = previous?.clicks (summed for the fold), null when the range has no comparison; hint = MARKET_HINTS[name] ?? null; share = bookings ÷ the top row's bookings (so the top row is 1; an empty result returns []). */
+export async function getMarkets(db: AnyDb, range: DateRange, limit?: number /* = 5 */): Promise<MarketDto[]>;
 
-let db: TestDb; let close: () => Promise<void>;
-beforeAll(async () => { ({ db, close } = await makeTestDb()); await loadFixture(db); });
-afterAll(() => close());
+export interface CampaignDto { key: CampaignKey | null; name: string; live: boolean; shown: number; visits: number; ctr: number; bookings: number; bookingValueCents: number; share: number }
+export interface CampaignSummaryDto { campaigns: CampaignDto[]; total: { shown: number; visits: number; ctr: number; bookings: number; bookingValueCents: number } }
+/** rows = getBreakdown(db, range, "campaign"). key = campaignKey(row.value); name = key ? glossary[key].label : row.label; shown = impressions; visits = clicks; ctr = row.ctr; share = row.shareOfBookings.
+ *  live = the campaign had impressions > 0 in the last seven days of the range: one more getBreakdown over { ...range, from: max(range.from, addDays(range.to, -6)) }.
+ *  total comes from getPeriodTotals(db, range.from, range.to) — daily_metrics, never a sum of breakdown rows (CLAUDE.md §2). */
+export async function getCampaigns(db: AnyDb, range: DateRange): Promise<CampaignSummaryDto>;
 
-describe("bucketStarts", () => {
-  it("starts weeks on the range's first day and months on the 1st after the first", () => {
-    expect(bucketStarts("2026-08-18", "2026-09-16", "week")).toEqual(["2026-08-18", "2026-08-25", "2026-09-01", "2026-09-08", "2026-09-15"]);
-    expect(bucketStarts("2024-09-17", "2024-12-05", "month")).toEqual(["2024-09-17", "2024-10-01", "2024-11-01", "2024-12-01"]);
-    expect(bucketStarts("2026-09-01", "2026-09-03", "day")).toEqual(["2026-09-01", "2026-09-02", "2026-09-03"]);
-  });
-});
-
-describe("getTrend", () => {
-  it("returns one point per day with comparisons aligned by index", async () => {
-    const t = await getTrend(db, FIXTURE_RANGE, "booking_value");
-    expect(t.metric).toBe("booking_value"); expect(t.granularity).toBe("day"); expect(t.points).toHaveLength(10);
-    expect(t.points[1]).toEqual({ bucket: "2026-09-02", current: 100000, previous: 0, lastYear: 0 });
-    expect(t.points[2]).toMatchObject({ bucket: "2026-09-03", current: 0, lastYear: 20000 }); // 2025-09-03 is index 2 of the last-year window
-    expect(t.points[3]).toMatchObject({ bucket: "2026-09-04", previous: 90000 });               // 2026-08-25 is index 3 of the previous window
-    expect(t.points[9]).toMatchObject({ bucket: "2026-09-10", current: 0 });                    // 2026-09-11 (outside) must not leak in
-  });
-  it("switches the column by metric and keeps counts as counts", async () => {
-    const b = await getTrend(db, FIXTURE_RANGE, "direct_bookings");
-    expect(b.points[1].current).toBe(1); expect(b.points[4].current).toBe(1);
-    const v = await getTrend(db, FIXTURE_RANGE, "website_visits");
-    expect(v.points[1].current).toBe(97); expect(v.points[0].current).toBe(10);
-  });
-  it("buckets into weeks and sums the days inside each", async () => {
-    const t = await getTrend(db, { ...FIXTURE_RANGE, granularity: "week" }, "booking_value");
-    expect(t.points.map((p) => p.bucket)).toEqual(["2026-09-01", "2026-09-08"]);
-    expect(t.points[0].current).toBe(150000); // 09-02 + 09-05
-    expect(t.points[1].current).toBe(30000);  // 09-09
-  });
-  it("has null comparisons without a comparison window", async () => {
-    const t = await getTrend(db, NO_COMPARISON_RANGE, "booking_value");
-    expect(t.points[1]).toEqual({ bucket: "2026-09-02", current: 100000, previous: null, lastYear: null });
-  });
-  it("guards the URL metric", () => {
-    expect(isTrendMetric("website_visits")).toBe(true); expect(isTrendMetric("evil")).toBe(false);
-  });
-});
-```
-
-- [ ] **Step 2: Failing breakdown tests**
-
-```ts
-// tests/queries/breakdowns.test.ts
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeTestDb, type TestDb } from "./setup";
-import { loadFixture, FIXTURE_RANGE, NO_COMPARISON_RANGE } from "./fixture";
-import { getMarkets, getCampaigns, getFunnel } from "@/lib/db/queries/breakdowns";
-
-let db: TestDb; let close: () => Promise<void>;
-beforeAll(async () => { ({ db, close } = await makeTestDb()); await loadFixture(db); });
-afterAll(() => close());
-
-describe("getMarkets", () => {
-  it("ranks by bookings, adds drive hints and previous-period visits, share against the top row", async () => {
-    const m = await getMarkets(db, FIXTURE_RANGE);
-    expect(m).toEqual([
-      { name: "Chicago, IL", hint: "2 h 15 drive", visits: 210, previousVisits: 40, bookings: 2, valueCents: 150000, share: 1 },
-      { name: "Detroit, MI", hint: "2 h 45 drive", visits: 140, previousVisits: 10, bookings: 1, valueCents: 30000, share: 0.5 },
-    ]);
-  });
-  it("folds the tail past the limit into Everywhere else", async () => {
-    const m = await getMarkets(db, FIXTURE_RANGE, 1);
-    expect(m[1]).toEqual({ name: "Everywhere else", hint: null, visits: 140, previousVisits: 10, bookings: 1, valueCents: 30000, share: 0.5 });
-  });
-  it("has null previousVisits without a comparison", async () => {
-    const m = await getMarkets(db, NO_COMPARISON_RANGE);
-    expect(m[0].previousVisits).toBeNull();
-  });
-});
-
-describe("getCampaigns", () => {
-  it("names campaigns from the glossary and takes the total from daily_metrics, not breakdowns", async () => {
-    const c = await getCampaigns(db, FIXTURE_RANGE);
-    expect(c.campaigns).toEqual([
-      { key: "brand_protection", name: "Protecting your name", live: true, shown: 1400, visits: 180, ctr: 180 / 1400, bookings: 2, valueCents: 130000, share: 2 / 3 },
-      { key: "discovery", name: "Finding new guests", live: true, shown: 4100, visits: 170, ctr: 170 / 4100, bookings: 1, valueCents: 50000, share: 1 / 3 },
-    ]);
-    expect(c.total).toEqual({ shown: 6200, visits: 420, ctr: 420 / 6200, bookings: 3, valueCents: 180000 }); // 5500/350 would mean breakdowns were summed
-  });
-  it("marks a campaign not live when it had no impressions in the last seven days", async () => {
-    // Range ending 2026-09-04: the last 7 days are 08-29..09-04, where only 09-02 has campaign rows (both campaigns) → both live.
-    // Range 2026-08-22..2026-08-31: only Retargeting on 08-25, and 08-25 is inside the last 7 days (08-25..08-31) → live.
-    const c = await getCampaigns(db, { ...NO_COMPARISON_RANGE, from: "2026-08-22", to: "2026-08-31" });
-    expect(c.campaigns.map((x) => [x.key, x.live])).toEqual([["retargeting", true]]);
-    // Range 2026-08-22..2026-09-01: last 7 days are 08-26..09-01, Retargeting's only row (08-25) is before that → not live.
-    const d = await getCampaigns(db, { ...NO_COMPARISON_RANGE, from: "2026-08-22", to: "2026-09-01" });
-    expect(d.campaigns.map((x) => [x.key, x.live])).toEqual([["retargeting", false]]);
-  });
-});
-
-describe("getFunnel", () => {
-  it("chains impressions → clicks → bookings with onward ratios, and device share by clicks", async () => {
-    const f = await getFunnel(db, FIXTURE_RANGE);
-    expect(f.steps).toEqual([
-      { key: "impressions", people: 6200, onwardRatio: 420 / 6200, valueCents: null },
-      { key: "clicks", people: 420, onwardRatio: 3 / 420, valueCents: null },
-      { key: "direct_bookings", people: 3, onwardRatio: null, valueCents: 180000 },
-    ]);
-    expect(f.newVisitors).toBe(275); expect(f.pagesPerSession).toBe(3.15);
-    expect(f.devices).toEqual([{ key: "device_mobile", share: 0.6 }, { key: "device_desktop", share: 0.4 }]);
-  });
-});
-```
-Market arithmetic: Chicago visits `70 + 120 + 20 = 210`, value `1000 + 500 = 1500`; Detroit `30 + 80 + 30 = 140`, value `300`. Campaign: Brand `300 + 1000 + 100 = 1400` shown, `60 + 100 + 20 = 180` visits, value `1000 + 300`; Discovery `700 + 3000 + 400 = 4100`, `40 + 100 + 30 = 170`. Devices by clicks: Mobile `60 + 120 + 30 = 210`, Desktop `40 + 80 + 20 = 140`, so `0.6 / 0.4`.
-
-- [ ] **Step 3: Run red**
-
-Run: `npx vitest run tests/queries/trend.test.ts tests/queries/breakdowns.test.ts` — Expected: FAIL, modules missing.
-
-- [ ] **Step 4: Implement trend**
-
-```ts
-// src/lib/db/queries/trend.ts
-import { sql } from "drizzle-orm";
-import type { DateRange, Granularity } from "@/lib/date-range";
-import { addDays, eachDay } from "@/lib/date-range";
-import { rowsOf, n, toCents, type AnyDb } from "./types";
-
-export type TrendMetric = "booking_value" | "direct_bookings" | "website_visits";
-export const TREND_METRICS: TrendMetric[] = ["booking_value", "direct_bookings", "website_visits"];
-export const isTrendMetric = (v: unknown): v is TrendMetric => TREND_METRICS.includes(v as TrendMetric);
-
-export interface TrendPoint { bucket: string; current: number; previous: number | null; lastYear: number | null }
-export interface TrendDto { metric: TrendMetric; granularity: Granularity; points: TrendPoint[] }
-
-/** Bucket boundaries start on the range's first day, not on a calendar Monday (D19). */
-export function bucketStarts(from: string, to: string, g: Granularity): string[] {
-  if (g === "day") return eachDay(from, to);
-  if (g === "week") { const out: string[] = []; for (let d = from; d <= to; d = addDays(d, 7)) out.push(d); return out; }
-  const out = [from]; let [y, m] = from.split("-").map(Number);
-  for (;;) { m += 1; if (m > 12) { m = 1; y += 1; } const s = `${y}-${String(m).padStart(2, "0")}-01`; if (s > to) break; out.push(s); }
-  return out;
-}
-
-async function bucketSums(db: AnyDb, from: string, to: string, g: Granularity, metric: TrendMetric): Promise<number[]> {
-  const column = metric === "booking_value" ? sql`booking_value` : metric === "direct_bookings" ? sql`bookings` : sql`website_visits`;
-  const rows = rowsOf<{ d: string; v: unknown }>(await db.execute(sql`select date::text as d, ${column} as v from daily_metrics where date between ${from} and ${to}`));
-  const byDay = new Map(rows.map((r) => [r.d, metric === "booking_value" ? toCents(r.v) : n(r.v)]));
-  const starts = bucketStarts(from, to, g);
-  return starts.map((s, i) => {
-    const end = i + 1 < starts.length ? addDays(starts[i + 1], -1) : to;
-    let sum = 0; for (const d of eachDay(s, end)) sum += byDay.get(d) ?? 0; return sum;
-  });
-}
-
-export async function getTrend(db: AnyDb, range: DateRange, metric: TrendMetric): Promise<TrendDto> {
-  const g = range.granularity, c = range.comparison;
-  const [cur, prev, ly] = await Promise.all([
-    bucketSums(db, range.from, range.to, g, metric),
-    c ? bucketSums(db, c.prevFrom, c.prevTo, g, metric) : null,
-    c ? bucketSums(db, c.lastYearFrom, c.lastYearTo, g, metric) : null,
-  ]);
-  const points = bucketStarts(range.from, range.to, g).map((bucket, i) => ({
-    bucket, current: cur[i], previous: prev ? (prev[i] ?? 0) : null, lastYear: ly ? (ly[i] ?? 0) : null,
-  }));
-  return { metric, granularity: g, points };
-}
-```
-
-- [ ] **Step 5: Implement breakdowns**
-
-```ts
-// src/lib/db/queries/breakdowns.ts
-import { sql } from "drizzle-orm";
-import type { DateRange } from "@/lib/date-range";
-import { addDays } from "@/lib/date-range";
-import type { Dimension } from "@/lib/db/schema";
-import { campaignKey, deviceKey, glossary, MARKET_HINTS, type CampaignKey, type DeviceKey, type GlossaryKey } from "@/lib/glossary";
-import { rowsOf, n, toCents, type AnyDb } from "./types";
-import { periodTotals } from "./overview";
-
-interface DimRow { value: string; impressions: number; clicks: number; bookings: number; valueCents: number }
-
-async function dimensionRows(db: AnyDb, dimension: Dimension, from: string, to: string): Promise<DimRow[]> {
-  const rows = rowsOf<Record<string, unknown>>(await db.execute(sql`
-    select dimension_value as value, sum(impressions) as impressions, sum(clicks) as clicks, sum(bookings) as bookings, sum(booking_value) as booking_value
-    from breakdowns where dimension = ${dimension} and date between ${from} and ${to}
-    group by dimension_value order by 4 desc, 3 desc, 1`));
-  return rows.map((r) => ({ value: String(r.value), impressions: n(r.impressions), clicks: n(r.clicks), bookings: n(r.bookings), valueCents: toCents(r.booking_value) }));
-}
-const ratio = (num: number, den: number) => (den > 0 ? num / den : 0);
-
-export interface MarketDto { name: string; hint: string | null; visits: number; previousVisits: number | null; bookings: number; valueCents: number; share: number }
-
-const SEEDED_OTHER = "Other";
-export async function getMarkets(db: AnyDb, range: DateRange, limit = 5): Promise<MarketDto[]> {
-  const c = range.comparison;
-  const [rows, prevRows] = await Promise.all([
-    dimensionRows(db, "feeder_market", range.from, range.to),
-    c ? dimensionRows(db, "feeder_market", c.prevFrom, c.prevTo) : null,
-  ]);
-  const prevClicks = prevRows ? new Map(prevRows.map((r) => [r.value, r.clicks])) : null;
-  const named = rows.filter((r) => r.value !== SEEDED_OTHER);
-  const top = named.slice(0, limit), rest = [...named.slice(limit), ...rows.filter((r) => r.value === SEEDED_OTHER)];
-  const max = top[0]?.bookings || 1;
-  const toDto = (r: DimRow): MarketDto => ({
-    name: r.value, hint: MARKET_HINTS[r.value] ?? null, visits: r.clicks,
-    previousVisits: prevClicks ? (prevClicks.get(r.value) ?? 0) : null,
-    bookings: r.bookings, valueCents: r.valueCents, share: r.bookings / max,
-  });
-  const out = top.map(toDto);
-  if (rest.length) {
-    const sum = (f: (r: DimRow) => number) => rest.reduce((a, r) => a + f(r), 0);
-    out.push({
-      name: "Everywhere else", hint: null, visits: sum((r) => r.clicks),
-      previousVisits: prevClicks ? sum((r) => prevClicks.get(r.value) ?? 0) : null,
-      bookings: sum((r) => r.bookings), valueCents: sum((r) => r.valueCents), share: sum((r) => r.bookings) / max,
-    });
-  }
-  return out;
-}
-
-export interface CampaignDto { key: CampaignKey | null; name: string; live: boolean; shown: number; visits: number; ctr: number; bookings: number; valueCents: number; share: number }
-export interface CampaignSummaryDto { campaigns: CampaignDto[]; total: { shown: number; visits: number; ctr: number; bookings: number; valueCents: number } }
-
-const LIVE_WINDOW_DAYS = 7;
-export async function getCampaigns(db: AnyDb, range: DateRange): Promise<CampaignSummaryDto> {
-  const liveFrom = addDays(range.to, -(LIVE_WINDOW_DAYS - 1));
-  const [rows, recent, totals] = await Promise.all([
-    dimensionRows(db, "campaign", range.from, range.to),
-    dimensionRows(db, "campaign", liveFrom < range.from ? range.from : liveFrom, range.to),
-    periodTotals(db, range.from, range.to), // totals come from daily_metrics, never from breakdowns
-  ]);
-  const live = new Set(recent.filter((r) => r.impressions > 0).map((r) => r.value));
-  const campaigns = rows.map((r): CampaignDto => {
-    const key = campaignKey(r.value);
-    return { key, name: key ? glossary[key].label : r.value, live: live.has(r.value), shown: r.impressions, visits: r.clicks, ctr: ratio(r.clicks, r.impressions), bookings: r.bookings, valueCents: r.valueCents, share: ratio(r.bookings, totals.bookings) };
-  });
-  return { campaigns, total: { shown: totals.impressions, visits: totals.clicks, ctr: ratio(totals.clicks, totals.impressions), bookings: totals.bookings, valueCents: totals.valueCents } };
-}
-
-export interface FunnelStepDto { key: GlossaryKey; people: number; onwardRatio: number | null; valueCents: number | null }
+export interface FunnelStepDto { key: GlossaryKey; people: number; onwardRatio: number | null; bookingValueCents: number | null }
 export interface FunnelDto { steps: FunnelStepDto[]; newVisitors: number; pagesPerSession: number; devices: { key: DeviceKey; share: number }[] }
-
-export async function getFunnel(db: AnyDb, range: DateRange): Promise<FunnelDto> {
-  const [t, deviceRows] = await Promise.all([periodTotals(db, range.from, range.to), dimensionRows(db, "device", range.from, range.to)]);
-  const clicks = deviceRows.reduce((a, r) => a + r.clicks, 0);
-  const devices = deviceRows.flatMap((r) => { const key = deviceKey(r.value); return key ? [{ key, share: ratio(r.clicks, clicks) }] : []; })
-    .sort((a, b) => b.share - a.share);
-  return {
-    steps: [
-      { key: "impressions", people: t.impressions, onwardRatio: t.impressions ? t.clicks / t.impressions : null, valueCents: null },
-      { key: "clicks", people: t.clicks, onwardRatio: t.clicks ? t.bookings / t.clicks : null, valueCents: null },
-      { key: "direct_bookings", people: t.bookings, onwardRatio: null, valueCents: t.valueCents },
-    ],
-    newVisitors: t.newVisitors, pagesPerSession: t.pagesPerSession, devices,
-  };
-}
+/** steps: [{ key: "impressions", people, onwardRatio: clicks/impressions }, { key: "clicks", people, onwardRatio: bookings/clicks }, { key: "direct_bookings", people: bookings, onwardRatio: null, bookingValueCents }]; a zero denominator gives onwardRatio null.
+ *  newVisitors and pagesPerSession from getPeriodTotals. devices from getBreakdown(db, range, "device"): key = deviceKey(row.value) (skip unknown), share = row.shareOfClicks, sorted by share desc. */
+export async function getFunnel(db: AnyDb, range: DateRange): Promise<FunnelDto>;
 ```
+`src/lib/db/queries/index.ts` re-exports every new value and type above, plus `chunkSums`, `n`, `toCents` from `./types`.
 
-- [ ] **Step 6: Run green; negative control; timing; gates**
+- [ ] **Step 1: Read the live fixture and write the failing tests with hand-computed expectations**
 
-Run: `npx vitest run tests/queries/trend.test.ts tests/queries/breakdowns.test.ts` — Expected: 11 passed.
-Negative control: in `getCampaigns`, compute `total` from `rows` (sum of breakdowns) instead of `totals`; the `total` assertion goes red with `shown: 5500`; restore.
-Timing: with `DATABASE_URL` set, run `npx tsx -e` three times against Supabase for `getTrend(db, parseRange("all", …), "booking_value")` and `getMarkets`, note the ms in the commit body (D23 measured 32–69 ms warm; anything over 100 ms gets a row in decisions.md "Rejected with measurement" or an index).
+Every expected value is computed by hand from the rows in `tests/queries/fixture.ts` and the arithmetic is written in a comment next to the assertion (the existing tests show the style). Cases to add:
+- `chunkSums`: the three examples above.
+- `getDailySeries(db, FIXTURE_RANGE.from, FIXTURE_RANGE.to, "booking_value")`: length equals the window's day count; one known day equals its row's booking_value in cents; a day with no row is 0.
+- `getQuickAnalytics(db, FIXTURE_RANGE)`: keys in the fixed order; each `value` equals the matching `getPeriodTotals` figure (`bookings`, `bookingValueCents`, `websiteVisits`, `impressions`) computed by hand; each `spark` has 4 entries summing to `value`; `previous` equals the previous window's figure by hand; with a range whose `comparison` is null every `previous` is null.
+- `getMarkets(db, FIXTURE_RANGE)`: order and `share` (top row 1, second row = its bookings ÷ top bookings), `hint` from `MARKET_HINTS`, `previousVisits` by hand; `getMarkets(db, FIXTURE_RANGE, 1)` yields the top row then one "Everywhere else" row whose `visits`, `bookings`, `bookingValueCents` are the hand-summed remainder.
+- `getCampaigns(db, FIXTURE_RANGE)`: `name` is the glossary label for a known seeded campaign value; `total` equals the hand-computed daily_metrics totals; `live` is true for a campaign with rows inside the last seven days and false for one whose only rows are earlier — if the fixture has no such campaign, add rows for one (a campaign value with impressions only on the first day of a longer range) rather than skipping the case.
+- `getFunnel(db, FIXTURE_RANGE)`: the three steps with `onwardRatio` written as the hand fraction (`clicks / impressions` from the fixture numbers); device shares sum to 1 within 1e-9 and are sorted descending; `newVisitors` and `pagesPerSession` by hand.
+
+Run: `npx vitest run tests/queries/overview.test.ts tests/queries/breakdowns.test.ts` — Expected: the new cases FAIL on missing exports; the existing cases still pass.
+
+- [ ] **Step 2: Implement `types.ts`, then the additions in `overview.ts` and `breakdowns.ts`, then the barrel**
+
+Keep every existing export's signature and behaviour. `getDailySeries` may be the existing private `series()` helper exported under the new name (or a thin wrapper), as the handoff note suggests.
+
+- [ ] **Step 3: Run green; negative control; gates**
+
+Run: `npx vitest run tests/queries/overview.test.ts tests/queries/breakdowns.test.ts` — Expected: all pass; report the counts.
+Negative control for the daily_metrics rule: temporarily compute `total` in `getCampaigns` by summing the breakdown rows; the `total` assertion must go red. If the fixture's breakdown rows sum exactly to its daily totals (the seed apportions exactly, and a hand-built fixture may too), first add one `daily_metrics` row inside `FIXTURE_RANGE` with no breakdown rows (document its figures and update the hand arithmetic), so the control can bite. Restore and name the control in the commit.
 Run: `npm run typecheck && npm run lint && npm test`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/lib/db/queries/trend.ts src/lib/db/queries/breakdowns.ts tests/queries/trend.test.ts tests/queries/breakdowns.test.ts
-git commit -m "Add trend, market, campaign and funnel queries
+git add src/lib/db/queries tests/queries
+git commit -m "Extend the query layer with quick analytics, markets, campaigns and funnel DTOs
 
-Buckets start on the range's first day; comparisons align by index.
-Campaign and funnel totals read daily_metrics; the fixture's missing
-breakdown rows prove a breakdown-derived total would be wrong (5,500 vs 6,200).
-Negative control: summing breakdowns for the campaign total reddened it (restored).
-Timing on Supabase, three runs: trend(all) <a>/<b>/<c> ms; markets(30d) <a>/<b>/<c> ms.
+Built on the live getBreakdown/getPeriodTotals: markets fold the tail into
+Everywhere else, campaigns carry a live flag and a daily_metrics total,
+the funnel chains impressions → clicks → bookings. Sparklines are four
+near-equal day chunks. Negative control: summing breakdown rows for the
+campaign total reddened it (restored).
 Gates: vitest <N> files passed; typecheck 0; lint 0.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
@@ -1190,188 +699,21 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Insights, computed at render time
+### Task 4: folded into Task 3 (revised)
 
-**Files:**
-- Create: `src/lib/insights.ts`
-- Test: `tests/insights.test.ts`
-
-**Interfaces:**
-- Consumes: `OverviewDto` (Task 3), `MarketDto`, `CampaignSummaryDto` (Task 4); `delta`, `oneIn`, `money`, `count`, `pct` from format.
-- Produces: `type InsightKind = "win" | "watch" | "action"`; `type InsightAnchor = "markets" | "campaigns" | "funnel"`; `interface InsightDto { kind: InsightKind; title: string; body: string; anchor: InsightAnchor | null }`; `interface InsightInput { overview: OverviewDto; markets: MarketDto[]; campaigns: CampaignSummaryDto }`; `computeInsights(input, limit = 3): InsightDto[]`
-
-Rules, in priority order (the first `limit` that fire are returned; each is one pure function so a test can hit it alone):
-1. **Booking value vs previous period** ≥ +10% → `win`; ≤ −10% → `watch`. Anchor none.
-2. **Top market's visits fell** ≥ 12% vs previous period → `watch`, anchor `markets`.
-3. **Protecting your name outperforms**: brand-protection click-through ≥ 1.5 × the blended rate → `action` ("Autumn is keeping your name at the top"), anchor `campaigns`.
-4. **Direct bookings vs last year** ≥ +10% → `win`.
-5. **Blended click-through fell** ≥ 15% vs previous period → `action` ("Autumn is rebalancing where your ads show"), anchor `funnel`.
-
-- [ ] **Step 1: Failing tests**
-
-```ts
-// tests/insights.test.ts
-import { describe, it, expect } from "vitest";
-import { computeInsights, type InsightInput } from "@/lib/insights";
-import type { OverviewDto } from "@/lib/db/queries/overview";
-import type { MarketDto, CampaignSummaryDto } from "@/lib/db/queries/breakdowns";
-
-const totals = (o: Partial<OverviewDto["current"]> = {}) => ({ bookings: 3, valueCents: 180000, impressions: 6200, clicks: 420, websiteVisits: 410, newVisitors: 275, pagesPerSession: 3.15, ...o });
-const overview = (o: Partial<OverviewDto> = {}): OverviewDto => ({
-  from: "2026-09-01", to: "2026-09-10", days: 10, prevLabel: "the previous 10 days", lastYearLabel: "this time last year",
-  current: totals(), previous: totals({ bookings: 1, valueCents: 90000, impressions: 1400, clicks: 140 }), lastYear: totals({ bookings: 2, valueCents: 40000 }),
-  feeRateBps: 1500, feeCents: 27000, netCents: 153000, ...o,
-});
-const market = (m: Partial<MarketDto> = {}): MarketDto => ({ name: "Chicago, IL", hint: "2 h 15 drive", visits: 210, previousVisits: 40, bookings: 2, valueCents: 150000, share: 1, ...m });
-const campaigns = (brandCtr = 180 / 1400, totalCtr = 420 / 6200): CampaignSummaryDto => ({
-  campaigns: [{ key: "brand_protection", name: "Protecting your name", live: true, shown: 1400, visits: 180, ctr: brandCtr, bookings: 2, valueCents: 130000, share: 2 / 3 }],
-  total: { shown: 6200, visits: 420, ctr: totalCtr, bookings: 3, valueCents: 180000 },
-});
-const input = (over: Partial<InsightInput> = {}): InsightInput => ({ overview: overview(), markets: [market()], campaigns: campaigns(), ...over });
-
-describe("computeInsights", () => {
-  it("fires a win when booking value is up at least 10% on the previous period", () => {
-    const [first] = computeInsights(input());
-    expect(first).toEqual({ kind: "win", title: "Booking value up 100% on the previous 10 days", body: "3 direct bookings worth $1,800, against $900 in the period before.", anchor: null });
-  });
-  it("fires a watch when booking value is down at least 10%", () => {
-    const [first] = computeInsights(input({ overview: overview({ current: totals({ valueCents: 70000 }) }) }));
-    expect(first.kind).toBe("watch"); expect(first.title).toBe("Booking value down 22% on the previous 10 days");
-  });
-  it("watches the top market when its visits fell 12% or more", () => {
-    const out = computeInsights(input({ markets: [market({ visits: 44, previousVisits: 50 })] }));
-    expect(out).toContainEqual({ kind: "watch", title: "Chicago, IL sent fewer visitors", body: "Visits from Chicago, IL fell 12% on the previous 10 days while bookings held at 2. Worth watching, not acting on yet.", anchor: "markets" });
-  });
-  it("credits brand protection when its click-through is 1.5× the blended rate", () => {
-    const out = computeInsights(input());
-    expect(out).toContainEqual({ kind: "action", title: "Autumn is keeping your name at the top", body: "1 in 8 people who searched for your name clicked through, against 1 in 15 across all ads.", anchor: "campaigns" });
-  });
-  it("returns at most limit, in rule order, and nothing when nothing fires", () => {
-    expect(computeInsights(input(), 1)).toHaveLength(1);
-    const quiet = input({ overview: overview({ current: totals({ valueCents: 92000, bookings: 2, clicks: 140, impressions: 1400 }), lastYear: totals({ bookings: 2 }) }), markets: [market({ visits: 40, previousVisits: 40 })], campaigns: campaigns(0.1, 0.1) });
-    expect(computeInsights(quiet)).toEqual([]);
-  });
-  it("skips comparison rules for the all-time range", () => {
-    expect(computeInsights(input({ overview: overview({ previous: null, lastYear: null, prevLabel: null, lastYearLabel: null }), markets: [market({ previousVisits: null })], campaigns: campaigns(0.1, 0.1) }))).toEqual([]);
-  });
-});
-```
-Arithmetic: 180000 vs 90000 → +100%; 70000 vs 90000 → −22%; 44 vs 50 → −12%; brand `180/1400 = 0.1286 → 1 in 8`, blended `420/6200 = 0.0677 → 1 in 15`, and `0.1286 / 0.0677 = 1.9 ≥ 1.5`. In the quiet case `92000 vs 90000 = +2%`, clicks `140/1400 = 0.1` equals the previous `140/1400`, bookings `2 vs 2`.
-
-- [ ] **Step 2: Run red**
-
-Run: `npx vitest run tests/insights.test.ts` — Expected: FAIL, module missing.
-
-- [ ] **Step 3: Implement**
-
-```ts
-// src/lib/insights.ts
-import type { OverviewDto } from "@/lib/db/queries/overview";
-import type { MarketDto, CampaignSummaryDto } from "@/lib/db/queries/breakdowns";
-import { delta, money, oneIn, count } from "@/lib/format";
-
-export type InsightKind = "win" | "watch" | "action";
-export type InsightAnchor = "markets" | "campaigns" | "funnel";
-export interface InsightDto { kind: InsightKind; title: string; body: string; anchor: InsightAnchor | null }
-export interface InsightInput { overview: OverviewDto; markets: MarketDto[]; campaigns: CampaignSummaryDto }
-
-type Rule = (i: InsightInput) => InsightDto | null;
-
-const valueVsPrevious: Rule = ({ overview: o }) => {
-  if (!o.previous || !o.prevLabel) return null;
-  const d = delta(o.current.valueCents, o.previous.valueCents);
-  if (d.pct === null || Math.abs(d.pct) < 10) return null;
-  const dir = d.pct > 0 ? "up" : "down";
-  return {
-    kind: d.pct > 0 ? "win" : "watch",
-    title: `Booking value ${dir} ${Math.abs(d.pct)}% on ${o.prevLabel}`,
-    body: `${count(o.current.bookings)} direct bookings worth ${money(o.current.valueCents)}, against ${money(o.previous.valueCents)} in the period before.`,
-    anchor: null,
-  };
-};
-
-const topMarketVisitsFell: Rule = ({ overview: o, markets }) => {
-  const m = markets[0];
-  if (!m || m.previousVisits === null || !o.prevLabel) return null;
-  const d = delta(m.visits, m.previousVisits);
-  if (d.pct === null || d.pct > -12) return null;
-  return {
-    kind: "watch",
-    title: `${m.name} sent fewer visitors`,
-    body: `Visits from ${m.name} fell ${Math.abs(d.pct)}% on ${o.prevLabel} while bookings held at ${count(m.bookings)}. Worth watching, not acting on yet.`,
-    anchor: "markets",
-  };
-};
-
-const brandProtectionWins: Rule = ({ campaigns }) => {
-  const brand = campaigns.campaigns.find((c) => c.key === "brand_protection");
-  if (!brand || campaigns.total.ctr <= 0 || brand.ctr < 1.5 * campaigns.total.ctr) return null;
-  return {
-    kind: "action",
-    title: "Autumn is keeping your name at the top",
-    body: `${oneIn(brand.ctr)} people who searched for your name clicked through, against ${oneIn(campaigns.total.ctr)} across all ads.`,
-    anchor: "campaigns",
-  };
-};
-
-const bookingsVsLastYear: Rule = ({ overview: o }) => {
-  if (!o.lastYear || !o.lastYearLabel) return null;
-  const d = delta(o.current.bookings, o.lastYear.bookings);
-  if (d.pct === null || d.pct < 10) return null;
-  return {
-    kind: "win",
-    title: `More direct bookings than ${o.lastYearLabel}`,
-    body: `${count(o.current.bookings)} this period against ${count(o.lastYear.bookings)} a year ago, up ${d.pct}%.`,
-    anchor: null,
-  };
-};
-
-const clickThroughFell: Rule = ({ overview: o }) => {
-  if (!o.previous || !o.prevLabel || !o.previous.impressions || !o.current.impressions) return null;
-  const d = delta(o.current.clicks / o.current.impressions, o.previous.clicks / o.previous.impressions);
-  if (d.pct === null || d.pct > -15) return null;
-  return {
-    kind: "action",
-    title: "Autumn is rebalancing where your ads show",
-    body: `${oneIn(o.current.clicks / o.current.impressions)} people who saw an ad clicked, down from ${oneIn(o.previous.clicks / o.previous.impressions)} on ${o.prevLabel}.`,
-    anchor: "funnel",
-  };
-};
-
-const RULES: Rule[] = [valueVsPrevious, topMarketVisitsFell, brandProtectionWins, bookingsVsLastYear, clickThroughFell];
-
-/** Insights are derived from the same DTOs the page renders, so they can never disagree with the numbers beside them (D24). */
-export function computeInsights(input: InsightInput, limit = 3): InsightDto[] {
-  const out: InsightDto[] = [];
-  for (const rule of RULES) { const r = rule(input); if (r) out.push(r); if (out.length >= limit) break; }
-  return out;
-}
-```
-`count` is exported from `format.ts` in Task 2 (`int.format`).
-
-- [ ] **Step 4: Run green; negative control; gates**
-
-Run: `npx vitest run tests/insights.test.ts` — Expected: 6 passed.
-Negative control: change the brand rule's `1.5` to `3`, run, see the credit test go red, restore.
-Run: `npm run typecheck && npm run lint && npm test`.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/lib/insights.ts tests/insights.test.ts
-git commit -m "Compute insights from the rendered DTOs instead of storing them
-
-Five pure rules in priority order (value vs previous, top-market visits,
-brand protection, bookings vs last year, click-through); each fires only
-with a comparison window. Negative control: raising the brand threshold
-to 3x reddened its test (restored).
-Gates: vitest <N> files passed; typecheck 0; lint 0.
-
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
-```
+The trend, market, campaign and funnel queries are delivered by Task 3 (revised) on top of the live `getBreakdown` and `getTrend`. Nothing to do here.
 
 ---
+
+### Task 5: dropped — the live insights engine stays
+
+`src/lib/insights.ts` (commit `f4dc290`, six rules, `tests/insights.test.ts`) is kept unchanged. Its types are `Insight { id, kind, title, body, anchor?: "trend" | "campaigns" | "markets" | "devices" }`, `InsightKind`, `InsightInput { overview, breakdowns: Record<Dimension, BreakdownRowDto[]>, range }` and `computeInsights(input, limit = 5)`. Components use `Insight` where the original plan said `InsightDto`; anchors map to page ids `#trend`, `#campaigns`, `#markets`, `#funnel` (devices live inside the funnel section).
+
+---
+
 ### Task 6: Copy atoms — the words next to every number
+
+> **Revision 2026-09-17 (live query layer, see Task 3 revised):** `InsightKind` comes from the live `src/lib/insights.ts` (same three values). `count` and the rest of `format.ts` already exist on the branch (Task 2). Nothing else changes.
 
 **Files:**
 - Create: `src/components/copy/metric-label.tsx`, `delta-text.tsx`, `value.tsx`, `insight-tag.tsx`, `live-dot.tsx`, `glossary-entry.tsx`, `index.ts`
@@ -1580,6 +922,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ---
 
 ### Task 7: Chart atoms and the trend chart
+
+> **Revision 2026-09-17 (live query layer, see Task 3 revised):** `TrendMetric` and `TREND_METRICS` are the live six-value list from `src/lib/db/queries/overview.ts` (`booking_value | bookings | clicks | impressions | website_visits | new_visitors`); `METRIC_LABELS` covers all six (Booking value, Direct bookings, Clicked to your website, People reached, Website visits, New visitors) and `metricKind` is money only for `booking_value`. There is no `TrendDto`: `TrendChart` and `TrendTable` take `{ metric: TrendMetric; granularity: Granularity; points: TrendPoint[]; prevLabel; lastYearLabel }` and the tests build those props instead of a `trend` object. `MetricSelect` lists the six metrics. Import `TrendPoint`, `TrendMetric`, `TREND_METRICS`, `isTrendMetric` from `@/lib/db/queries`.
 
 **Files:**
 - Create: `src/components/charts/chart-config.ts`, `meter.tsx`, `sparkline.tsx`, `chart-legend.tsx`, `use-chart-style.ts`, `style-segment.tsx`, `metric-select.tsx`, `trend-table.tsx`, `trend-chart.tsx`, `index.ts`
@@ -1947,12 +1291,14 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 8: Collapsible section and the dashboard organisms
 
+> **Revision 2026-09-17 (live query layer, see Task 3 revised):** `OverviewDto` is the live type: `{ current, previous, lastYear, feeRateBps, costPerBookingCents, otaCommissionPerBookingCents, commissionAvoidedCents }` where each `PeriodTotals` carries `from, to, days, bookings, bookingValueCents, feeCents, netCents, impressions, clicks, websiteVisits, newVisitors, pagesPerSession, ctr, conversion, avgBookingValueCents`. `Headline` therefore takes `{ overview: OverviewDto; range: DateRange }` and reads the labels from `range.label` and `range.comparison?.prevLabel / lastYearLabel`; the test builds the DTO in that shape (fee 273600 and net 1550400 sit inside `current`). Insights are the live `Insight` type (with `id`, used as the React key) and anchors `trend | campaigns | markets | devices`; `InsightCard`'s link map is `{ trend: ["#trend", "See the trend"], campaigns: ["#campaigns", "See your campaigns"], markets: ["#markets", "See where your guests come from"], devices: ["#funnel", "See the funnel"] }` and the test asserts `#markets` for a markets anchor. `QuickStatDto`/`QuickAnalyticsDto` come from `@/lib/db/queries`.
+
 **Files:**
 - Create: `src/components/layout/collapsible-section.tsx` (+ export from `layout/index.ts`), `src/components/dashboard/headline.tsx`, `quick-stat.tsx`, `quick-analytics.tsx`, `insight-card.tsx`, `insight-list.tsx`, `glossary-section.tsx`, `overview-skeleton.tsx`, `index.ts`
 - Test: `tests/components/dashboard.test.tsx`
 
 **Interfaces:**
-- Consumes: Tasks 1, 2, 5, 6, 7; `OverviewDto`, `QuickAnalyticsDto`, `QuickStatDto` (Task 3); `InsightDto` (Task 5); shadcn `Collapsible*`, `Skeleton`; lucide `ChevronDown`.
+- Consumes: Tasks 1, 2, 5, 6, 7; `OverviewDto`, `QuickAnalyticsDto`, `QuickStatDto` (Task 3); `Insight` (Task 5); shadcn `Collapsible*`, `Skeleton`; lucide `ChevronDown`.
 - Produces:
   - `CollapsibleSection({ id, title, description, openAtWide?: boolean, children })` — client; closed on server and first paint; opens when the URL hash equals `#id`; with `openAtWide` it is open in place from `2xl` by CSS.
   - `Headline({ overview, rangeTitle })`, `QuickStat({ stat })`, `QuickAnalytics({ data })`, `InsightCard({ insight })`, `InsightList({ insights })`, `GlossarySection({ keys })`, `OverviewBodySkeleton()`, `OverviewPageSkeleton()`.
@@ -1969,10 +1315,10 @@ import { CollapsibleSection } from "@/components/layout";
 import { Headline, QuickAnalytics, InsightList, GlossarySection, OverviewBodySkeleton } from "@/components/dashboard";
 import type { OverviewDto, QuickAnalyticsDto } from "@/lib/db/queries/overview";
 
-const totals = { bookings: 41, valueCents: 1824000, impressions: 6400, clicks: 1020, websiteVisits: 1080, newVisitors: 5210, pagesPerSession: 3.6 };
+const totals = { bookings: 41, bookingValueCents: 1824000, impressions: 6400, clicks: 1020, websiteVisits: 1080, newVisitors: 5210, pagesPerSession: 3.6 };
 const overview: OverviewDto = {
   from: "2026-08-18", to: "2026-09-16", days: 30, prevLabel: "the previous 30 days", lastYearLabel: "this time last year",
-  current: totals, previous: { ...totals, bookings: 35, valueCents: 1508000 }, lastYear: { ...totals, bookings: 33, valueCents: 1471000 },
+  current: totals, previous: { ...totals, bookings: 35, bookingValueCents: 1508000 }, lastYear: { ...totals, bookings: 33, bookingValueCents: 1471000 },
   feeRateBps: 1500, feeCents: 273600, netCents: 1550400,
 };
 const quick: QuickAnalyticsDto = { stats: [
@@ -2117,14 +1463,14 @@ import { DeltaText } from "@/components/copy";
 export function Headline({ overview: o, rangeTitle }: { overview: OverviewDto; rangeTitle: string }) {
   return (
     <section aria-label="Headline" className="flex flex-col gap-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{rangeTitle} · {rangeLabel(o.from, o.to)}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{rangeTitle} · {rangeLabel(o.current.from, o.current.to)}</p>
       <h1 className="max-w-4xl text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-        Autumn brought you <span className="tabular-nums">{o.current.bookings} direct bookings</span> worth <span className="tabular-nums">{money(o.current.valueCents)}</span>. You kept <span className="tabular-nums">{money(o.netCents)}</span> after Autumn&apos;s {o.feeRateBps / 100}% fee.
+        Autumn brought you <span className="tabular-nums">{o.current.bookings} direct bookings</span> worth <span className="tabular-nums">{money(o.current.bookingValueCents)}</span>. You kept <span className="tabular-nums">{money(o.current.netCents)}</span> after Autumn&apos;s {o.feeRateBps / 100}% fee.
       </h1>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-        {o.previous && o.prevLabel ? <DeltaText current={o.current.valueCents} previous={o.previous.valueCents} vsLabel={o.prevLabel} className="text-sm" /> : null}
-        {o.lastYear && o.lastYearLabel ? <DeltaText current={o.current.valueCents} previous={o.lastYear.valueCents} vsLabel={o.lastYearLabel} className="text-sm" /> : null}
-        <span>Autumn&apos;s fee this period: <span className="tabular-nums">{money(o.feeCents)}</span></span>
+        {o.previous && o.prevLabel ? <DeltaText current={o.current.bookingValueCents} previous={o.previous.bookingValueCents} vsLabel={o.prevLabel} className="text-sm" /> : null}
+        {o.lastYear && o.lastYearLabel ? <DeltaText current={o.current.bookingValueCents} previous={o.lastYear.bookingValueCents} vsLabel={o.lastYearLabel} className="text-sm" /> : null}
+        <span>Autumn&apos;s fee this period: <span className="tabular-nums">{money(o.current.feeCents)}</span></span>
       </p>
     </section>
   );
@@ -2172,12 +1518,12 @@ export function QuickAnalytics({ data }: { data: QuickAnalyticsDto }) {
 
 ```tsx
 // src/components/dashboard/insight-card.tsx
-import type { InsightDto } from "@/lib/insights";
+import type { Insight } from "@/lib/insights";
 import { InsightTag } from "@/components/copy";
 
-const LINK: Record<NonNullable<InsightDto["anchor"]>, string> = { markets: "See where your guests come from", campaigns: "See your campaigns", funnel: "See the funnel" };
+const LINK: Record<NonNullable<Insight["anchor"]>, string> = { markets: "See where your guests come from", campaigns: "See your campaigns", funnel: "See the funnel" };
 
-export function InsightCard({ insight }: { insight: InsightDto }) {
+export function InsightCard({ insight }: { insight: Insight }) {
   return (
     <article className="flex flex-col gap-1.5 py-4 first:pt-0 last:pb-0">
       <div><InsightTag kind={insight.kind} /></div>
@@ -2191,11 +1537,11 @@ export function InsightCard({ insight }: { insight: InsightDto }) {
 
 ```tsx
 // src/components/dashboard/insight-list.tsx
-import type { InsightDto } from "@/lib/insights";
+import type { Insight } from "@/lib/insights";
 import { Panel, PanelHeader, PanelBody, EmptyState } from "@/components/layout";
 import { InsightCard } from "./insight-card";
 
-export function InsightList({ insights }: { insights: InsightDto[] }) {
+export function InsightList({ insights }: { insights: Insight[] }) {
   return (
     <Panel>
       <PanelHeader headingId="insights-h" title="What's happening" description="Computed from the numbers on this page." />
@@ -2300,6 +1646,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ### Task 9: Source organisms on the Overview — markets, campaigns, funnel
 
+> **Revision 2026-09-17 (live query layer, see Task 3 revised):** DTO money fields are `bookingValueCents` (already substituted in the code below); `MarketDto`, `CampaignSummaryDto`, `FunnelDto` are imported from `@/lib/db/queries` (the barrel), not from a file path.
+
 **Files:**
 - Create: `src/components/dashboard/market-row.tsx`, `feeder-markets.tsx`, `campaign-row.tsx`, `campaign-summary.tsx`, `funnel-step.tsx`, `funnel-section.tsx`; Modify: `src/components/dashboard/index.ts` (append the six exports)
 - Test: `tests/components/dashboard-sources.test.tsx`
@@ -2322,21 +1670,21 @@ import { FeederMarkets, CampaignSummary, FunnelSection } from "@/components/dash
 import type { MarketDto, CampaignSummaryDto, FunnelDto } from "@/lib/db/queries/breakdowns";
 
 const markets: MarketDto[] = [
-  { name: "Chicago, IL", hint: "2 h 15 drive", visits: 377, previousVisits: 428, bookings: 14, valueCents: 630000, share: 1 },
-  { name: "Everywhere else", hint: null, visits: 202, previousVisits: 190, bookings: 9, valueCents: 398000, share: 9 / 14 },
+  { name: "Chicago, IL", hint: "2 h 15 drive", visits: 377, previousVisits: 428, bookings: 14, bookingValueCents: 630000, share: 1 },
+  { name: "Everywhere else", hint: null, visits: 202, previousVisits: 190, bookings: 9, bookingValueCents: 398000, share: 9 / 14 },
 ];
 const summary: CampaignSummaryDto = {
   campaigns: [
-    { key: "brand_protection", name: "Protecting your name", live: true, shown: 2300, visits: 690, ctr: 0.3, bookings: 27, valueCents: 1201000, share: 27 / 41 },
-    { key: "discovery", name: "Finding new guests", live: false, shown: 4100, visits: 330, ctr: 0.08, bookings: 14, valueCents: 623000, share: 14 / 41 },
+    { key: "brand_protection", name: "Protecting your name", live: true, shown: 2300, visits: 690, ctr: 0.3, bookings: 27, bookingValueCents: 1201000, share: 27 / 41 },
+    { key: "discovery", name: "Finding new guests", live: false, shown: 4100, visits: 330, ctr: 0.08, bookings: 14, bookingValueCents: 623000, share: 14 / 41 },
   ],
-  total: { shown: 6400, visits: 1020, ctr: 1020 / 6400, bookings: 41, valueCents: 1824000 },
+  total: { shown: 6400, visits: 1020, ctr: 1020 / 6400, bookings: 41, bookingValueCents: 1824000 },
 };
 const funnel: FunnelDto = {
   steps: [
-    { key: "impressions", people: 6400, onwardRatio: 1020 / 6400, valueCents: null },
-    { key: "clicks", people: 1020, onwardRatio: 41 / 1020, valueCents: null },
-    { key: "direct_bookings", people: 41, onwardRatio: null, valueCents: 1824000 },
+    { key: "impressions", people: 6400, onwardRatio: 1020 / 6400, bookingValueCents: null },
+    { key: "clicks", people: 1020, onwardRatio: 41 / 1020, bookingValueCents: null },
+    { key: "direct_bookings", people: 41, onwardRatio: null, bookingValueCents: 1824000 },
   ],
   newVisitors: 5210, pagesPerSession: 3.6, devices: [{ key: "device_mobile", share: 0.58 }, { key: "device_desktop", share: 0.35 }, { key: "device_tablet", share: 0.07 }],
 };
@@ -2408,7 +1756,7 @@ export function MarketRow({ market: m }: { market: MarketDto }) {
       </div>
       <div role="cell" className="hidden text-right text-sm tabular-nums text-muted-foreground @md:block">{count(m.visits)}</div>
       <div role="cell" className="text-right text-sm font-semibold tabular-nums">{count(m.bookings)}</div>
-      <div role="cell" className="text-right text-sm tabular-nums">{money(m.valueCents)}</div>
+      <div role="cell" className="text-right text-sm tabular-nums">{money(m.bookingValueCents)}</div>
     </div>
   );
 }
@@ -2468,7 +1816,7 @@ export function CampaignRow({ campaign: c }: { campaign: CampaignDto }) {
       <div role="cell" className="hidden text-right text-sm tabular-nums text-muted-foreground @lg:block">{count(c.shown)}</div>
       <div role="cell" className="hidden text-right text-sm tabular-nums text-muted-foreground @lg:block">{count(c.visits)}</div>
       <div role="cell" className="hidden text-right text-sm tabular-nums text-muted-foreground @lg:block">{oneIn(c.ctr)}</div>
-      <div role="cell" className="text-right text-sm tabular-nums"><span className="font-semibold">{count(c.bookings)}</span> <span className="text-muted-foreground">· {money(c.valueCents)}</span></div>
+      <div role="cell" className="text-right text-sm tabular-nums"><span className="font-semibold">{count(c.bookings)}</span> <span className="text-muted-foreground">· {money(c.bookingValueCents)}</span></div>
     </div>
   );
 }
@@ -2506,7 +1854,7 @@ export function CampaignSummary({ summary: s }: { summary: CampaignSummaryDto })
               <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{count(s.total.shown)}</span>
               <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{count(s.total.visits)}</span>
               <span role="cell" className="hidden text-right text-sm tabular-nums @lg:block">{oneIn(s.total.ctr)}</span>
-              <span role="cell" className="text-right text-sm tabular-nums"><span className="font-semibold">{count(s.total.bookings)}</span> <span className="text-muted-foreground">· {money(s.total.valueCents)}</span></span>
+              <span role="cell" className="text-right text-sm tabular-nums"><span className="font-semibold">{count(s.total.bookings)}</span> <span className="text-muted-foreground">· {money(s.total.bookingValueCents)}</span></span>
             </div>
           </div>
         )}
@@ -2531,7 +1879,7 @@ export function FunnelStep({ step: s }: { step: FunnelStepDto }) {
       <span role="cell" className="text-sm">{label}</span>
       <span role="cell" className="text-right text-sm font-semibold tabular-nums">{count(s.people)}</span>
       <span role="cell" className="text-right text-sm tabular-nums text-muted-foreground">{s.onwardRatio === null ? "" : oneIn(s.onwardRatio)}</span>
-      <span role="cell" className="text-right text-sm tabular-nums">{s.valueCents === null ? "—" : money(s.valueCents)}</span>
+      <span role="cell" className="text-right text-sm tabular-nums">{s.bookingValueCents === null ? "—" : money(s.bookingValueCents)}</span>
     </div>
   );
 }
@@ -2771,6 +2119,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ---
 
 ### Task 11: Shell, range control and the Overview page
+
+> **Revision 2026-09-17 (live query layer, see Task 3 revised):** Imports come from the barrel `@/lib/db/queries` (`getDataBounds, getOverview, getQuickAnalytics, getTrend, isTrendMetric, getMarkets, getCampaigns, getFunnel, getAllBreakdowns`, types `TrendMetric`). The trend panel gets `id="trend"` (an insight anchor). Insights: `computeInsights({ overview, breakdowns: await getAllBreakdowns(db, range), range }, 3)` — add `getAllBreakdowns` to the `OverviewBody` `Promise.all`. `TrendChart` receives `metric`, `granularity={range.granularity}` and `points={trend}` where `trend` is the `TrendPoint[]` from `getTrend`. `Headline` receives `range={range}`. The default metric stays `booking_value`.
 
 **Files:**
 - Modify: `src/lib/date-range.ts:17` (export the preset list)
@@ -3047,7 +2397,7 @@ Run: `npm run build` — Expected: exit 0; `/` listed as dynamic (ƒ); no "dynam
 2. `read_console_messages` — Expected: no errors, no hydration warnings.
 3. Compute the truth for the default window from the database, independently of the page:
 ```bash
-npx tsx -e 'import "dotenv/config"; import { db } from "./src/lib/db/client"; import { getDataBounds } from "./src/lib/db/queries/meta"; import { parseRange } from "./src/lib/date-range"; import { periodTotals } from "./src/lib/db/queries/overview"; const b = await getDataBounds(db); const r = parseRange(undefined, b.min, b.max); const t = await periodTotals(db, r.from, r.to); console.log(r.from, r.to, t.bookings, t.valueCents, Math.round(t.valueCents * 0.15)); process.exit(0)'
+npx tsx -e 'import "dotenv/config"; import { db } from "./src/lib/db/client"; import { getDataBounds } from "./src/lib/db/queries/meta"; import { parseRange } from "./src/lib/date-range"; import { periodTotals } from "./src/lib/db/queries/overview"; const b = await getDataBounds(db); const r = parseRange(undefined, b.min, b.max); const t = await periodTotals(db, r.from, r.to); console.log(r.from, r.to, t.bookings, t.bookingValueCents, Math.round(t.bookingValueCents * 0.15)); process.exit(0)'
 ```
    `read_page` the headline and check bookings, value and net (`value − fee`) equal the printed numbers.
 4. Screenshots at three widths with `resize_window` (`mobile` preset = 390; `width: 1280, height: 900`; `width: 1728, height: 1100`), then reset to `desktop`. At 1728 the funnel must be open in place; at 390 the quick analytics must be 2×2 and the Visits/Shown columns hidden.
