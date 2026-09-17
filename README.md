@@ -10,6 +10,19 @@ hotel-marketing data.
 - Stack: Next.js 16 (App Router, Server Components), React 19, TypeScript,
   Tailwind 4, shadcn/ui, Recharts, Drizzle ORM, Supabase Postgres, Vitest, Vercel.
 
+## Start here if you are reviewing this
+
+- **[The decision log](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/decisions.md)** —
+  every decision in this repo, the alternative it was chosen over, the reason
+  argued from the hotel owner and the data, and the test that would fail if it
+  were silently reversed. Product decisions D1 through D10; engineering and
+  data decisions D11 onward. This is the document to read for "why".
+- **[The operating contract](https://github.com/akaieuan/autumn-dash-take-home/blob/main/CLAUDE.md)** —
+  how work was done: what a change must prove before it is called done, and
+  the invariants the codebase keeps.
+- **[The brief](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/reference/take-home-brief.txt)**
+  as received, for reference.
+
 ## Before and after
 
 The screens Autumn gave in the brief, beside the redesign of each. The
