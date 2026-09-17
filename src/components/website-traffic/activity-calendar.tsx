@@ -21,6 +21,14 @@ const SPAN_LABEL: Record<CalendarSpan, string> = { year: "Year", half: "6 months
 const SPAN_SHORT: Record<CalendarSpan, string> = { year: "1y", half: "6m", quarter: "13w" };
 const STEP: Record<string, number> = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1, PageDown: 28, PageUp: -28 };
 
+/**
+ * How many weeks a calendar of a given width can show and still keep every tile a thumb-sized square:
+ * under 28rem the last 13, under 42rem the last 26, wider the chosen span. Columns are auto-placed
+ * with no explicit count, so a hidden week simply gives its width to the rest. Static classes, so
+ * Tailwind can see them; the same rule covers a week's tiles and its month label.
+ */
+const weekVisibility = (weeksBack: number) => (weeksBack >= 26 ? "@max-2xl:hidden" : weeksBack >= 13 ? "@max-md:hidden" : "");
+
 const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: ${day.value === null ? "no data" : `${count(day.value)} ${unit}`}`;
 
 /**
@@ -54,7 +62,9 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const rank = shown === null ? null : dayRank(days, shown.date);
   const month = monthContext(days, pinnedDate);
 
-  const columns = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
+  // One cell per week for the month row: the label sits on the week its month starts in, blank otherwise.
+  const monthByColumn = new Map(monthColumns(visible).map((m, i) => [m.column, { label: m.label, odd: i % 2 === 1 }]));
+  const weekCells = Array.from({ length: weeks }, (_, i) => ({ column: i + 1, back: weeks - 1 - i, month: monthByColumn.get(i + 1) ?? null }));
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
 
   const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => (e.target as HTMLElement).closest<HTMLElement>("[data-date]")?.dataset.date ?? null;
@@ -138,13 +148,14 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
       <PanelBody className="@container gap-(--stack-gap)">
         {/* Source order is tiles, day card, context: on a phone the day card sits right under the tiles it describes; from lg it stands beside them and spans both rows. */}
         <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:grid-rows-[auto_auto]">
-          <div className="flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
+          {/* This column is its own container: the weeks it shows depend on the width the tiles actually get. */}
+          <div className="@container flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
               <div aria-hidden="true" />
-              <div aria-hidden="true" className="col-start-2 row-start-1 grid h-4 text-[10px] leading-4 text-muted-foreground" style={columns}>
-                {monthColumns(visible).map((m, i) => (
-                  <span key={m.column} className={cn("whitespace-nowrap", i % 2 === 1 && "hidden @md:inline")} style={{ gridColumnStart: m.column }}>
-                    {m.label}
+              <div aria-hidden="true" className={cn("col-start-2 row-start-1 grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground", span === "year" ? "gap-[2px]" : "gap-[3px]")}>
+                {weekCells.map((w) => (
+                  <span key={w.column} className={cn("min-w-0 overflow-visible whitespace-nowrap", weekVisibility(w.back))}>
+                    {w.month ? <span className={cn(w.month.odd && "hidden @md:inline")}>{w.month.label}</span> : null}
                   </span>
                 ))}
               </div>
@@ -162,12 +173,12 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                 onPointerLeave={() => setHover(null)}
                 onClick={onClick}
                 onKeyDown={onKeyDown}
-                className={cn("col-start-2 row-start-2 grid grid-flow-col grid-rows-7", span === "year" ? "gap-[2px]" : "gap-[3px]")}
-                style={columns}
+                className={cn("col-start-2 row-start-2 grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)]", span === "year" ? "gap-[2px]" : "gap-[3px]")}
               >
-                {visible.map((d) => {
+                {visible.map((d, i) => {
                   const level = heatLevel(d.value, visibleMax);
                   const isPinned = d.date === pinnedDate;
+                  const back = weeks - 1 - Math.floor(i / 7);
                   return (
                     <button
                       key={d.date}
@@ -182,12 +193,13 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                         // A 4px corner on a year's ~10px tile reads as a circle, so the year gets 2px (owner, 2026-09-17).
                         span === "year" ? "rounded-(--radius-tile)" : "rounded-(--radius-min)",
                         level === null ? EMPTY : LEVEL[level],
+                        weekVisibility(back),
                         isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
                         !isPinned && hover === d.date && "ring-2 ring-foreground/50",
                       )}
                     >
                       {span === "quarter" && d.value !== null ? (
-                        <span className={cn("px-1 pb-0.5 text-[10px] font-medium leading-none tabular-nums", level === 4 ? "text-card" : "text-foreground")}>
+                        <span className={cn("hidden px-1 pb-0.5 text-[10px] font-medium leading-none tabular-nums @lg:inline", level === 4 ? "text-card" : "text-foreground")}>
                           {count(d.value)}
                         </span>
                       ) : null}

@@ -75,6 +75,16 @@ describe("heatLevel and monthColumns", () => {
 });
 
 describe("ActivityCalendar", () => {
+  it("shows fewer weeks in a narrow column so a tile never shrinks below a thumb: old weeks carry the container-gated classes", () => {
+    const { container } = render(<ActivityCalendar activity={activity} initialSpan="year" />);
+    const tiles = [...container.querySelectorAll<HTMLElement>("[data-date]")];
+    const weeks = Math.ceil(tiles.length / 7);
+    const back = (i: number) => weeks - 1 - Math.floor(i / 7);
+    expect(tiles.filter((_, i) => back(i) >= 26).every((t) => t.className.includes("@max-2xl:hidden"))).toBe(true);
+    expect(tiles.filter((_, i) => back(i) >= 13 && back(i) < 26).every((t) => t.className.includes("@max-md:hidden") && !t.className.includes("@max-2xl:hidden"))).toBe(true);
+    expect(tiles.filter((_, i) => back(i) < 13).some((t) => t.className.includes("@max-"))).toBe(false); // the last 13 weeks always show
+  });
+
   it("draws one tile per visible day: six months by default, the whole year on demand", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
     expect(screen.getByRole("heading", { level: 2, name: "Every day people visited" })).toBeInTheDocument();
