@@ -23,8 +23,8 @@ const markets: MarketDto[] = [
 ];
 const summary: CampaignSummaryDto = {
   campaigns: [
-    { key: "brand_protection", name: "Protecting your name", live: true, shown: 2300, visits: 690, ctr: 0.3, bookings: 27, bookingValueCents: 1201000, share: 27 / 41 },
-    { key: "discovery", name: "Finding new guests", live: false, shown: 4100, visits: 330, ctr: 0.08, bookings: 14, bookingValueCents: 623000, share: 14 / 41 },
+    { key: "brand_protection", name: "Protecting your name", live: true, shown: 2300, visits: 690, ctr: 0.3, bookings: 27, bookingValueCents: 1201000, spendCents: 0, share: 27 / 41 },
+    { key: "discovery", name: "Finding new guests", live: false, shown: 4100, visits: 330, ctr: 0.08, bookings: 14, bookingValueCents: 623000, spendCents: 0, share: 14 / 41 },
   ],
   total: { shown: 6400, visits: 1020, ctr: 1020 / 6400, bookings: 41, bookingValueCents: 1824000 },
 };

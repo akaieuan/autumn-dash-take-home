@@ -33,3 +33,6 @@ npm-debug.log*
 
 # tool scratch
 .claude/settings.local.json
+
+# agent worktrees
+.claude/worktrees/

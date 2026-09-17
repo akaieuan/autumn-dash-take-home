@@ -1,8 +1,9 @@
 import type { OverviewDto } from "./db/queries/overview";
 import type { BreakdownRowDto } from "./db/queries/breakdowns";
+import type { EventImpactDto } from "./db/queries/events";
 import type { Dimension } from "./db/schema";
 import type { DateRange } from "./date-range";
-import { delta, money, pct } from "./format";
+import { delta, longDate, money, oneIn, pct } from "./format";
 
 /**
  * Insights are computed at render time from the same numbers the charts show,
@@ -11,11 +12,11 @@ import { delta, money, pct } from "./format";
 export type InsightKind = "win" | "watch" | "action";
 export interface Insight { id: string; kind: InsightKind; title: string; body: string; anchor?: "trend" | "campaigns" | "markets" | "devices" }
 
-export interface InsightInput { overview: OverviewDto; breakdowns: Record<Dimension, BreakdownRowDto[]>; range: DateRange }
+export interface InsightInput { overview: OverviewDto; breakdowns: Record<Dimension, BreakdownRowDto[]>; range: DateRange; events?: EventImpactDto[] }
 
 const ORDER: Record<InsightKind, number> = { watch: 0, win: 1, action: 2 };
 
-export function computeInsights({ overview, breakdowns, range }: InsightInput, limit = 5): Insight[] {
+export function computeInsights({ overview, breakdowns, range, events = [] }: InsightInput, limit = 5): Insight[] {
   const out: Insight[] = [];
   const cur = overview.current, prev = overview.previous, ly = overview.lastYear, cmp = range.comparison;
 
@@ -60,6 +61,15 @@ export function computeInsights({ overview, breakdowns, range }: InsightInput, l
   // 6. Phones.
   const mobile = (breakdowns.device ?? []).find((d) => d.value === "Mobile");
   if (mobile && mobile.shareOfClicks >= 0.55) out.push({ id: "mobile", kind: "action", title: `${pct(mobile.shareOfClicks)} of visitors arrive on a phone`, body: `Worth checking your booking page on your own phone now and then: that is where most guests decide.`, anchor: "devices" });
+
+  // 7. The most recent thing Autumn did, with its before/after (D26: events cause the data, so this is the honest "what is Autumn doing").
+  const recent = events.find((e) => e.days >= 7);
+  if (recent) {
+    const { event: e, before, after, days } = recent;
+    const who = e.campaignLabel ? `${e.campaignLabel} ads` : "your ads";
+    const clicks = before.ctr > 0 && after.ctr > 0 ? ` ${oneIn(after.ctr)} clicked, against ${oneIn(before.ctr)} before.` : "";
+    out.push({ id: `event-${e.id}`, kind: "action", title: `${e.kindLabel}: ${e.title}`, body: `On ${longDate(e.date)}. In the ${days} days since, ${who} brought ${after.bookings} bookings worth ${money(after.bookingValueCents)}, against ${before.bookings} in the ${days} days before.${clicks}`, anchor: "campaigns" });
+  }
 
   return out.sort((a, b) => ORDER[a.kind] - ORDER[b.kind]).slice(0, limit);
 }

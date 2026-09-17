@@ -4,3 +4,5 @@ export { getOverview, getPeriodTotals, getTrend, bucketStarts, TREND_METRICS, is
 export type { OverviewDto, PeriodTotals, TrendMetric, TrendPoint, QuickStatDto, QuickAnalyticsDto } from "./overview";
 export { getBreakdown, getAllBreakdowns, getMarkets, getCampaigns, getFunnel } from "./breakdowns";
 export type { BreakdownRowDto, MarketDto, CampaignDto, CampaignSummaryDto, FunnelStepDto, FunnelDto } from "./breakdowns";
+export { getCampaignMeta, getEvents, getEventImpact, getRecentEventImpacts } from "./events";
+export type { CampaignMetaDto, EventDto, EventImpactDto, WindowTotals } from "./events";

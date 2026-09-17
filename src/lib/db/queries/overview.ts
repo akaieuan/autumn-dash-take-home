@@ -9,6 +9,8 @@ export interface PeriodTotals {
   impressions: number; clicks: number; websiteVisits: number; bookings: number;
   bookingValueCents: number; feeCents: number; netCents: number;
   newVisitors: number; pagesPerSession: number;
+  /** What Autumn spent on ads in the window. Autumn funds it; shown for the cost-vs-return story. */
+  spendCents: number;
   ctr: number; conversion: number; avgBookingValueCents: number | null;
 }
 
@@ -29,7 +31,7 @@ export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRa
       coalesce(sum(impressions), 0) as impressions, coalesce(sum(clicks), 0) as clicks,
       coalesce(sum(website_visits), 0) as visits, coalesce(sum(bookings), 0) as bookings,
       coalesce(sum(booking_value), 0)::float8 as value, coalesce(sum(new_visitors), 0) as new_visitors,
-      coalesce(avg(pages_per_session), 0)::float8 as pps
+      coalesce(avg(pages_per_session), 0)::float8 as pps, coalesce(sum(spend), 0)::float8 as spend
     from daily_metrics where date between ${from} and ${to}`));
   const bookingValueCents = toCents(r.value);
   const feeCents = Math.round((bookingValueCents * feeRateBps) / 10000);
@@ -37,7 +39,7 @@ export async function getPeriodTotals(db: AnyDb, from: string, to: string, feeRa
   return {
     from, to, days: n(r.days), impressions, clicks, websiteVisits: n(r.visits), bookings,
     bookingValueCents, feeCents, netCents: bookingValueCents - feeCents,
-    newVisitors: n(r.new_visitors), pagesPerSession: Math.round(n(r.pps) * 100) / 100,
+    newVisitors: n(r.new_visitors), pagesPerSession: Math.round(n(r.pps) * 100) / 100, spendCents: toCents(r.spend),
     ctr: impressions ? clicks / impressions : 0,
     conversion: clicks ? bookings / clicks : 0,
     avgBookingValueCents: bookings ? Math.round(bookingValueCents / bookings) : null,

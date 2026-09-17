@@ -9,12 +9,14 @@ export type GlossaryKey =
   | "direct_bookings" | "booking_value" | "autumn_fee" | "net_revenue" | "avg_booking_value"
   | "impressions" | "clicks" | "website_visits" | "ctr" | "conversion"
   | "cost_per_booking" | "ota_commission" | "new_visitors" | "pages_per_session"
-  | "campaign" | "device" | "feeder_market"
+  | "campaign" | "device" | "feeder_market" | "spend" | "events"
   | CampaignKey | DeviceKey;
 
 export interface GlossaryEntry { label: string; industryTerm?: string; meaning: string; purpose?: string }
 
 export const glossary: Record<GlossaryKey, GlossaryEntry> = {
+  spend: { label: "What Autumn spent on ads", industryTerm: "ad spend", meaning: "The money Autumn paid Google to show your ads. Autumn funds this; you only pay the fee on bookings it brings." },
+  events: { label: "What Autumn did", meaning: "Changes Autumn made to your campaigns: launches, budget and bid changes, refreshed ads, seasonal pushes. Each one can be compared before and after." },
   direct_bookings: { label: "Direct bookings from Autumn", industryTerm: "attributed bookings", meaning: "Stays booked on your own website after a guest saw or clicked an ad Autumn ran for you." },
   booking_value: { label: "Booking value", meaning: "The room revenue from those stays, before any fee." },
   autumn_fee: { label: "Autumn's fee", meaning: "Autumn pays for the ads and charges a percentage only on bookings it brought you. This is that amount for the period." },
@@ -76,3 +78,8 @@ export const MARKET_HINTS: Record<string, string> = {
   "St. Louis, MO": "5 h 30 drive",
   "Toronto, ON": "6 h drive",
 };
+
+/** Plain labels for `campaign_events.kind`. */
+export const EVENT_KIND_LABELS = {
+  launched: "Switched on", budget_change: "Budget changed", copy_refresh: "Ads refreshed", bid_change: "Bids adjusted", seasonal_push: "Seasonal push",
+} as const;
