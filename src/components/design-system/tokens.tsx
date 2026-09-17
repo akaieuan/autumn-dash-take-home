@@ -1,3 +1,5 @@
+import { EYEBROW } from "@/components/copy";
+
 export interface TokenSwatch { name: string; note?: string }
 
 /** Colour tokens as swatches. The colour comes from the live CSS variable, so the page can never show a stale hex. */
@@ -40,6 +42,9 @@ const SPACING = [
   { name: "--stack-gap", note: "between panels and rows" },
   { name: "--panel-pad", note: "inside every panel" },
   { name: "--plot-height", note: "the chart's minimum box" },
+  { name: "--card-day", note: "the day card's reserved height" },
+  { name: "--card-event", note: "the event card's reserved height" },
+  { name: "--card-compare", note: "the event card's before/after box" },
 ];
 
 /** Spacing tokens as measured bars; the width is the live value. */
@@ -62,7 +67,7 @@ const TYPE = [
   { cls: "text-base font-semibold", label: "Panel title · 16/600", sample: "Where your guests come from" },
   { cls: "text-sm", label: "Body · 14/400", sample: "Cities sending bookings, biggest first." },
   { cls: "text-xs text-muted-foreground", label: "Caption · 12/400 muted", sample: "Data through Sep 16, 2026" },
-  { cls: "text-[11px] font-medium uppercase tracking-wide text-muted-foreground", label: "Label · 11/500 caps", sample: "Direct bookings from Autumn" },
+  { cls: EYEBROW, label: "Label · 11/500 caps", sample: "Direct bookings from Autumn" },
   { cls: "text-2xl font-semibold tabular-nums", label: "Value · 24/600 tabular", sample: "$117,368" },
 ];
 

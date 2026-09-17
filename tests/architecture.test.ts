@@ -33,7 +33,9 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
   });
   it("globals.css carries the layout tokens and a dark theme block", () => {
     const css = read("src/app/globals.css");
-    for (const t of ["--page-gutter", "--stack-gap", "--panel-pad", "--plot-height", "--radius-panel", "--r-in", "--radius-min", "--radius-float"]) expect(css).toContain(`${t}:`);
+    // --card-day, --card-event and --card-compare joined the list on 2026-09-17: the day card and the
+    // event card reserve their height from a token, never a tuned-by-eye min-h-[19rem] (audit item 5).
+    for (const t of ["--page-gutter", "--stack-gap", "--panel-pad", "--plot-height", "--card-day", "--card-event", "--card-compare", "--radius-panel", "--r-in", "--radius-min", "--radius-float"]) expect(css).toContain(`${t}:`);
     expect(css).toMatch(/\.dark\s*\{/); // light and dark themes (owner, 2026-09-17)
     expect(css).toMatch(/--chart-1:\s*#3f6b55/);
   });

@@ -1,5 +1,7 @@
 import type { ChartConfig } from "@/components/ui/chart";
 import type { DateRange } from "@/lib/date-range";
+import { cap } from "@/lib/format";
+import { glossary, type GlossaryKey } from "@/lib/glossary";
 
 /** One coloured series, comparisons in grey: the emphasis form (D26). Tokens only. */
 export const trendChartConfig = {
@@ -38,19 +40,27 @@ export interface ChartPoint {
   lastYear: number | null;
 }
 
-/** Plain language, no acronyms: what an innkeeper would call each of the six series. */
-export const METRIC_LABELS: Record<ChartMetric, string> = {
-  booking_value: "Booking value",
-  bookings: "Direct bookings",
-  clicks: "Clicked to your website",
-  impressions: "People reached",
-  website_visits: "Website visits",
-  new_visitors: "New visitors",
+/**
+ * Which glossary entry owns each series' words. The chart does not write its own copy: the
+ * glossary is the one place a metric is named (CLAUDE.md §2), so the picker, the chart title and
+ * the table header can never disagree with the "What these numbers mean" panel the way
+ * "People reached" disagreed with "Saw your hotel" before 2026-09-17.
+ */
+export const GLOSSARY_KEY: Record<ChartMetric, GlossaryKey> = {
+  booking_value: "booking_value",
+  bookings: "direct_bookings",
+  clicks: "clicks",
+  impressions: "impressions",
+  website_visits: "website_visits",
+  new_visitors: "new_visitors",
 };
 
-export const metricKind = (m: ChartMetric): "money" | "count" => (m === "booking_value" ? "money" : "count");
+/** Plain language, no acronyms: what an innkeeper would call each of the six series. */
+export const METRIC_LABELS: Record<ChartMetric, string> = Object.fromEntries(
+  METRIC_ORDER.map((m) => [m, glossary[GLOSSARY_KEY[m]].label]),
+) as Record<ChartMetric, string>;
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+export const metricKind = (m: ChartMetric): "money" | "count" => (m === "booking_value" ? "money" : "count");
 
 /**
  * Legend and table wording for the comparison series, from the range itself (so year-to-date never claims

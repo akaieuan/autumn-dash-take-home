@@ -1,4 +1,4 @@
-import { count, weekdayShort } from "@/lib/format";
+import { count, times, weekdayShort } from "@/lib/format";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function WeekdayRhythm({ averages, unit = "visits" }: { averages: { weekd
   const quietest = rows.reduce((q, r) => (r.average < q.average ? r : q), rows[0]);
 
   return (
-    <Panel id="rhythm" className="scroll-mt-20">
+    <Panel id="rhythm">
       <PanelHeader headingId="rhythm-h" title="Which days are busiest" description={`Average ${unit} per weekday, over the last year.`} />
       <PanelBody className="gap-3">
         <div className="grid h-32 grid-cols-7 items-end gap-1.5">
@@ -36,7 +36,7 @@ export function WeekdayRhythm({ averages, unit = "visits" }: { averages: { weekd
         </div>
         {min > 0 ? (
           <p className="text-sm text-muted-foreground">
-            {`${WEEKDAY_FULL[busiest.weekday]}s bring ${(max / min).toFixed(1)}× a ${WEEKDAY_FULL[quietest.weekday]}.`}
+            {`${WEEKDAY_FULL[busiest.weekday]}s bring ${times(max / min)} a ${WEEKDAY_FULL[quietest.weekday]}.`}
           </p>
         ) : null}
       </PanelBody>

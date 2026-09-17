@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { MetricLabel, DeltaText, Value, InsightTag, LiveDot, GlossaryEntry } from "@/components/copy";
+import { MetricLabel, DeltaText, Value, InsightTag, LiveDot, GlossaryEntry, Eyebrow, EYEBROW, COLUMN_HEADER, NUM } from "@/components/copy";
 
 const wrap = (ui: React.ReactNode) => render(<TooltipProvider>{ui}</TooltipProvider>);
 
@@ -48,5 +48,31 @@ describe("copy atoms", () => {
     expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByText("People who clicked (click-through rate, CTR)")).toBeInTheDocument();
     expect(screen.getByText(/Shown as '1 in N'/)).toBeInTheDocument();
+  });
+});
+
+// The three atoms that replaced twelve hand-written copies of the same class (design audit
+// 2026-09-17, item 1). The classes are written out here, so a restyle of the label or the numeric
+// cell is a deliberate edit to one file and this test, never a silent drift back into twelve.
+describe("Eyebrow, ColumnHeader and Num", () => {
+  it("Eyebrow carries the 11px caps label class and takes the element the outline needs", () => {
+    const { container } = render(
+      <>
+        <Eyebrow>Pointing at</Eyebrow>
+        <dl><Eyebrow as="dt">In the year</Eyebrow></dl>
+        <Eyebrow as="h3" className="whitespace-nowrap">Your ads</Eyebrow>
+      </>,
+    );
+    expect(EYEBROW).toBe("text-[11px] font-medium uppercase tracking-wide text-muted-foreground");
+    expect(screen.getByText("Pointing at").tagName).toBe("SPAN");
+    expect(screen.getByText("Pointing at").className).toBe(EYEBROW);
+    expect(container.querySelector("dt")?.textContent).toBe("In the year");
+    const h3 = screen.getByRole("heading", { level: 3 });
+    expect(h3.className).toContain("text-[11px]");
+    expect(h3.className).toContain("whitespace-nowrap"); // the caller's class is merged, not dropped
+  });
+  it("COLUMN_HEADER is the eyebrow class and NUM the right-aligned tabular cell, so DataTable restyles from one place", () => {
+    expect(COLUMN_HEADER).toBe(EYEBROW);
+    expect(NUM).toBe("text-right tabular-nums");
   });
 });

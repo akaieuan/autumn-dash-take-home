@@ -3,7 +3,7 @@ import type { BreakdownRowDto } from "./db/queries/breakdowns";
 import type { EventImpactDto } from "./db/queries/events";
 import type { Dimension } from "./db/schema";
 import type { DateRange } from "./date-range";
-import { delta, longDate, money, oneIn, pct } from "./format";
+import { cap, delta, longDate, money, oneIn, pct } from "./format";
 
 /**
  * Insights are computed at render time from the same numbers the charts show,
@@ -25,7 +25,6 @@ export interface InsightInput { overview: OverviewDto; breakdowns: Record<Dimens
 
 const ORDER: Record<InsightKind, number> = { watch: 0, win: 1, action: 2 };
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** now vs before, the shape most rules share. */
 const nowBefore = (format: "money" | "count" | "pct", now: number, before: number, beforeLabel = "Before"): InsightChart => ({
   kind: "bars", format,

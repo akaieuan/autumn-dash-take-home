@@ -94,8 +94,8 @@
   --heat-2: color-mix(in oklab, var(--chart-1) 45%, var(--card));
   --heat-3: color-mix(in oklab, var(--chart-1) 70%, var(--card));
   --heat-4: var(--chart-1);
-  --positive: #6f8b7a;
-  --watch: #c48a3a;
+  --positive: #3f6b55; /* 5.6:1 on the page, 6.1:1 on a card: small green text passes AA (Lighthouse 2026-09-17 failed the old #6f8b7a at 3.3:1) */
+  --watch: #8f4f0e;    /* 5.4:1 on the page; the old #c48a3a was 2.6:1 */
   --negative: #b5563f;
   --radius: 0.75rem;
   --sidebar: #fbfbfa;
@@ -157,6 +157,12 @@
   --page-gutter: 1rem;
   --stack-gap: 1rem;
   --plot-height: 200px;
+  /* Reserved heights, so a card and its skeleton cannot disagree and nothing moves under the pointer
+     when the calendar is hovered or the events pager is clicked. Tuned by eye 2026-09-17; they scale
+     with --plot-height below, by the same 1.3 step, so a wide screen keeps the rhythm. */
+  --card-day: 19rem;        /* DayCard */
+  --card-event: 19.5rem;    /* EventImpactCard */
+  --card-compare: 10.75rem; /* the event card's before/after box */
   --radius-panel: 1.5rem;   /* outer cards, popovers */
   --panel-pad: 1rem;        /* inset of anything directly inside a panel */
   --radius-min: 4px;
@@ -172,6 +178,7 @@
 }
 @media (min-width: 1024px) {
   :root { --page-gutter: 2rem; --stack-gap: 1.25rem; --plot-height: 260px; --radius-panel: 1.75rem; --panel-pad: 1.25rem; }  /* 28 − 20 keeps --r-in at 8px */
+  /* The card tokens do not scale with --plot-height: their height is their content, and on 2026-09-17 a 1.3× step left a band of empty space in the event card. */
 }
 @media (min-width: 1536px) {
   :root { --page-gutter: 3rem; }

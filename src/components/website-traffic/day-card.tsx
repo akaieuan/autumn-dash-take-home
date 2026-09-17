@@ -1,17 +1,18 @@
 import type { ActivityDay } from "@/lib/db/queries";
-import { count, deltaText, delta, oneIn, weekdayDate } from "@/lib/format";
+import { count, deltaText, delta, oneIn, ordinal, perVisit, weekdayDate } from "@/lib/format";
 import { weekdayOf } from "@/lib/activity";
+import type { DayRank } from "@/lib/activity";
+import { Eyebrow } from "@/components/copy";
 import { Meter } from "@/components/charts";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DASH = "—";
-const EYEBROW = "text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
 
 function Stat({ label, value, note, tone }: { label: string; value: string; note?: string | null; tone?: "positive" | "watch" }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={EYEBROW}>{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       <span className="text-[22px] font-semibold leading-tight tabular-nums">{value}</span>
       {note ? <span className={cn("text-[11px]", tone === "positive" ? "text-positive" : tone === "watch" ? "text-watch" : "text-muted-foreground")}>{note}</span> : null}
     </div>
@@ -20,20 +21,18 @@ function Stat({ label, value, note, tone }: { label: string; value: string; note
 
 /**
  * The one day the reader is looking at, in words. Its height is fixed, so moving the pointer across
- * the calendar never moves the page under the pointer.
+ * the calendar never moves the page under the pointer. The rank it shows is `DayRank`, computed in
+ * `@/lib/activity` (design audit item 9) rather than declared a second time here.
  */
-export interface DayRank { day: number; days: number; weekday: number; weekdays: number }
 
-const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th"}`;
-
-export function DayCard({ day, typical, mode, unit, rank = null }: { day: ActivityDay | null; typical: number | null; mode: "hover" | "pinned"; unit: string; rank?: DayRank | null }) {
+export function DayCard({ day, typical, mode, unit, rank = null, className }: { day: ActivityDay | null; typical: number | null; mode: "hover" | "pinned"; unit: string; rank?: DayRank | null; className?: string }) {
   const eyebrow = mode === "hover" ? "Pointing at" : "Kept open";
-  const shell = "flex min-h-[19rem] min-w-0 flex-col gap-3.5 rounded-(--r-in) bg-background p-(--panel-pad)";
+  const shell = cn("flex min-h-(--card-day) min-w-0 flex-col gap-3.5 rounded-(--r-in) bg-background p-(--panel-pad)", className);
 
   if (day === null) {
     return (
       <aside aria-label="Selected day" className={shell}>
-        <span className={EYEBROW}>{eyebrow}</span>
+        <Eyebrow>{eyebrow}</Eyebrow>
         <p className="text-[18px] font-semibold leading-tight">Pick a day</p>
       </aside>
     );
@@ -49,7 +48,7 @@ export function DayCard({ day, typical, mode, unit, rank = null }: { day: Activi
   return (
     <aside aria-label="Selected day" className={shell}>
       <div className="flex flex-col gap-0.5">
-        <span className={EYEBROW}>{eyebrow}</span>
+        <Eyebrow>{eyebrow}</Eyebrow>
         <p className="text-[18px] font-semibold leading-tight tabular-nums">{`${weekdayDate(day.date)}, ${day.date.slice(0, 4)}`}</p>
       </div>
 
@@ -72,14 +71,14 @@ export function DayCard({ day, typical, mode, unit, rank = null }: { day: Activi
         />
         <Stat
           label="Pages per visit"
-          value={day.pagesPerSession === null ? DASH : day.pagesPerSession.toFixed(1)}
+          value={day.pagesPerSession === null ? DASH : perVisit(day.pagesPerSession)}
           note={day.pagesPerSession === null ? null : "per visit"}
         />
       </div>
 
       {hasTypical ? (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
-          <span className={EYEBROW}>{`Against a typical ${weekday}`}</span>
+          <Eyebrow>{`Against a typical ${weekday}`}</Eyebrow>
           <Meter
             share={share}
             label={`This ${weekday} against a typical one`}
@@ -92,12 +91,12 @@ export function DayCard({ day, typical, mode, unit, rank = null }: { day: Activi
         // Where the day sits in the year and among its own weekdays: the two questions a busy day raises.
         <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3">
           <div className="flex flex-col gap-0.5">
-            <dt className={EYEBROW}>In the year</dt>
+            <Eyebrow as="dt">In the year</Eyebrow>
             <dd className="text-sm font-semibold tabular-nums">{rank.day === 1 ? "Busiest day" : `${ordinal(rank.day)} busiest`}</dd>
             <dd className="text-[11px] text-muted-foreground">of {count(rank.days)} days</dd>
           </div>
           <div className="flex flex-col gap-0.5">
-            <dt className={EYEBROW}>Among {weekday}s</dt>
+            <Eyebrow as="dt">Among {weekday}s</Eyebrow>
             <dd className="text-sm font-semibold tabular-nums">{rank.weekday === 1 ? "Busiest" : `${ordinal(rank.weekday)} busiest`}</dd>
             <dd className="text-[11px] text-muted-foreground">of {count(rank.weekdays)} {weekday}s</dd>
           </div>

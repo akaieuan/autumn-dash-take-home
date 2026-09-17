@@ -18,7 +18,7 @@ export function TrafficStory({ data, impacts, range, metric }: { data: CampaignS
   const highlight = picked ? { id: picked.event.id, from: picked.after.from, to: picked.after.to } : null;
   return (
     <Grid variant="sidebar">
-      <Panel id="traffic" className="scroll-mt-20 h-full">
+      <Panel id="traffic" className="h-full">
         <PanelHeader
           headingId="traffic-h"
           title="Visits by campaign"

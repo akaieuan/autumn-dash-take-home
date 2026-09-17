@@ -1,10 +1,18 @@
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
+/**
+ * The room a jump target leaves for the sticky top bar. Anything an insight or the sidebar can link
+ * to needs it; `Panel` applies it itself whenever it has an `id`, so the thirteen callers that
+ * repeated it no longer can forget it (design audit 2026-09-17, item 3). The constant is exported
+ * for the one anchor that is not a Panel — `EventImpactCard`'s `<article>`.
+ */
+export const ANCHOR = "scroll-mt-20";
+
 /** A titled card. Radius and padding come from tokens so an inset child using rounded-(--r-in) is concentric with it (D28). */
 export function Panel({ id, className, children }: { id?: string; className?: string; children: React.ReactNode }) {
   return (
-    <Card id={id} className={cn("gap-4 overflow-visible rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", className)}>
+    <Card id={id} className={cn("gap-4 overflow-visible rounded-(--radius-panel) p-(--panel-pad) [--card-spacing:0px]", id && ANCHOR, className)}>
       {children}
     </Card>
   );

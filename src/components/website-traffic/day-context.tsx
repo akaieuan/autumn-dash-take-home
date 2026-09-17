@@ -1,9 +1,9 @@
 "use client";
 import type { ActivityDay } from "@/lib/db/queries";
-import { count, shortDate, weekdayDate, weekdayShort } from "@/lib/format";
+import { count, ordinal, shortDate, weekdayDate, weekdayShort } from "@/lib/format";
+import { Eyebrow } from "@/components/copy";
 import { cn } from "@/lib/utils";
 
-const EYEBROW = "text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
 const BAR_ROOM = 56; // px left for a bar once the value and the weekday letters have their lines
 
 const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: ${day.value === null ? "no data" : `${count(day.value)} ${unit}`}`;
@@ -17,7 +17,7 @@ export function WeekStrip({ days, pinned, onPick, unit }: { days: (ActivityDay |
   const max = Math.max(0, ...days.map((d) => d?.value ?? 0));
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <span className={EYEBROW}>The week of {first ? shortDate(first.date) : "—"}</span>
+      <Eyebrow>The week of {first ? shortDate(first.date) : "—"}</Eyebrow>
       <div className="grid h-24 grid-cols-7 items-end gap-1">
         {days.map((d, i) =>
           d === null ? (
@@ -46,12 +46,6 @@ export function WeekStrip({ days, pinned, onPick, unit }: { days: (ActivityDay |
   );
 }
 
-const ordinal = (n: number) => {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 13) return `${n}th`;
-  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
-};
-
 /** Where the day's month sits in the year: a total, a rank, and the month before it. */
 export function MonthSummary({
   label,
@@ -70,7 +64,7 @@ export function MonthSummary({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className={EYEBROW}>{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       <p className="flex items-baseline gap-1.5">
         <span className="text-[22px] font-semibold leading-tight tabular-nums">{count(total)}</span>
         <span className="text-xs text-muted-foreground">{unit}</span>

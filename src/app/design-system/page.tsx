@@ -1,6 +1,6 @@
 import { DsSection, DsGrid, Spec, SwatchGrid, RadiusDemo, SpacingDemo, TypeScale } from "@/components/design-system";
 import { Grid, Stack, Panel, PanelHeader, PanelBody, EmptyState, RangeSegment, RangeSelect, ThemeToggle } from "@/components/layout";
-import { MetricLabel, Value, DeltaText, InsightTag, LiveDot, GlossaryEntry } from "@/components/copy";
+import { MetricLabel, Value, DeltaText, InsightTag, LiveDot, GlossaryEntry, Eyebrow } from "@/components/copy";
 import { Sparkline, Meter, ShareBar, ShareLegend, ChartLegend, StyleSegment, MetricSelect, TrendChart, TrendTable, seriesColor } from "@/components/charts";
 import { Headline, QuickAnalytics, QuickStat, InsightList, InsightCard, FeederMarkets, CampaignSummary, FunnelSection, GlossaryPanel, OverviewBodySkeleton } from "@/components/dashboard";
 import { ActivityCalendar, DayCard, WeekStrip, MonthSummary, WeekdayRhythm, TrafficIntro, TrafficMetricSelect, TrafficStory, CampaignTrafficChart, CampaignTrafficTable, EventImpactCard, WhatAutumnDid, CampaignEfficiencyTable, DeviceConversion } from "@/components/website-traffic";
@@ -36,7 +36,7 @@ export default function DesignSystemPage() {
     <div className="grid grid-cols-1 gap-(--stack-gap) px-(--page-gutter) py-8 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-12">
       <nav aria-label="Chapters" className="flex flex-col gap-3 lg:sticky lg:top-8 lg:self-start">
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Autumn dashboard</span>
+          <Eyebrow>Autumn dashboard</Eyebrow>
           <span className="text-base font-semibold">Design system</span>
           <span className="text-xs text-muted-foreground">Rendered from the code, with fixture numbers. Not linked from the product.</span>
         </div>

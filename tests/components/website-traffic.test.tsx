@@ -5,6 +5,9 @@ import { ActivityCalendar, heatLevel, monthColumns } from "@/components/website-
 import { DayCard } from "@/components/website-traffic/day-card";
 import { MonthSummary, WeekStrip } from "@/components/website-traffic/day-context";
 import { WeekdayRhythm } from "@/components/website-traffic/weekday-rhythm";
+import { TrafficIntro } from "@/components/website-traffic/traffic-intro";
+import { glossary } from "@/lib/glossary";
+import { parseRange } from "@/lib/date-range";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
 
 const DAY = 86_400_000;
@@ -188,7 +191,8 @@ describe("WeekdayRhythm", () => {
     const averages = [40, 30, 20, 25, 35, 50, 60].map((average, weekday) => ({ weekday, average }));
     render(<WeekdayRhythm averages={averages} />);
     expect(screen.getAllByText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/).map((e) => e.textContent)).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-    expect(screen.getByText("Saturdays bring 3.0× a Tuesday.")).toBeInTheDocument(); // 60 / 20
+    // `times` from format.ts drops a decimal that says nothing, so an exact 3 reads "3×", not "3.0×".
+    expect(screen.getByText("Saturdays bring 3× a Tuesday.")).toBeInTheDocument(); // 60 / 20
   });
   it("says nothing about the ratio when a weekday has no traffic at all", () => {
     render(<WeekdayRhythm averages={[0, 30, 20, 25, 35, 50, 60].map((average, weekday) => ({ weekday, average }))} />);
@@ -216,5 +220,21 @@ describe("DayCard", () => {
     render(<DayCard day={{ date: "2025-08-31", value: null, newVisitors: null, bookings: null, pagesPerSession: null }} typical={null} mode="hover" unit="visits" />);
     expect(screen.getByText("Pointing at")).toBeInTheDocument();
     expect(screen.getAllByText("—")).toHaveLength(4);
+  });
+});
+
+describe("TrafficIntro", () => {
+  // One word for one thing (design audit 2026-09-17, item 10): the headline calls an ad-driven visit
+  // what the glossary calls it, and says where first-time visitors come from in the glossary's own
+  // words. Rewording either entry without following it here turns this red.
+  const range = parseRange("30d", "2024-09-17", "2026-09-16");
+  it("names visits the way the glossary does and keeps new visitors separate from them", () => {
+    render(<TrafficIntro range={range} totals={{ visits: 1548, newVisitors: 1116, previousVisits: 1402 }} />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent("1,548 people visited your site from Autumn's ads. 1,116 first-time visitors came from any source, not only ads.");
+    expect(glossary.website_visits.label).toBe("Visited your site");
+    expect(h1.textContent).toContain(glossary.website_visits.label.toLowerCase());
+    expect(glossary.new_visitors.meaning).toContain("from any source, not only ads");
+    expect(h1.textContent).toContain("from any source, not only ads");
   });
 });

@@ -45,6 +45,22 @@ export function deltaText(current: number, previous: number | null, vsLabel: str
 /** 0.083 → "1 in 12". Plain-language click-through and conversion. */
 export const oneIn = (rate: number) => (rate <= 0 ? "none" : `1 in ${Math.round(1 / rate)}`);
 
+/** "the previous 30 days" → "The previous 30 days". Sentence case for a phrase written lower-case. */
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A spoken rank: 1 → "1st", 11 → "11th", 21 → "21st", 112 → "112th". */
+export const ordinal = (n: number) => {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+};
+
+/** "4.2×", but "3×" when the decimal says nothing. */
+export const times = (ratio: number) => `${ratio.toFixed(1).replace(/\.0$/, "")}×`;
+
+/** Pages per visit, always to one decimal so 3 reads as "3.0" beside a 3.4. */
+export const perVisit = (pages: number) => pages.toFixed(1);
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const parts = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return { y, m, d }; };
 /** US date voice throughout, the way the seeded property's owner reads a date: "Sep 1". */

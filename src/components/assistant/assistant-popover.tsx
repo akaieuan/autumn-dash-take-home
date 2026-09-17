@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { MessageCircle, ChevronDown, Sparkles, Send, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Eyebrow } from "@/components/copy";
 import { PromptChip, ComingSoonAction } from "./prompt-chip";
 
 const QUESTIONS = ["Why did Chicago drop?", "Compare to last September", "What drove Labor Day?", "Explain the fee"];
@@ -30,9 +31,9 @@ export function AssistantPopover() {
         </div>
         <div className="flex flex-col gap-3 p-(--panel-pad)">
           <p className="max-w-64 rounded-(--r-in) rounded-tl-(--radius-min) bg-background px-3 py-2 text-sm leading-snug">Hi. Ask about any number on this page, or tell me what you&apos;d like changed.</p>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Try asking</p>
+          <Eyebrow as="p">Try asking</Eyebrow>
           <div className="flex flex-wrap gap-1.5">{QUESTIONS.map((q) => <PromptChip key={q} text={q} onPick={setDraft} />)}</div>
-          <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Take action <span className="inline-flex h-5 items-center rounded-(--r-in) bg-muted px-1.5 text-[10px] font-semibold normal-case tracking-normal text-foreground">Coming soon</span></p>
+          <Eyebrow as="p" className="flex items-center gap-2">Take action <span className="inline-flex h-5 items-center rounded-(--r-in) bg-muted px-1.5 text-[10px] font-semibold normal-case tracking-normal text-foreground">Coming soon</span></Eyebrow>
           <div className="flex flex-col gap-1.5">{ACTIONS.map((a) => <ComingSoonAction key={a} text={a} />)}</div>
           {notice ? <p role="status" className="rounded-(--r-in) bg-muted px-3 py-2 text-xs text-muted-foreground">{notice}</p> : null}
         </div>

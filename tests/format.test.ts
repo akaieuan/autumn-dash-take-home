@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { money, moneyExact, moneyCompact, compact, count, pct, delta, deltaText, oneIn, shortDate, longDate, bucketLabel, rangeLabel } from "@/lib/format";
+import { money, moneyExact, moneyCompact, compact, count, pct, delta, deltaText, oneIn, shortDate, longDate, bucketLabel, rangeLabel, cap, ordinal, times, perVisit } from "@/lib/format";
 
 describe("format", () => {
   it("money renders whole dollars from cents", () => {
@@ -54,5 +54,35 @@ describe("format", () => {
     expect(bucketLabel("2026-09-01", "day")).toBe("Sep 1");
     expect(rangeLabel("2026-08-18", "2026-09-16")).toBe("Aug 18 – Sep 16, 2026");
     expect(rangeLabel("2025-12-20", "2026-01-05")).toBe("Dec 20, 2025 – Jan 5, 2026");
+  });
+  // The four helpers that had drifted into components (design audit 2026-09-17, item 4).
+  it("cap lifts the first letter of a range's own wording and leaves the rest alone", () => {
+    expect(cap("the previous 30 days")).toBe("The previous 30 days");
+    expect(cap("this time last year")).toBe("This time last year");
+    expect(cap("")).toBe("");
+    expect(cap("YTD so far")).toBe("YTD so far");
+  });
+  it("ordinal says a rank the way it is spoken, teens included", () => {
+    expect(ordinal(1)).toBe("1st");
+    expect(ordinal(2)).toBe("2nd");
+    expect(ordinal(3)).toBe("3rd");
+    expect(ordinal(4)).toBe("4th");
+    expect(ordinal(11)).toBe("11th");
+    expect(ordinal(12)).toBe("12th");
+    expect(ordinal(13)).toBe("13th");
+    expect(ordinal(21)).toBe("21st");
+    expect(ordinal(112)).toBe("112th");
+  });
+  it("times drops a decimal that says nothing", () => {
+    expect(times(4.2)).toBe("4.2×");
+    expect(times(3)).toBe("3×");
+    expect(times(1.0)).toBe("1×");
+    expect(times(2.04)).toBe("2×");
+  });
+  it("perVisit keeps one decimal, even on a whole number", () => {
+    expect(perVisit(3.4)).toBe("3.4");
+    expect(perVisit(3)).toBe("3.0");
+    expect(perVisit(2.95)).toBe("3.0");
+    expect(perVisit(0)).toBe("0.0");
   });
 });

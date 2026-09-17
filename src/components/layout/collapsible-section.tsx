@@ -33,7 +33,7 @@ export function CollapsibleSection({
   }, [id]);
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <Panel id={id} className="gap-0 scroll-mt-20">
+      <Panel id={id} className="gap-0">
         <CollapsibleTrigger
           className={cn(
             "flex w-full items-center justify-between gap-3 text-left",

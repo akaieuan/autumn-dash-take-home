@@ -21,7 +21,7 @@ export function WhatAutumnDid({ impacts, selected, onSelect }: { impacts: EventI
   };
   const many = impacts.length > 1;
   return (
-    <Panel id="events" className="scroll-mt-20 h-full">
+    <Panel id="events" className="h-full">
       <PanelHeader
         headingId="events-h"
         title="What Autumn did"
