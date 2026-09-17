@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# env — never commit a live DATABASE_URL
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# testing / coverage
+coverage/
+.vitest/
+
+# misc
+.DS_Store
+*.pem
+*.log
+npm-debug.log*
+*.tsbuildinfo
+
+# tool scratch
+.claude/settings.local.json

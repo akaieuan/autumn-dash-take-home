@@ -1,0 +1,278 @@
+
+
+
+
+               🍂
+               Autumn Design Engineer Take
+               Home 2
+               At a glance
+                 • The task: design and build a new marketing dashboard with two connected
+                   screens, live and deployed.
+                    ◦ Time: you have 24 hours from receiving this brief.
+                 • You send back: one live URL, a repo link, and screenshots of your work.
+                 • Send to: aaryan@autumnplatform.com
+                 • Questions: email aaryan@autumnplatform.com at any point.
+
+
+               The tasks
+               Autumn helps independent hotels understand whether our marketing work is
+               driving more direct bookings and revenue. Today, the dashboard has useful
+               information, but it can feel dense, technical, and overwhelming for a hotel owner
+               who is short on time.
+               Your assignment has two connected parts:
+
+               Task 1: Redesign the main marketing dashboard
+               Design and build the primary dashboard screen a hotel owner would see first.
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+               This screen should answer the most important customer question: is Autumn
+               helping my hotel get more direct bookings and revenue?
+               What belongs on that first screen is up to you. We want to see your judgment: what
+               you keep, what you demote, what you simplify, what you explain, and how you
+               make the experience feel calm instead of intimidating.
+
+               Task 2: Design a connected detail screen
+               Design and build a second screen that connects naturally from the main dashboard.
+               The second screen should let the hotel owner go deeper into one important area
+               without making the first screen feel crowded. You can choose the focus. For
+               example, it could be website traffic, campaign performance, feeder markets,
+               booking attribution, visitor behavior, insights, or another connected area you think
+               matters more.
+               The second screen should feel like part of the same product experience. It should
+               use the same data source, the same customer-centered thinking, and a clear
+               navigation path from the first screen.
+               Together, the two screens should show that you can design both the executive-
+               level experience and the deeper supporting view.
+
+               Reference dashboard
+               Use the screenshots below as reference for the current product surface. You do
+               not need to copy the layout. The goal is to rethink it.
+
+
+
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+               Current Autumn marketing dashboard, overview
+
+
+
+
+               Current Autumn marketing dashboard, website traffic
+
+               What is on the current dashboard
+               Reference photo 1: Marketing dashboard overview
+                 • Autumn Results: Shows the number of bookings and booking value Autumn
+                     has driven for the hotel.
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+                 • Total Impressions from Ads: Shows how many times the hotel appeared in
+                   paid advertising placements.
+                 • Total Website Visits from Ads: Shows how many people clicked from ads to
+                   the hotel website.
+                 • Total Booking Value: Shows the total dollar value of bookings attributed to
+                   Autumn.
+                 • Trends Over Time: Shows how performance changes across the selected date
+                   range.
+                 • Funnel and Website Engagement: Shows how people move from impressions
+                   to clicks to purchases, including conversion rate (CVR), new visitors, and pages
+                   per session.
+                 • Insights: Highlights notable changes, wins, or issues that the hotel owner may
+                   care about.
+                 • Campaign Summary: Breaks performance down by campaign category,
+                   including impressions, clicks, click-through rate (CTR), and bookings.
+                 • Device Summary: Shows performance by device type, including clicks, click-
+                   through rate (CTR), and booking value.
+                 • Feeder Markets: Shows which geographic markets are sending visitors and
+                   bookings to the hotel.
+               Reference photo 2: Website traffic detail
+                 • Autumn Results: Repeats the most important outcome metrics so the user
+                   stays oriented while looking at traffic details.
+                 • Total Impressions from Ads: Shows how often ads appeared during the
+                   selected period.
+                 • Click-Through Rate (CTR) from Ads: Shows the percentage of ad impressions
+                   that turned into clicks.
+                 • Website Visits from Ads: Shows how many website visits came from paid ads.
+                 • Traffic by Device: Shows whether visitors are coming from desktop, mobile, or
+                   tablet.
+                 • Traffic by Time of Day: Shows when visitors are most likely to arrive on the
+                   website.
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+                 • Visitor Demographics: Placeholder area for demographic details when that
+                   data is available.
+                • Funnel and Website Engagement: Shows the path from impressions to clicks
+                   to purchases, along with engagement metrics like new visitors and pages per
+                   session.
+                • Top Traffic Channels: Shows which channels, such as organic search, direct
+                   traffic, or paid search, are driving visits.
+                • Page Views: Shows which website pages visitors are viewing most often.
+                • Events: Shows important website actions, such as page views, user
+                   engagement, and session starts.
+                • All Website Visitors: Shows visitor volume by city, region, and country.
+               You can decide how much of this should remain visible, how it should be grouped,
+               and what should be moved into the second screen or behind progressive
+               disclosure. The point is not to show every metric at once. The point is to help a
+               hotel owner quickly understand performance, trust the work, and know what
+               matters.
+
+               Product context
+               Autumn’s customer is not a growth marketer.
+               They are usually an owner-operator of an independent hotel, inn, B&B, ranch,
+               lodge, or boutique property. They may be the front desk, the marketing
+               department, the revenue manager, and the person fixing the towel rack, all in the
+               same day.
+               They care about questions like:
+                • Did Autumn help me get more direct bookings?
+                • How much revenue did that create?
+                • Are the right guests finding my property?
+                • What changed since last month?
+                • Is anything concerning?
+                • What is Autumn doing about it?
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+               They may not know what click-through rate (CTR), conversion rate (CVR),
+               campaign categories, attribution, or funnel conversion mean. If those concepts are
+               useful, make them understandable.
+               The experience should feel calm, hospitality-native, and confidence-building, not
+               like an ad platform.
+
+               Requirements
+               1. Build two connected screens
+               Build a working, deployed dashboard experience with:
+                • A main marketing dashboard screen
+                • A second connected detail screen
+                • Navigation between the two screens
+                • A coherent information hierarchy across both screens
+               The two screens should feel intentionally connected. The second screen should not
+               be a random extra page. It should help explain or support something important
+               from the first screen.
+
+               2. Use React, Next.js, and a real hosted database
+               Build the project using:
+                • React
+                • Next.js
+                • A hosted database of your choice
+               The dashboard must actually fetch and render data from the database. If the
+               dashboard is hardcoded, the submission will not pass.
+
+
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+               You may use any styling system, charting library, user interface (UI) library, or
+               backend approach you think is appropriate, as long as the final result is polished,
+               fast, and reliable.
+
+               3. Seed your own database
+               Create and seed a hosted database with at least 720 days of plausible, meaningful
+               marketing data.
+               Free-tier infrastructure is completely fine. Examples include Supabase, Neon,
+               MongoDB, or another hosted database you prefer.
+               Your data model is part of the assignment. It should generally represent the kind of
+               information in the reference dashboard, but it should not be random noise. The
+               data should feel realistic for an independent hotel marketing program.
+               Your seeded data should support both screens. If the dashboard shows
+               seasonality, campaign performance, feeder markets, bookings, revenue, visitor
+               behavior, or trend comparisons, the underlying data should make those views
+               believable.
+               A seeding script is a positive signal. We want to see how you think about data
+               shape, data quality, and repeatable setup.
+
+               4. Design for hotel owners
+               The redesigned dashboard should be less intimidating and less overwhelming than
+               the current version.
+               Use your own judgment to decide:
+                • What the user should see first
+                • What belongs on the main screen
+                • What belongs on the second screen
+                • Which metrics deserve emphasis
+                • Which metrics need plain-language explanation
+                • Which details should be available but not dominant
+
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+                 • How to show progress, wins, problems, and next steps
+                 • How to make the dashboard feel useful without making it feel like homework
+               We are especially interested in how you translate data into a customer experience.
+               The dashboard should help the hotel owner feel oriented, not buried.
+
+               What to send back
+                1. One live URL
+                    • Both screens should be reachable.
+                    • If login is required, include test credentials.
+                2. A repo link
+                    • Include setup instructions.
+                    • Include database setup and seeding instructions.
+                3. Screenshots
+                    • Include the old/reference dashboard.
+                    • Include your redesigned main screen.
+                    • Include your connected second screen.
+
+
+               How we'll evaluate it
+                 • Product judgment: Does the dashboard make the right information obvious for
+                   a hotel owner?
+                 • Design craft: Does it feel polished, calm, clear, and appropriate for
+                   independent hospitality?
+                 • Engineering quality: Is it built well, connected to a real database, responsive,
+                   and maintainable?
+                 • Data realism: Does the seeded data feel plausible, meaningful, and connected
+                   to the dashboard experience?
+
+               Important constraints
+9/17/26, 10:16 AM                                                          Autumn Design Engineer Take Home 2
+
+
+
+
+                 • Do not hardcode the dashboard data.
+                 • Do not spend time building unrelated product surfaces.
+                 • Do not optimize for showing the most charts. Optimize for showing the right
+                   information.
+                 • You may use AI tools however you would use them on the job.
+
+
+               Follow-up conversation
+               We'll schedule this meeting on completion of this project and will use the
+               conversation to discuss:
+                • Your design decisions
+                • What you believed mattered most to the hotel owner
+                • Why you chose the second screen
+                • How you structured the data
+                • Any technical tradeoffs you made
+                • What you learned while building it
+                • What you would do next with more time
+               We care less about whether you guessed our preferred answer and more about
+               how you reasoned from the customer, the data, and the constraints.
+
+               Submission
+
+
+
+
+
