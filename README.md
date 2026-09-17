@@ -41,7 +41,7 @@ site.
 
 | The current website-traffic tab | The new Website traffic |
 |---|---|
-| ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) | ![New Website traffic](public/screenshots/traffic-desktop-dark.png) |
+| ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) | ![New Website traffic](public/screenshots/traffic-desktop.png) |
 
 ## Designing for a hotel owner
 
@@ -258,6 +258,26 @@ Query tests run against an in-process Postgres (PGlite) using the real
 migration and a hand-computed fixture, so no database is needed to run the
 suite.
 
+### Performance on the deployed URL
+
+Lighthouse 13.4, run on 2026-09-17 against the live site, all four
+categories. Mobile is Lighthouse's throttled phone profile; desktop is its
+desktop preset. The traffic-page desktop figure is the median of three runs,
+because the first run landed on a cold serverless function (1.7 s to first
+byte, score 90) and the next two did not (30 to 60 ms, score 100).
+
+| Screen | Profile | Performance | Accessibility | Best practices | SEO | Largest contentful paint | Layout shift |
+|---|---|---|---|---|---|---|---|
+| Overview | mobile | 91 | 96 | 100 | 100 | 3.1 s | 0.002 |
+| Overview | desktop | 100 | 100 | 100 | 100 | 0.4 s | 0 |
+| Website traffic | mobile | 91 | 96 | 100 | 100 | 3.2 s | 0 |
+| Website traffic | desktop | 100 | 100 | 100 | 100 | 0.6 s | 0 |
+
+Both screens clear the 90 floor the operating contract sets for performance
+and accessibility. The mobile largest-contentful-paint is the headline
+sentence arriving over a simulated slow 4G connection; blocking time stays
+under 50 ms on every run.
+
 ## The two screens
 
 Screenshots are of the deployed site, in `public/screenshots/`.
@@ -312,6 +332,8 @@ decide the next campaign rather than read analytics.
   booked, and value per visit, per campaign; the total row reads the daily
   totals, never a sum of the rows.
 - **Which days are busiest**, and **what they visit on, and what books.**
+
+![Website traffic on desktop](public/screenshots/traffic-desktop.png)
 
 ![Website traffic, dark theme](public/screenshots/traffic-desktop-dark.png)
 
@@ -384,9 +406,11 @@ parts I would bring up first.
   of the interaction, wired to nothing. The next step is a model that
   answers over the same query layer the screens use, so it can never quote
   a number the page does not show.
-- **Measured performance on the deployed URL.** Query timings are recorded
-  (32 to 69 ms warm); Lighthouse scores and time to first byte are not yet,
-  and the operating contract asks for both.
+- **Warm the cold path.** Lighthouse is green on both screens (table under
+  Gates), but the first request after the function has gone idle takes about
+  1.7 s to answer while it opens a database connection; warm requests take
+  under 60 ms. A keep-warm ping or a cached first payload would remove the
+  one slow load an owner might ever see.
 - **Negative controls for every decision.** Eleven decisions are marked
   "tested" rather than "verified": the proving test exists but has not been
   deliberately broken once. Finishing that pass is a morning's work and would
