@@ -6,3 +6,5 @@ export { getBreakdown, getAllBreakdowns, getMarkets, getCampaigns, getFunnel } f
 export type { BreakdownRowDto, MarketDto, CampaignDto, CampaignSummaryDto, FunnelStepDto, FunnelDto } from "./breakdowns";
 export { getCampaignMeta, getEvents, getEventImpact, getRecentEventImpacts } from "./events";
 export type { CampaignMetaDto, EventDto, EventImpactDto, WindowTotals } from "./events";
+export { getTrafficByCampaign, getCampaignEfficiency, bucketEnd } from "./traffic";
+export type { CampaignSeriesDto, CampaignSeries, CampaignSeriesMetric, EventMarker, CampaignEfficiencyDto, CampaignEfficiencyRow } from "./traffic";
