@@ -22,6 +22,10 @@ hotel-marketing data.
   the invariants the codebase keeps.
 - **[The brief](https://github.com/akaieuan/autumn-dash-take-home/blob/main/docs/reference/take-home-brief.txt)**
   as received, for reference.
+- **[The design system](https://autumn-dash-take-home.vercel.app/design-system)**,
+  live: every token, primitive, atom, molecule and organism rendered from the
+  real components with fixture data, so the pieces can be judged on their own
+  before they are judged in the page.
 
 ## Before and after
 
@@ -102,6 +106,52 @@ dimension does not reconcile.
 
 ```bash
 npm run dev
+```
+
+## Repo structure
+
+Pages compose, components render, queries fetch. That rule decides where
+everything lives.
+
+```
+src/
+  app/
+    (dashboard)/            the product; the group's layout owns the sidebar frame
+      page.tsx              Overview
+      website-traffic/      the second screen
+      loading.tsx, error.tsx
+    design-system/          every token, primitive and component, from the real code
+    layout.tsx, globals.css, not-found.tsx
+  components/
+    ui/                     shadcn primitives, owned by the CLI
+    layout/ copy/ charts/   atoms and molecules shared by both screens
+    dashboard/              the Overview's organisms
+    website-traffic/        the traffic screen's organisms
+    assistant/              the Ask Autumn popover
+    design-system/          the sections of the design-system page
+  lib/
+    db/
+      schema.ts             the four tables
+      client.ts             Supabase over postgres-js, opened on the first query
+      queries/              one module per screen; each returns typed view models
+    date-range.ts           a URL preset becomes dates, anchored on the last day with data
+    format.ts               the only place money, percentages and dates are formatted
+    glossary.ts             every plain-language label and definition
+    insights.ts             the "What's happening" rules; pure, no database
+    property.ts             the constants that are the owner's to change
+    activity.ts, navigation.ts, sidebar.ts, theme.ts   calendar, nav, sidebar state, theme
+scripts/
+  seed/                     the deterministic generator: profile, events, apportionment
+  db-migrate.ts             applies drizzle/ through the app's own client
+  db-verify.ts              re-measures the seed from the live database
+drizzle/                    generated migrations; never hand-edited
+tests/                      Vitest: pure logic, the seed, queries against an in-memory Postgres, component renders
+docs/
+  decisions.md              the decision log
+  reference/                the brief, findautumn.com notes, the before screenshots
+  superpowers/              the design spec and implementation plans
+public/screenshots/         the after screenshots
+CLAUDE.md                   the operating contract
 ```
 
 ## The data model
