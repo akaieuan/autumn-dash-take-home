@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { apportion } from "../scripts/seed/apportion";
+import { apportion, apportionByDraw } from "../scripts/seed/apportion";
+import { makeRng } from "../scripts/seed/rng";
 
 describe("apportion", () => {
   it("sums exactly to the total and gives zero weight nothing", () => {
@@ -16,5 +17,21 @@ describe("apportion", () => {
   it("handles zero total and all-zero weights", () => {
     expect(apportion(0, [1, 2])).toEqual([0, 0]);
     expect(apportion(5, [0, 0])).toEqual([0, 0]);
+  });
+});
+
+describe("apportionByDraw", () => {
+  it("sums exactly, respects caps, and spreads small totals in proportion over many days", () => {
+    const rng = makeRng(3);
+    const totals = [0, 0, 0];
+    for (let day = 0; day < 3000; day++) {
+      const parts = apportionByDraw(1, [34, 12, 3], rng.next);
+      expect(parts.reduce((s, p) => s + p, 0)).toBe(1);
+      parts.forEach((p, i) => (totals[i] += p));
+    }
+    expect(totals[1] / 3000).toBeGreaterThan(0.19); expect(totals[1] / 3000).toBeLessThan(0.30); // 12/49 ≈ 0.245
+    expect(totals[2]).toBeGreaterThan(100);                                                       // 3/49 ≈ 6% of 3000
+    const capped = apportionByDraw(5, [10, 1], rng.next, [2, 5]);
+    expect(capped).toEqual([2, 3]);
   });
 });

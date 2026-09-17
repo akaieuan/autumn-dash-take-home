@@ -61,8 +61,22 @@ describe("seed generators", () => {
     const mk = (v: string) => sum(data.breakdowns.filter((b) => b.dimension === "feeder_market" && b.dimensionValue === v), (b) => b.bookings);
     expect(mk("Chicago, IL")).toBeGreaterThan(mk("Grand Rapids, MI"));
   });
+  it("light markets and campaigns still book: no zero rows over the full window, at most two over the last 90 days", () => {
+    const from = "2026-06-19";
+    const zeros = (dim: string, since: string) => {
+      const byValue = new Map<string, number>();
+      for (const b of data.breakdowns) if (b.dimension === dim && b.date >= since) byValue.set(b.dimensionValue, (byValue.get(b.dimensionValue) ?? 0) + b.bookings);
+      return [...byValue.values()].filter((v) => v === 0).length;
+    };
+    expect(zeros("feeder_market", "2024-09-17")).toBe(0);
+    expect(zeros("campaign", "2024-09-17")).toBe(0);
+    expect(zeros("feeder_market", from)).toBeLessThanOrEqual(2);
+    expect(zeros("campaign", from)).toBe(0);
+  });
   it("brand protection clicks through far better than discovery, as in the reference", () => {
     const ctr = (v: string) => { const r = data.breakdowns.filter((b) => b.dimensionValue === v); return sum(r, (b) => b.clicks) / sum(r, (b) => b.impressions); };
     expect(ctr("Brand Protection")).toBeGreaterThan(ctr("Discovery & Competitors") * 2);
+    const cvr = (v: string) => { const r = data.breakdowns.filter((b) => b.dimensionValue === v); return sum(r, (b) => b.bookings) / sum(r, (b) => b.clicks); };
+    expect(cvr("Brand Protection")).toBeGreaterThan(cvr("Discovery & Competitors") * 2);
   });
 });

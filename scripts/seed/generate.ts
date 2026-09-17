@@ -2,7 +2,7 @@ import type { BreakdownRow, DailyMetricRow, Dimension } from "@/lib/db/schema";
 import { DIMENSIONS } from "@/lib/db/schema";
 import { dayOfWeek, daysBetween, eachDay } from "@/lib/date-range";
 import { makeRng, type Rng } from "./rng";
-import { apportion } from "./apportion";
+import { apportion, apportionByDraw } from "./apportion";
 import { BASE_IMPRESSIONS_PER_DAY, CLICK_THROUGH_RATE, DIMENSION_DEFS, SEED, WINDOW, avgBookingValueCents, conversionRate, demandMultiplier, growth, ramp } from "./profile";
 
 const cents = (c: number) => Math.round(c) / 100;
@@ -50,8 +50,10 @@ export function generateBreakdowns(rng: Rng, daily: DailyMetricRow[]): Breakdown
       const jitter = defs.map(() => 0.85 + rng.next() * 0.3);
       const impW = weightsFor(dimension, day.date).map((w, i) => w * jitter[i]);
       const impressions = apportion(day.impressions, impW);
-      const clicks = apportion(day.clicks, impressions.map((n, i) => n * defs[i].ctr), impressions);
-      const bookings = apportion(day.bookings, clicks.map((n, i) => n * defs[i].cvr), clicks);
+      // Impressions are hundreds a day: exact remainder split. Clicks and bookings are small counts:
+      // weighted draws, so light markets and campaigns still win their share over a month.
+      const clicks = apportionByDraw(day.clicks, impressions.map((n, i) => n * defs[i].ctr), rng.next, impressions);
+      const bookings = apportionByDraw(day.bookings, clicks.map((n, i) => n * defs[i].cvr), rng.next, clicks);
       const valueCents = apportion(Math.round(day.bookingValue * 100), bookings.map((n, i) => n * defs[i].valueMult));
       defs.forEach((d, i) => {
         if (impressions[i] === 0 && clicks[i] === 0 && bookings[i] === 0 && (d.startsOn && day.date < d.startsOn)) return; // campaign not launched yet
