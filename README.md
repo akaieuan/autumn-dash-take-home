@@ -340,7 +340,7 @@ parts I would bring up first.
 - **Measured performance on the deployed URL.** Query timings are recorded
   (32 to 69 ms warm); Lighthouse scores and time to first byte are not yet,
   and the operating contract asks for both.
-- **Negative controls for every decision.** Nine decisions are marked
+- **Negative controls for every decision.** Eleven decisions are marked
   "tested" rather than "verified": the proving test exists but has not been
   deliberately broken once. Finishing that pass is a morning's work and would
   make the log fully falsified.
