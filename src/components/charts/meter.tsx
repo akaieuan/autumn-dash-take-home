@@ -1,5 +1,5 @@
-/** A single-hue share bar. The track is a pill (exempt from concentric corners). */
-export function Meter({ share, label }: { share: number; label: string }) {
+/** A share bar. Colour defaults to the brand primary; pass a series colour when rows are being compared. */
+export function Meter({ share, label, color }: { share: number; label: string; color?: string }) {
   const clamped = Math.max(0, Math.min(1, share));
   return (
     <div
@@ -13,7 +13,7 @@ export function Meter({ share, label }: { share: number; label: string }) {
       <div
         data-slot="meter-fill"
         className="h-full rounded-full bg-primary"
-        style={{ width: `${Math.round(clamped * 100)}%` }}
+        style={{ width: `${Math.round(clamped * 100)}%`, ...(color ? { backgroundColor: color } : {}) }}
       />
     </div>
   );

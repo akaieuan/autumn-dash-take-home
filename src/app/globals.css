@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -24,6 +26,11 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-other: var(--series-other);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -75,6 +82,12 @@
   --chart-3: #cfcdc6; /* same period last year */
   --chart-4: #a0661e; /* second series, campaigns only */
   --chart-5: #95938c;
+  /* Identity colours for comparing campaigns, cities and devices. Validated 2026-09-17 (dataviz validator, adjacent pairs, light surface): all checks pass; amber is below 3:1 so every use carries a text label. */
+  --series-1: #1f8a5f;
+  --series-2: #d9822b;
+  --series-3: #3b73c9;
+  --series-4: #b0508f;
+  --series-other: #b9b7b0;
   --positive: #6f8b7a;
   --watch: #c48a3a;
   --negative: #b5563f;
@@ -89,6 +102,50 @@
   --sidebar-ring: #6f8b7a;
 }
 
+/* Dark theme, added 2026-09-17 at the owner's request (reverses D7). Same brand hues, lifted for a warm charcoal ground. */
+.dark {
+  color-scheme: dark;
+  --background: #141412;
+  --foreground: #ecebe7;
+  --card: #1c1b19;
+  --card-foreground: #ecebe7;
+  --popover: #22211e;
+  --popover-foreground: #ecebe7;
+  --primary: #8fae9b;
+  --primary-foreground: #141412;
+  --secondary: #2a2925;
+  --secondary-foreground: #ecebe7;
+  --muted: #2a2925;
+  --muted-foreground: #a8a69f;
+  --accent: #3a3327;
+  --accent-foreground: #ecebe7;
+  --destructive: #d27a62;
+  --border: rgba(236, 235, 231, 0.1);
+  --input: rgba(236, 235, 231, 0.16);
+  --ring: #8fae9b;
+  --chart-1: #8fae9b;
+  --chart-2: #77756f;
+  --chart-3: #55534e;
+  --chart-4: #d19a52;
+  --chart-5: #8a8882;
+  --series-1: #2f9a6a;
+  --series-2: #d0762b;
+  --series-3: #4a82dc;
+  --series-4: #cc5a94;
+  --series-other: #5a5853;
+  --positive: #8fae9b;
+  --watch: #dca756;
+  --negative: #d27a62;
+  --sidebar: #1c1b19;
+  --sidebar-foreground: #ecebe7;
+  --sidebar-primary: #8fae9b;
+  --sidebar-primary-foreground: #141412;
+  --sidebar-accent: #2a2925;
+  --sidebar-accent-foreground: #ecebe7;
+  --sidebar-border: rgba(236, 235, 231, 0.1);
+  --sidebar-ring: #8fae9b;
+}
+
 /* Layout rhythm (D27) and concentric corners (D28). Components reference these; they never carry a literal gutter, padding or radius. */
 :root {
   --page-gutter: 1rem;
@@ -101,6 +158,7 @@
   --radius-float: 1rem;     /* chart tooltips */
   --float-pad: 0.75rem;
   --r-float-in: max(var(--radius-min), calc(var(--radius-float) - var(--float-pad)));
+  --r-header: max(var(--radius-min), calc(var(--radius-panel) - 0.5rem)); /* the sticky bar sits 8px inside the inset card */
 }
 @media (min-width: 640px) {
   :root { --page-gutter: 1.5rem; }

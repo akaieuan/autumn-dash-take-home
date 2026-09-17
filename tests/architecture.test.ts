@@ -19,7 +19,7 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     for (const f of components()) expect(read(f), f).not.toMatch(/(?<!import type[^;]{0,80})from\s+["']@\/lib\/db/);
   });
   it("layout adapts by CSS only: no viewport hooks anywhere in src", () => {
-    for (const f of walk("src")) expect(read(f), f).not.toMatch(/useIsMobile|matchMedia|window\.innerWidth|useMediaQuery/);
+    for (const f of walk("src")) expect(read(f), f).not.toMatch(/useIsMobile|window\.innerWidth|useMediaQuery|matchMedia\(\s*[\"'`]\((?:min|max)-width/);
   });
   it("money is formatted only in format.ts", () => {
     for (const f of walk("src").filter((p) => !p.endsWith("src/lib/format.ts"))) expect(read(f), f).not.toMatch(/Intl\.NumberFormat/);
@@ -27,10 +27,10 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
   it("pages import barrels, never a file inside a component folder", () => {
     for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|bookings|assistant)\/[a-z]/);
   });
-  it("globals.css carries the layout tokens and no dark block", () => {
+  it("globals.css carries the layout tokens and a dark theme block", () => {
     const css = read("src/app/globals.css");
     for (const t of ["--page-gutter", "--stack-gap", "--panel-pad", "--plot-height", "--radius-panel", "--r-in", "--radius-min", "--radius-float"]) expect(css).toContain(`${t}:`);
-    expect(css).not.toMatch(/\.dark\s*\{/);
+    expect(css).toMatch(/\.dark\s*\{/); // light and dark themes (owner, 2026-09-17)
     expect(css).toMatch(/--chart-1:\s*#3f6b55/);
   });
   it("components set no outer margins (parents own spacing with gap)", () => {

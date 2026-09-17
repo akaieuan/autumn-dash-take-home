@@ -87,7 +87,7 @@ async function OverviewBody({
   return (
     <Stack>
       <Grid variant="sidebar">
-        <Panel id="trend" className="scroll-mt-20">
+        <Panel id="trend" className="scroll-mt-20 h-full">
           <PanelHeader
             headingId="trend-h"
             title="Day by day"
@@ -114,21 +114,7 @@ async function OverviewBody({
         <CampaignSummary summary={campaigns} />
         <FunnelSection funnel={funnel} />
       </Grid>
-      <GlossarySection
-        keys={[
-          "direct_bookings",
-          "booking_value",
-          "autumn_fee",
-          "net_revenue",
-          "impressions",
-          "clicks",
-          "website_visits",
-          "ctr",
-          "conversion",
-          "new_visitors",
-          "pages_per_session",
-        ]}
-      />
+      <GlossarySection />
     </Stack>
   );
 }

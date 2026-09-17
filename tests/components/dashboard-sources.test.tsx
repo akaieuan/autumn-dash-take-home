@@ -78,14 +78,18 @@ describe("CampaignSummary", () => {
 });
 
 describe("FunnelSection", () => {
-  it("is a collapsible that opens in place on wide screens and chains the steps", () => {
+  it("is an always-visible panel that chains the steps and splits visits by device", () => {
     wrap(<FunnelSection funnel={funnel} />);
-    const btn = screen.getByRole("button", { name: /Funnel and website engagement/ });
-    expect(btn.getAttribute("aria-expanded")).toBe("false");
-    expect((document.querySelector("[data-slot=collapsible-content]") as HTMLElement).className).toContain("2xl:block");
-    expect(screen.getByRole("row", { name: "Saw your hotel" })).toHaveTextContent("6,4001 in 6");
-    expect(screen.getByRole("row", { name: "Direct bookings from Autumn" })).toHaveTextContent("41$18,240");
+    expect(screen.getByRole("heading", { level: 2, name: "From seen to booked" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /From seen to booked/ })).toBeNull(); // not a collapsible any more
+    const steps = screen.getAllByRole("listitem").filter((li) => li.closest("ol"));
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toHaveTextContent("Saw your hotel6,400");
+    expect(steps[0]).toHaveTextContent("1 in 6 clicked");   // 1020 / 6400 = 0.159 → 1 in 6
+    expect(steps[1]).toHaveTextContent("1 in 25 booked");   // 41 / 1020 = 0.040 → 1 in 25
+    expect(steps[2]).toHaveTextContent("Direct bookings from Autumn41$18,240");
     expect(screen.getByText("5,210")).toBeInTheDocument();
-    expect(screen.getByRole("meter", { name: "Phone share of visits" }).getAttribute("aria-valuenow")).toBe("0.58");
+    expect(screen.getByText("3.6")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Share of clicks by device: Phone 58%, Computer 35%, Tablet 7%" })).toBeInTheDocument();
   });
 });

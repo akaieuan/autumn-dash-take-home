@@ -169,10 +169,14 @@ describe("CollapsibleSection", () => {
 });
 
 describe("GlossarySection and skeleton", () => {
-  it("lists the entries it is given inside a collapsible", () => {
-    wrap(<GlossarySection keys={["direct_bookings", "autumn_fee"]} />);
-    expect(screen.getByRole("button", { name: /Understand these numbers/ })).toBeInTheDocument();
-    expect(screen.getByText("Direct bookings from Autumn (attributed bookings)")).toBeInTheDocument();
+  it("groups the glossary into tabs and shows the first group's terms with their industry names", () => {
+    wrap(<GlossarySection groups={[{ id: "money", label: "Bookings and money", keys: ["direct_bookings", "autumn_fee"] }, { id: "ads", label: "Your ads", keys: ["ctr"] }]} />);
+    expect(screen.getByRole("heading", { level: 2, name: "What these numbers mean" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Bookings and money/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: /^Your ads/ })).toBeInTheDocument();
+    expect(screen.getByText("Direct bookings from Autumn")).toBeInTheDocument();
+    expect(screen.getByText("attributed bookings")).toBeInTheDocument();
+    expect(screen.queryByText("People who clicked")).toBeNull(); // the second tab's term is not rendered until chosen
   });
   it("skeleton reserves the plot height so the chart never shifts the page", () => {
     const { container } = render(<OverviewBodySkeleton />);

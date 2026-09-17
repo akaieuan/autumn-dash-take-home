@@ -11,3 +11,9 @@ afterEach(cleanup);
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
 }
+
+// jsdom has no matchMedia; the theme switch reads prefers-color-scheme. Light by default in tests.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = (query: string) =>
+    ({ matches: false, media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false }) as unknown as MediaQueryList;
+}

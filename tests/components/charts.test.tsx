@@ -42,16 +42,20 @@ describe("chart atoms", () => {
     expect(screen.getByText("This period")).toBeInTheDocument();
     expect(screen.getByText("Same days last year")).toBeInTheDocument();
   });
-  it("TrendTable is the chart's twin: one row per bucket, money formatted", () => {
-    render(<TrendTable metric={metric} granularity={granularity} points={points} prevLabel="Previous 10 days" lastYearLabel="Same days last year" />);
-    expect(screen.getByText("View as table")).toBeInTheDocument();
-    expect(screen.getByRole("row", { name: /Sep 3/ })).toHaveTextContent("$0$900$200");
+  it("TrendTable is the chart's twin: one row per bucket, money formatted, change and totals", () => {
+    render(<TrendTable metric="booking_value" granularity="day" points={points} prevLabel="Previous 10 days" lastYearLabel="Same days last year" />);
+    expect(screen.getByRole("row", { name: /Sep 3/ })).toHaveTextContent("$0$900-100%$200"); // 0 vs 900 → −100%
+    expect(screen.getByRole("row", { name: /Sep 2/ })).toHaveTextContent("$1,000$0—$0");     // no previous → no change
+    const total = screen.getAllByRole("row").at(-1)!;
+    expect(total).toHaveTextContent("Total$1,000$900+11%$200");                            // 100000 vs 90000 → +11%
   });
   it("TrendChart renders an accessible figure, a legend and the table twin", () => {
     render(<TrendChart metric={metric} granularity={granularity} points={points} prevLabel="Previous 10 days" lastYearLabel="Same days last year" />);
     expect(screen.getByRole("figure", { name: "Booking value, day by day" })).toBeInTheDocument();
     expect(screen.getAllByText("Previous 10 days").length).toBeGreaterThan(0);
-    expect(screen.getByText("View as table")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Table" })); // the table twin swaps into the same box
+    expect(screen.getByRole("row", { name: /Sep 3/ })).toBeInTheDocument();
+    expect(screen.queryByRole("figure", { name: "Booking value, day by day" })).not.toBeNull();
   });
 });
 
