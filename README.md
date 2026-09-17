@@ -10,6 +10,20 @@ hotel-marketing data.
 - Stack: Next.js 16 (App Router, Server Components), React 19, TypeScript,
   Tailwind 4, shadcn/ui, Recharts, Drizzle ORM, Supabase Postgres, Vitest, Vercel.
 
+## Before and after
+
+The screens Autumn gave in the brief, beside the redesign of each. The
+originals are unedited in `docs/reference/`; the new ones are the deployed
+site.
+
+| The current marketing dashboard | The new Overview |
+|---|---|
+| ![Current Autumn marketing dashboard](docs/reference/current-dashboard-overview.png) | ![New Overview](public/screenshots/overview-desktop.png) |
+
+| The current website-traffic tab | The new Website traffic |
+|---|---|
+| ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) | ![New Website traffic](public/screenshots/traffic-desktop-dark.png) |
+
 ## Run it locally
 
 Requires Node 24 and a Postgres database. The instructions assume Supabase's
@@ -195,25 +209,23 @@ decide the next campaign rather than read analytics.
 
 ![Which days are busiest, and what they visit on](public/screenshots/traffic-weekdays-and-devices.png)
 
-## Before: the current Autumn dashboard
-
-The screens given in the brief, extracted from the PDF and kept unedited in
-`docs/reference/`.
-
-| Marketing dashboard | Website traffic |
-|---|---|
-| ![Current Autumn marketing dashboard](docs/reference/current-dashboard-overview.png) | ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) |
-
 ## Design process
 
-The first sketch fixed the shape before any component existed: a sentence, a
-row of cards kept close to the current product, and one main chart the owner
-can restyle. The artboard then grew it into a user story, the data contract,
-an atomic component library, and the page at three widths.
+The first sketch was drawn in [Blockpad](https://github.com/akaieuan/blockpad),
+my own storyboard tool. It fixed the shape before any component existed: a
+sentence, a row of cards kept close to the current product, and one main chart
+the owner can restyle.
 
-| First sketch | The artboard |
+![Wireframe sketch, drawn in Blockpad](public/screenshots/design-wireframe.png)
+
+Two artboards then grew it into a user story, the data contract, an atomic
+component library, and each page at three widths. The second board also holds
+the anatomy of the activity calendar and the seven components that only make
+sense on the traffic screen.
+
+| Overview artboard | Website traffic artboard |
 |---|---|
-| ![Wireframe sketch](public/screenshots/design-wireframe.png) | ![Design artboard](public/screenshots/design-artboard.png) |
+| ![Overview design artboard](public/screenshots/design-artboard.png) | ![Website traffic design artboard](public/screenshots/design-artboard-traffic.png) |
 
 ## Docs
 
