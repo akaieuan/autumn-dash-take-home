@@ -7,9 +7,14 @@ import { PromptChip, ComingSoonAction } from "./prompt-chip";
 
 const QUESTIONS = ["Why did Chicago drop?", "Compare to last September", "What drove Labor Day?", "Explain the fee"];
 const ACTIONS = ["Pause “Finding new guests” for two weeks", "Email me a one-page summary every Monday", "Add Kalamazoo as a market to watch"];
-const PREVIEW_NOTICE = "Ask Autumn is a preview. Replies aren't connected yet.";
+const PREVIEW_NOTICE = "Nothing was sent: this is a placeholder for the planned assistant. In production the reply would come from your own numbers.";
 
-/** Help-desk style: a launcher in the corner and a card anchored above it. The page behind stays fully visible (owner's call, 2026-09-17). */
+/**
+ * Help-desk style: a launcher in the corner and a card anchored above it. The page behind stays fully
+ * visible (owner's call, 2026-09-17). The card is a placeholder for the production layout and says so
+ * in its own words (owner, 2026-09-17): a "Preview" badge in the header, a first message that explains
+ * what the real thing would do, and a send that reports it went nowhere. Nothing here pretends to reply.
+ */
 export function AssistantPopover() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -25,12 +30,20 @@ export function AssistantPopover() {
         <div className="flex items-center justify-between gap-3 border-b border-border p-(--panel-pad)">
           <div className="flex items-center gap-2.5">
             <span className="inline-flex size-7 items-center justify-center rounded-(--r-in) bg-primary text-primary-foreground"><Sparkles className="size-4" aria-hidden="true" /></span>
-            <div><p className="text-sm font-semibold">Ask Autumn</p><p className="text-xs text-muted-foreground">Usually replies in a minute</p></div>
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                Ask Autumn
+                <span className="inline-flex h-5 items-center rounded-(--r-in) bg-muted px-1.5 text-[10px] font-semibold text-foreground">Preview</span>
+              </p>
+              <p className="text-xs text-muted-foreground">A placeholder for the planned assistant</p>
+            </div>
           </div>
           <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="inline-flex size-7 items-center justify-center rounded-(--r-in) text-muted-foreground hover:bg-muted"><X className="size-4" aria-hidden="true" /></button>
         </div>
         <div className="flex flex-col gap-3 p-(--panel-pad)">
-          <p className="max-w-64 rounded-(--r-in) rounded-tl-(--radius-min) bg-background px-3 py-2 text-sm leading-snug">Hi. Ask about any number on this page, or tell me what you&apos;d like changed.</p>
+          <p className="max-w-64 rounded-(--r-in) rounded-tl-(--radius-min) bg-background px-3 py-2 text-sm leading-snug">
+            This is a mock-up of where Ask Autumn would live. In production you&apos;d ask about any number on this page, or tell Autumn what you&apos;d like changed, and it would answer from your own data.
+          </p>
           <Eyebrow as="p">Try asking</Eyebrow>
           <div className="flex flex-wrap gap-1.5">{QUESTIONS.map((q) => <PromptChip key={q} text={q} onPick={setDraft} />)}</div>
           <Eyebrow as="p" className="flex items-center gap-2">Take action <span className="inline-flex h-5 items-center rounded-(--r-in) bg-muted px-1.5 text-[10px] font-semibold normal-case tracking-normal text-foreground">Coming soon</span></Eyebrow>

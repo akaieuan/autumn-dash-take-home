@@ -25,11 +25,14 @@ describe("AssistantPopover", () => {
     expect(screen.queryByRole("button", { name: /Pause/ })).toBeNull();
     expect(screen.getByText(/Pause .Finding new guests. for two weeks/)).toBeInTheDocument();
   });
-  it("says plainly that replies are not wired up yet", () => {
+  it("says plainly that it is a placeholder for the planned assistant and that nothing was sent", () => {
     render(<AssistantPopover />);
     fireEvent.click(screen.getByRole("button", { name: "Ask Autumn" }));
+    expect(screen.getByText("Preview")).toBeInTheDocument();
+    expect(screen.getByText("A placeholder for the planned assistant")).toBeInTheDocument();
+    expect(screen.getByText(/This is a mock-up of where Ask Autumn would live/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Your question"), { target: { value: "hello" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Ask Autumn is a preview. Replies aren't connected yet.");
+    expect(screen.getByRole("status")).toHaveTextContent("Nothing was sent: this is a placeholder for the planned assistant.");
   });
 });
