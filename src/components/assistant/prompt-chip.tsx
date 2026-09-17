@@ -1,3 +1,4 @@
+"use client";
 import { ArrowRight } from "lucide-react";
 
 export function PromptChip({ text, onPick }: { text: string; onPick: (text: string) => void }) {

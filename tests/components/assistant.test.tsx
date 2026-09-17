@@ -14,7 +14,7 @@ describe("AssistantPopover", () => {
     const { baseElement } = render(<AssistantPopover />);
     fireEvent.click(screen.getByRole("button", { name: "Ask Autumn" }));
     expect(screen.getByRole("dialog", { name: "Ask Autumn" })).toBeInTheDocument();
-    expect(baseElement.querySelector("[data-slot=popover-overlay]")).toBeNull();
+    expect(baseElement.querySelector('[data-slot$="overlay"]')).toBeNull();
   });
   it("offers example questions as buttons and unbuilt actions as Coming soon, not buttons", () => {
     render(<AssistantPopover />);

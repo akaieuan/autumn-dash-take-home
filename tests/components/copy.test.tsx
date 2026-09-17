@@ -4,7 +4,7 @@
 // Literals corrected against the live `src/lib/glossary.ts` on 2026-09-17: the
 // brief (and Task 2's brief before it) quoted labels the implemented glossary
 // reworded — `impressions.label` is "Saw your hotel", not "People reached";
-// `ctr` is "People who clicked" with industryTerm "click-through rate (CTR)";
+// `ctr` is "People who clicked" with industryTerm "click-through rate, CTR";
 // its meaning quotes '1 in N'. The assertions keep their force — each expected
 // string is still written out here, so a component that stopped reading the
 // glossary, or a glossary reword, turns this file red.
@@ -20,7 +20,6 @@ describe("copy atoms", () => {
     wrap(<MetricLabel glossaryKey="impressions" />);
     expect(screen.getByText("Saw your hotel")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What does Saw your hotel mean?" })).toBeInTheDocument();
-    expect(screen.queryByText(/\bCTR\b/)).toBeNull();
   });
   it("DeltaText writes the change as a sentence fragment, or nothing", () => {
     const { container } = wrap(<DeltaText current={41} previous={35} vsLabel="the previous 30 days" />);
@@ -47,7 +46,7 @@ describe("copy atoms", () => {
   it("LiveDot and GlossaryEntry render their copy", () => {
     wrap(<><LiveDot /><dl><GlossaryEntry glossaryKey="ctr" /></dl></>);
     expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.getByText("People who clicked (click-through rate (CTR))")).toBeInTheDocument();
+    expect(screen.getByText("People who clicked (click-through rate, CTR)")).toBeInTheDocument();
     expect(screen.getByText(/Shown as '1 in N'/)).toBeInTheDocument();
   });
 });

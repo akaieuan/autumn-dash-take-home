@@ -13,8 +13,10 @@ const read = (p: string) => readFileSync(p, "utf8");
 const components = () => walk("src/components").filter((p) => !p.includes("/ui/"));
 
 describe("architecture gates (CLAUDE.md §2 invariants)", () => {
-  it("components never fetch: no @/lib/db import under src/components", () => {
-    for (const f of components()) expect(read(f), f).not.toMatch(/from\s+["']@\/lib\/db/);
+  it("components never fetch: no @/lib/db value import under src/components", () => {
+    // `import type { MarketDto } from "@/lib/db/queries"` is erased at compile time, so it carries no
+    // Drizzle or postgres-js into a client bundle; only a value import from @/lib/db is forbidden.
+    for (const f of components()) expect(read(f), f).not.toMatch(/(?<!import type[^;]{0,80})from\s+["']@\/lib\/db/);
   });
   it("layout adapts by CSS only: no viewport hooks anywhere in src", () => {
     for (const f of walk("src")) expect(read(f), f).not.toMatch(/useIsMobile|matchMedia|window\.innerWidth|useMediaQuery/);

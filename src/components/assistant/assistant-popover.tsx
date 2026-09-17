@@ -36,7 +36,7 @@ export function AssistantPopover() {
           <div className="flex flex-col gap-1.5">{ACTIONS.map((a) => <ComingSoonAction key={a} text={a} />)}</div>
           {notice ? <p role="status" className="rounded-(--r-in) bg-muted px-3 py-2 text-xs text-muted-foreground">{notice}</p> : null}
         </div>
-        <form className="flex items-center gap-1.5 border-t border-border p-3" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) setNotice(PREVIEW_NOTICE); }}>
+        <form className="flex items-center gap-1.5 border-t border-border p-(--panel-pad)" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) setNotice(PREVIEW_NOTICE); }}>
           <label htmlFor="ask-autumn" className="sr-only">Your question</label>
           <input id="ask-autumn" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about your numbers…" className="h-10 min-w-0 flex-1 rounded-(--r-in) border border-border bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" />
           <button type="submit" aria-label="Send" disabled={!draft.trim()} className="inline-flex size-10 shrink-0 items-center justify-center rounded-(--r-in) bg-foreground text-card disabled:opacity-40"><Send className="size-4" aria-hidden="true" /></button>
