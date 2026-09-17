@@ -43,6 +43,53 @@ site.
 |---|---|
 | ![Current Autumn website-traffic tab](docs/reference/current-dashboard-website-traffic.png) | ![New Website traffic](public/screenshots/traffic-desktop-dark.png) |
 
+## Designing for a hotel owner
+
+The brief asks for judgment on eight things. Here is the call made on each,
+with the decision-log entry that records the alternative and the reason.
+
+- **What the owner sees first.** One sentence: how many direct bookings
+  Autumn brought, what they were worth, and what the owner kept after
+  Autumn's fee, with the change since the previous period in words. Not a
+  row of equal stat cards; the answer to "is this working?" comes before any
+  number that supports it (D1).
+- **What belongs on the main screen.** Only what answers the owner's six
+  questions: the headline, four quick stats, one trend chart, the insights,
+  where guests come from, and what each campaign is doing. Everything on it
+  reconciles to the headline, so the page argues one case rather than
+  listing facts (D5, D18).
+- **What belongs on the second screen.** The "why" behind the headline:
+  which days visitors arrive, which campaigns produce them, what Autumn
+  changed and what happened after, and where the next dollar would do the
+  most good. It exists to help decide the next campaign, and it repeats
+  nothing from the Overview (D31).
+- **Which metrics get emphasis.** Direct bookings, booking value, and net
+  after the fee, in that order, always with two comparisons: the period
+  before and the same period last year, so "down" can be read as "the
+  season" when that is what it is (D1, D3). Impressions and clicks are
+  demoted to quick stats and the funnel; they explain, they do not lead.
+- **Which metrics get plain-language explanation.** All of them. Every
+  metric is named in plain words first ("Saw your hotel", "Clicked through",
+  "What you kept", "Commission you avoided"); the industry term appears once
+  in parentheses with a tooltip, and click-through rate reads as "1 in N
+  people clicked". A test fails if any label carries a bare acronym (D4).
+- **Which details are available but not dominant.** The funnel from seen to
+  booked starts collapsed. The glossary is a panel, visible but at the foot
+  of the page (D34). Devices, weekday rhythm and cost per visit live on the
+  second screen. The chart can be restyled or read as a table, but it is one
+  chart, not six (D5).
+- **How progress, wins, problems and next steps are shown.** The insights
+  are computed from the numbers on the page and tagged Win, Watch, or
+  "Autumn is on it". Each carries its own small bar chart as evidence, and a
+  Watch is paired with what Autumn does about it, so a problem is never
+  shown without a next step (D24, D33). On the traffic screen, "What Autumn
+  did" shows each change with the days before and after it (D26, D38).
+- **Useful without feeling like homework.** Nothing needs decoding, nothing
+  needs clicking to be understood, and nothing floats over the page. Changing
+  the range keeps the owner's place on the page (D32). The default range is
+  the last 30 days, the span an owner-operator actually thinks in (D3). The
+  palette is the warm paper of Autumn's own site, not an ad platform's (D7).
+
 ## Run it locally
 
 Requires Node 24 and a Postgres database. The instructions assume Supabase's
