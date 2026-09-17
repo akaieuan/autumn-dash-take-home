@@ -151,25 +151,51 @@ export function weekContext<T extends DayLike>(days: T[], date: string | null): 
   return date === null ? [] : weekOf(days, date);
 }
 
+/** "2026-01" back two months is "2025-11": month keys are arithmetic on y × 12 + m, never a Date. */
+const monthKeyBack = (key: string, n: number): string => {
+  const [y, m] = key.split("-").map(Number);
+  const t = y * 12 + (m - 1) - n;
+  return `${String(Math.floor(t / 12)).padStart(4, "0")}-${String((t % 12) + 1).padStart(2, "0")}`;
+};
+
 /**
- * For a narrow calendar: the last `cells × size` days folded into `cells` buckets of `size` days each,
- * so a span always draws the same 7 × 13 grid and only the meaning of a square changes (a day, two
- * days, four days). A bucket carries its busiest day so tapping it can keep that day open.
+ * For a narrow calendar: the last `count` calendar months, oldest first, ending with the month of the
+ * last day in `days`. A square that means four days still reads as a day and hides the distance
+ * (owner, 2026-09-17), so a phone gets month blocks instead — big enough to carry a name, a total and
+ * a change. A month the data never reached is padded rather than dropped, so the grid stays 6 or 12.
+ * Each block carries its busiest day, so tapping it keeps that day open exactly as a tile does.
  */
-export interface DayBucket { from: string; to: string; total: number | null; busiest: string | null }
-export function bucketGrid<T extends DayLike>(days: T[], cells: number, size: number): DayBucket[] {
-  const slice = days.slice(-cells * size);
-  const out: DayBucket[] = [];
-  for (let i = 0; i < slice.length; i += size) {
-    const group = slice.slice(i, i + size);
-    let total: number | null = null;
-    let busiest: T | null = null;
-    for (const d of group) {
-      if (d.value === null) continue;
-      total = (total ?? 0) + d.value;
-      if (busiest === null || d.value > (busiest.value as number)) busiest = d;
+export interface MonthBlock { key: string; total: number | null; busiest: string | null; deltaPct: number | null }
+export function monthBlocks(days: DayLike[], count: number): MonthBlock[] {
+  if (days.length === 0 || count <= 0) return [];
+  const months = new Map<string, { total: number | null; busiest: string | null; best: number }>();
+  for (const d of days) {
+    const key = d.date.slice(0, 7);
+    let m = months.get(key);
+    if (m === undefined) {
+      m = { total: null, busiest: null, best: -Infinity };
+      months.set(key, m);
     }
-    out.push({ from: group[0].date, to: group[group.length - 1].date, total, busiest: busiest?.date ?? null });
+    if (d.value === null) continue;
+    m.total = (m.total ?? 0) + d.value;
+    if (d.value > m.best) {
+      m.best = d.value;
+      m.busiest = d.date;
+    }
+  }
+  const last = days[days.length - 1].date.slice(0, 7);
+  const out: MonthBlock[] = [];
+  for (let back = count - 1; back >= 0; back--) {
+    const key = monthKeyBack(last, back);
+    const total = months.get(key)?.total ?? null;
+    // The month before it in the calendar, even when that month sits outside the window being drawn.
+    const before = months.get(monthKeyBack(key, 1))?.total ?? null;
+    out.push({
+      key,
+      total,
+      busiest: months.get(key)?.busiest ?? null,
+      deltaPct: total === null || before === null || before === 0 ? null : Math.round(((total - before) / before) * 100),
+    });
   }
   return out;
 }

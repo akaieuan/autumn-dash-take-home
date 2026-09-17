@@ -775,6 +775,61 @@ page beside the two dynamic screens.
 
 **Status:** verified 2026-09-17.
 
+### D40. Narrow calendars show month blocks in the same stage
+
+**We chose:** under 28rem of tile column (42rem for the year span) the
+activity calendar swaps its day grid for month blocks: six in a 3 × 2 grid
+for half a year, twelve in a 4 × 3 grid for a year. Each block names its
+month, carries that month's total, and — where the 3 × 2 layout has the room
+— how it moved on the month before. The row above the blocks says the whole
+distance out loud ("Oct 2025 – Sep 2026"), because a block has no dates on
+it. The box is exactly as tall as the 13-week day grid would be at the same
+width, so changing span never changes the panel's height. Both grids are in
+the DOM and container queries show one; there is no JS measurement. A block
+carries its busiest day, so pointing at it fills the same readout and day
+card as a tile, and tapping it keeps that day.
+
+**Instead of:** squares that stood for two or four days, so every span drew
+the same 91-square grid (rejected 2026-09-17 by the owner: a square still
+reads as a day, and folding four days into one hides how far back the span
+reaches). And before that, month tiles that let the panel change height when
+the span changed (rejected the same day: the page jumped under the reader).
+
+**Why:** a phone gives the tile column about 320px. Twelve months of day
+tiles there is a field of 6px dots that answers nothing; the same area holds
+twelve blocks with a readable month name and a four-digit total. The
+distance caption is what the folded squares lost. Holding the stage to the
+13-week geometry is what keeps the three spans interchangeable: the owner
+can tap between them and only the contents change.
+
+**How we know it holds:** `tests/activity.test.ts` proves `monthBlocks` on a
+hand-summed fixture — a padded month the data never reached, a delta of 25%
+computed from two totals a reader can add, a tie on the busiest day, a
+`count` larger than the data, a zero previous month that must not divide, and
+empty days. `tests/components/website-traffic.test.tsx` asserts six blocks at
+half with `@md:hidden` on their wrapper and `hidden @md:grid` on the day
+grid, twelve at year with the `@2xl` pair, none at 13 weeks, the distance
+caption, the legend note, and that clicking a block pins the day in its
+`data-busiest`; a second test asserts no tile carries `@max-md:hidden` or
+`@max-2xl:hidden` any more, so a reinstated per-week gating goes red.
+`tests/components/layout.test.tsx` asserts `grow` and `justify-end` on the
+panel header's action slot. Negative controls run 2026-09-17: setting the
+half span to twelve blocks turned the component test red; removing the
+`before === 0` guard from `monthBlocks` turned the pure test red; both
+restored. Measured in the browser on 2026-09-17 at a 375px viewport, where
+the tile column is 247px: the 13-week day grid renders 131.64px tall and the
+block stage 131.61px, and the panel is 1119.56px at 13 weeks against 1119.53px
+at both other spans — 0.03px apart, one subpixel of the tile grid's own
+rounding. At 430px (column 302px) all three panels are 1109.15px exactly.
+Hovering a block and hovering a tile each left the toggle at x 120.41 y 18
+width 222.59 and the stage at 96 / 88 / 247, unchanged to the hundredth of a
+pixel, while the readout changed to that day. Across widths the container
+query does what the table says: at a 900px viewport (column 555px, between
+28rem and 42rem) six months draws 26 day columns and the year draws blocks;
+at 1440px (column 771px) all three draw day tiles, 13, 26 and 54 columns.
+
+**Status:** verified 2026-09-17.
+
 ---
 
 ## 4. Superseded decisions, kept for the record

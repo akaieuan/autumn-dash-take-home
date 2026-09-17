@@ -88,41 +88,56 @@ describe("DayCard height", () => {
 });
 
 describe("ActivityCalendar", () => {
-  it("keeps the 13-week geometry under 28rem for every span: 91 squares, each a day, two days or four days", () => {
+  // Under 28rem (42rem for a year) the same stage holds month blocks instead of day tiles: a square
+  // meaning four days still read as a day and hid the distance (owner, 2026-09-17, D40). Both grids
+  // are in the DOM at once and CSS shows exactly one, so these are class assertions, not layout ones.
+  const blocks = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("[data-busiest]")];
+  const blockGroup = (c: HTMLElement) => c.querySelector<HTMLElement>("#activity [role=group][aria-label^='Each block']");
+  const dayGroup = (c: HTMLElement) => c.querySelector<HTMLElement>("#activity [role=group]:not([aria-label^='Each block'])");
+
+  it("swaps the day grid for month blocks on a narrow panel: six for half a year, twelve for a year, none for 13 weeks", () => {
     const half = render(<ActivityCalendar activity={activity} initialSpan="half" />);
-    const squares = (c: HTMLElement) => [...c.querySelectorAll("button")].filter((b) => /–/.test(b.getAttribute("aria-label") ?? ""));
-    expect(squares(half.container)).toHaveLength(91);
-    expect(squares(half.container)[0].getAttribute("aria-label")).toMatch(/^\w{3} \d{1,2} – \w{3} \d{1,2}: [\d,]+ visits$/);
-    expect(squares(half.container)[0].parentElement?.parentElement?.className).toContain("@md:hidden");
-    expect(screen.getByText("Each square is two days.")).toBeInTheDocument();
-    expect(half.container.querySelector("#activity [role=group]:not([aria-label^='Each square'])")?.parentElement?.className).toContain("hidden @md:grid");
-    fireEvent.click(squares(half.container)[10]); // tapping a square keeps its busiest day open
-    expect(squares(half.container)[10].getAttribute("aria-pressed")).toBe("true");
-    expect(half.container.querySelector("[data-date][aria-pressed='true']")?.getAttribute("data-date")).toBe(squares(half.container)[10].getAttribute("data-bucket"));
+    expect(blocks(half.container)).toHaveLength(6);
+    expect(blocks(half.container)[0].getAttribute("aria-label")).toMatch(/^\w{3} \d{4}: [\d,]+ visits$/);
+    expect(blockGroup(half.container)?.parentElement?.className).toContain("@md:hidden");
+    expect(dayGroup(half.container)?.parentElement?.className).toContain("hidden @md:grid");
+    // The fixture's last day is 2026-09-05, so six months back is April and twelve is October 2025.
+    expect(screen.getByText("Apr – Sep 2026")).toBeInTheDocument();
+    expect(screen.getByText("Each block is a month.")).toBeInTheDocument();
+    fireEvent.click(blocks(half.container)[2]); // tapping a block keeps its busiest day open
+    expect(blocks(half.container)[2].getAttribute("aria-pressed")).toBe("true");
+    expect(half.container.querySelector("[data-date][aria-pressed='true']")?.getAttribute("data-date")).toBe(blocks(half.container)[2].getAttribute("data-busiest"));
     half.unmount();
+
     const year = render(<ActivityCalendar activity={activity} initialSpan="year" />);
-    expect(squares(year.container)).toHaveLength(91);
-    expect(screen.getByText("Each square is four days.")).toBeInTheDocument();
+    expect(blocks(year.container)).toHaveLength(12);
+    expect(blockGroup(year.container)?.parentElement?.className).toContain("@2xl:hidden");
+    expect(dayGroup(year.container)?.parentElement?.className).toContain("hidden @2xl:grid");
+    expect(screen.getByText("Oct 2025 – Sep 2026")).toBeInTheDocument();
     year.unmount();
+
     const quarter = render(<ActivityCalendar activity={activity} initialSpan="quarter" />);
-    expect(squares(quarter.container)).toHaveLength(0);
+    expect(blocks(quarter.container)).toHaveLength(0);
+    expect(screen.getByText("Each square is a day.")).toBeInTheDocument();
+    expect(dayGroup(quarter.container)?.parentElement?.className).not.toContain("hidden");
   });
 
-  it("keeps the header readout at one width so the span toggle never moves while hovering", () => {
+  it("keeps the header readout on its own line under sm and at one width above it, so the span toggle never moves while hovering", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
     const readout = container.querySelector("#activity p[aria-live]") as HTMLElement;
-    expect(readout.className).toContain("w-52");
-    expect(readout.className).toContain("justify-end");
+    expect(readout.className).toContain("basis-full");   // own line, left aligned, on a phone
+    expect(readout.className).toContain("sm:w-52");      // fixed width from sm, so the toggle never slides
+    expect(readout.className).toContain("sm:justify-end");
   });
 
-  it("shows fewer weeks in a narrow column so a tile never shrinks below a thumb: old weeks carry the container-gated classes", () => {
-    const { container } = render(<ActivityCalendar activity={activity} initialSpan="year" />);
-    const tiles = [...container.querySelectorAll<HTMLElement>("[data-date]")];
-    const weeks = Math.ceil(tiles.length / 7);
-    const back = (i: number) => weeks - 1 - Math.floor(i / 7);
-    expect(tiles.filter((_, i) => back(i) >= 26).every((t) => t.className.includes("@max-2xl:hidden"))).toBe(true);
-    expect(tiles.filter((_, i) => back(i) >= 13 && back(i) < 26).every((t) => t.className.includes("@max-md:hidden") && !t.className.includes("@max-2xl:hidden"))).toBe(true);
-    expect(tiles.filter((_, i) => back(i) < 13).some((t) => t.className.includes("@max-"))).toBe(false); // the last 13 weeks always show
+  it("never hides a single week any more: whole grids switch, so no tile carries a container-gated hide", () => {
+    for (const span of ["year", "half", "quarter"] as const) {
+      const { container, unmount } = render(<ActivityCalendar activity={activity} initialSpan={span} />);
+      const tiles = [...container.querySelectorAll<HTMLElement>("[data-date]")];
+      expect(tiles.length, span).toBeGreaterThan(0);
+      expect(tiles.some((t) => /@max-(md|2xl):hidden/.test(t.className)), span).toBe(false);
+      unmount();
+    }
   });
 
   it("draws one tile per visible day: six months by default, the whole year on demand", () => {
