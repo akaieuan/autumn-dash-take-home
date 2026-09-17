@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  weekdayOf, weekdayAverages, monthTotals, weekOf, lastWeeks, heatLevel, monthColumns,
-  visibleWindow, dayRank, monthContext, weekContext, monthBlocks, type DayLike,
+  weekdayOf, weekdayAverages, monthTotals, weekOf, heatLevel, monthColumns,
+  dayRank, monthContext, weekContext, monthBlocks, monthCalendar, monthsBetween,
+  monthBlocksInRange, type DayLike,
 } from "@/lib/activity";
 
 /** A local date walker, so the fixtures below never borrow the helper under test. */
@@ -87,28 +88,6 @@ describe("weekOf", () => {
   });
 });
 
-describe("lastWeeks", () => {
-  it("keeps the last whole weeks, starting on a Sunday", () => {
-    expect(lastWeeks(DAYS, 1).map((d) => d.date)).toEqual([
-      "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05",
-    ]);
-  });
-  it("returns every day when the window is at least as long as the data", () => {
-    expect(lastWeeks(DAYS, 2)).toHaveLength(14);
-    expect(lastWeeks(DAYS, 26)).toHaveLength(14);
-  });
-  it("never draws more columns than asked when the last week is partial", () => {
-    const partial = DAYS.slice(0, 12); // 2026-08-23..2026-09-03: two columns, the second five days long
-    const one = lastWeeks(partial, 1);
-    expect(one.map((d) => d.date)).toEqual(["2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03"]);
-    expect(Math.ceil(one.length / 7)).toBe(1);
-    expect(weekdayOf(one[0].date)).toBe(0);
-  });
-  it("returns nothing for a window of no weeks", () => {
-    expect(lastWeeks(DAYS, 0)).toEqual([]);
-  });
-});
-
 describe("heatLevel and monthColumns still live here", () => {
   it("scales a day against the window's own maximum", () => {
     expect(heatLevel(null, 290)).toBeNull();
@@ -121,28 +100,6 @@ describe("heatLevel and monthColumns still live here", () => {
     const threeWeeks = Array.from({ length: 21 }, (_, i) => ({ date: addUtcDays("2026-08-23", i), value: 1 }));
     expect(monthColumns(threeWeeks)).toEqual([{ column: 3, label: "Sep" }]);
     expect(monthColumns(DAYS)).toEqual([]); // two August columns only: nothing to label
-  });
-});
-
-/**
- * Thirty whole weeks, Sunday 2026-02-22 through Saturday 2026-09-19, so a span can actually cut
- * something: the two-week DAYS fixture is shorter than every window the toggle offers.
- */
-const LONG: DayLike[] = Array.from({ length: 210 }, (_, i) => ({ date: addUtcDays("2026-02-22", i), value: i }));
-
-describe("visibleWindow", () => {
-  it("draws the whole year, the last 26 weeks, or the last 13", () => {
-    expect(visibleWindow(LONG, "year")).toHaveLength(210);
-    const half = visibleWindow(LONG, "half");
-    expect(half).toHaveLength(182);                 // 26 columns
-    expect(half[0].date).toBe("2026-03-22");
-    const quarter = visibleWindow(LONG, "quarter");
-    expect(quarter).toHaveLength(91);               // 13 columns
-    expect(quarter[0].date).toBe("2026-06-21");
-    expect(weekdayOf(quarter[0].date)).toBe(0);     // every window starts on a Sunday
-  });
-  it("never trims data shorter than the window", () => {
-    expect(visibleWindow(DAYS, "quarter")).toHaveLength(14);
   });
 });
 
@@ -217,5 +174,44 @@ describe("monthBlocks", () => {
   });
   it("has nothing to draw without days", () => {
     expect(monthBlocks([], 6)).toEqual([]);
+  });
+});
+
+describe("monthCalendar", () => {
+  it("pads the first day under its weekday and the last row to seven", () => {
+    // 2026-09-01 is a Tuesday, so two blanks come first; 2 + 30 = 32 cells fill five rows of
+    // seven (35), which leaves three blanks at the end.
+    const thirty = Array.from({ length: 30 }, (_, i) => ({ date: addUtcDays("2026-09-01", i), value: 1 }));
+    expect(monthCalendar(thirty)).toEqual({ leading: 2, rows: 5, trailing: 3 });
+  });
+  it("pads nothing for four whole weeks that start on a Sunday", () => {
+    const twentyEight = Array.from({ length: 28 }, (_, i) => ({ date: addUtcDays("2026-08-23", i), value: 1 }));
+    expect(monthCalendar(twentyEight)).toEqual({ leading: 0, rows: 4, trailing: 0 });
+  });
+  it("has no rows at all for no days", () => {
+    expect(monthCalendar([])).toEqual({ leading: 0, rows: 0, trailing: 0 });
+  });
+});
+
+describe("monthsBetween", () => {
+  it("counts calendar months inclusive, never days divided by thirty", () => {
+    expect(monthsBetween("2026-01-01", "2026-09-16")).toBe(9);   // year to date on the seeded data
+    expect(monthsBetween("2024-09-17", "2026-09-16")).toBe(25);  // two years, both Septembers counted
+    expect(monthsBetween("2026-09-01", "2026-09-16")).toBe(1);   // one month, whole or part
+    expect(monthsBetween("2026-08-31", "2026-09-01")).toBe(2);   // two days, two months
+  });
+});
+
+describe("monthBlocksInRange", () => {
+  it("draws one block per calendar month the range touches", () => {
+    const b = monthBlocksInRange(BLOCK_DAYS, "2026-07-30", "2026-09-01");
+    expect(b.map((m) => m.key)).toEqual(["2026-07", "2026-08", "2026-09"]);
+    expect(b[2]).toEqual({ key: "2026-09", total: 50, busiest: "2026-09-01", deltaPct: 100 });
+  });
+  it("caps at twenty-four so two years and a day stay a 12 x 2 grid", () => {
+    const b = monthBlocksInRange(BLOCK_DAYS, "2024-09-17", "2026-09-01");  // 25 calendar months
+    expect(b).toHaveLength(24);
+    expect(b[0].key).toBe("2024-10");  // the 25th month, September 2024, is the one dropped
+    expect(b[23].key).toBe("2026-09");
   });
 });

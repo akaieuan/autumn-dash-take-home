@@ -1,9 +1,10 @@
 import { monthShort } from "./format";
 
 /**
- * The arithmetic behind the activity calendar: heat steps, month labels, weekday rhythm,
- * and the two window helpers the span toggle needs. Pure and UI-free, so every rule here
- * is proved by `tests/activity.test.ts` rather than by a rendered DOM.
+ * The arithmetic behind the activity calendar: heat steps, month labels, weekday rhythm, and the
+ * padding a grid needs to sit its days under the right weekdays. The calendar draws the page range
+ * (D41), so nothing here picks a window any more. Pure and UI-free, so every rule is proved by
+ * `tests/activity.test.ts` rather than by a rendered DOM.
  */
 
 export interface DayLike {
@@ -79,28 +80,31 @@ export function weekOf<T extends DayLike>(days: T[], date: string): (T | null)[]
 }
 
 /**
- * The last `weeks` columns of `days`, starting on a Sunday. It walks back from the naive cut to the
- * week's Sunday, then forward a week at a time if that overshot: a trailing partial week must not
- * buy an extra column, or the "13 weeks" span would quietly draw fourteen.
- * `weeks >= ceil(days.length / 7)` returns all of `days`.
+ * The blanks a month calendar needs: `leading` invisible cells so the first day sits under its own
+ * weekday, `trailing` so the last row is whole, and the rows those cells fill. Sunday is row one,
+ * like every other grid here.
  */
-export function lastWeeks<T extends DayLike>(days: T[], weeks: number): T[] {
-  if (weeks <= 0 || days.length === 0) return [];
-  const columns = Math.ceil(days.length / 7);
-  if (weeks >= columns) return days;
-  let start = days.length - weeks * 7;
-  while (start > 0 && weekdayOf(days[start].date) !== 0) start -= 1;
-  while (start + 7 < days.length && Math.ceil((days.length - start) / 7) > weeks) start += 7;
-  return days.slice(start);
+export function monthCalendar<T extends DayLike>(days: T[]): { leading: number; trailing: number; rows: number } {
+  if (days.length === 0) return { leading: 0, trailing: 0, rows: 0 };
+  const leading = weekdayOf(days[0].date);
+  const rows = Math.ceil((leading + days.length) / 7);
+  return { leading, trailing: rows * 7 - leading - days.length, rows };
 }
 
-/** How far back the calendar draws. The toggle's own type lives beside the hook; this is its arithmetic. */
-export type ActivitySpan = "year" | "half" | "quarter";
-const SPAN_WEEKS: Record<ActivitySpan, number> = { year: 0, half: 26, quarter: 13 };
+/** Calendar months a range touches, both ends counted: "2026-01-01".."2026-09-16" is 9, two days across a month boundary are 2. */
+export function monthsBetween(from: string, to: string): number {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  return (ty * 12 + tm) - (fy * 12 + fm) + 1;
+}
 
-/** The days a span shows: the year is everything, the others are the last whole 26 or 13 columns. */
-export function visibleWindow<T extends DayLike>(days: T[], span: ActivitySpan): T[] {
-  return span === "year" ? days : lastWeeks(days, SPAN_WEEKS[span]);
+/**
+ * One block per calendar month the range touches. Capped at 24: "all" is two years and a day on the
+ * seeded data, and a 25th block would hang alone under a 12 x 2 grid, so the oldest stub month is
+ * dropped rather than given a row of its own. `monthBlocks` pads any month the data never reached.
+ */
+export function monthBlocksInRange(days: DayLike[], from: string, to: string): MonthBlock[] {
+  return monthBlocks(days, Math.min(monthsBetween(from, to), 24));
 }
 
 /** Where a day sits among every day with data, and among its own weekday; 1 is the busiest. */
