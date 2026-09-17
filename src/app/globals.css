@@ -160,7 +160,7 @@
   /* Reserved heights, so a card and its skeleton cannot disagree and nothing moves under the pointer
      when the calendar is hovered or the events pager is clicked. Tuned by eye 2026-09-17; they scale
      with --plot-height below, by the same 1.3 step, so a wide screen keeps the rhythm. */
-  --card-day: 19rem;        /* DayCard */
+  --card-day: 26rem;        /* DayCard: every block always renders, so this is the card's real height, not a floor it grows past */
   --card-event: 19.5rem;    /* EventImpactCard */
   --card-compare: 10.75rem; /* the event card's before/after box */
   --radius-panel: 1.5rem;   /* outer cards, popovers */

@@ -74,6 +74,20 @@ describe("heatLevel and monthColumns", () => {
   });
 });
 
+describe("DayCard height", () => {
+  it("renders the same blocks for a full day, a day with no typical weekday and no rank, and no day at all", () => {
+    const full = render(<DayCard day={{ date: "2026-09-05", value: 290, newVisitors: 200, bookings: 2, pagesPerSession: 3.4 }} typical={120} mode="pinned" unit="visits" rank={{ day: 3, days: 371, weekday: 1, weekdays: 53 }} />);
+    const blocks = (c: HTMLElement) => c.querySelectorAll("aside > *").length;
+    const notes = (c: HTMLElement) => c.querySelectorAll("aside .text-\\[11px\\]").length;
+    const a = { blocks: blocks(full.container), notes: notes(full.container) };
+    full.unmount();
+    const bare = render(<DayCard day={{ date: "2026-09-06", value: 0, newVisitors: null, bookings: null, pagesPerSession: null }} typical={0} mode="hover" unit="visits" rank={null} />);
+    expect(blocks(bare.container)).toBe(a.blocks);   // typical and rank blocks are always there
+    expect(notes(bare.container)).toBe(a.notes);     // every stat keeps its note line
+    expect(screen.getByText("No typical Sunday to compare with yet.")).toBeInTheDocument();
+  });
+});
+
 describe("ActivityCalendar", () => {
   it("shows fewer weeks in a narrow column so a tile never shrinks below a thumb: old weeks carry the container-gated classes", () => {
     const { container } = render(<ActivityCalendar activity={activity} initialSpan="year" />);
@@ -229,7 +243,7 @@ describe("DayCard", () => {
   it("renders an em dash for a day the data does not cover", () => {
     render(<DayCard day={{ date: "2025-08-31", value: null, newVisitors: null, bookings: null, pagesPerSession: null }} typical={null} mode="hover" unit="visits" />);
     expect(screen.getByText("Pointing at")).toBeInTheDocument();
-    expect(screen.getAllByText("—")).toHaveLength(4);
+    expect(screen.getAllByText("—")).toHaveLength(6); // four stats and, since 2026-09-17, the two rank cells: every block always renders so hovering never re-flows the card;
   });
 });
 

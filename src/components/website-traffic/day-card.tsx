@@ -14,7 +14,8 @@ function Stat({ label, value, note, tone }: { label: string; value: string; note
     <div className="flex flex-col gap-0.5">
       <Eyebrow>{label}</Eyebrow>
       <span className="text-[22px] font-semibold leading-tight tabular-nums">{value}</span>
-      {note ? <span className={cn("text-[11px]", tone === "positive" ? "text-positive" : tone === "watch" ? "text-watch" : "text-muted-foreground")}>{note}</span> : null}
+      {/* Always one line, so a day without a note is the same height as one with it: hovering never re-flows the card. */}
+      <span className={cn("min-h-4 truncate text-[11px]", tone === "positive" ? "text-positive" : tone === "watch" ? "text-watch" : "text-muted-foreground")}>{note ?? "\u00a0"}</span>
     </div>
   );
 }
@@ -32,8 +33,11 @@ export function DayCard({ day, typical, mode, unit, rank = null, className }: { 
   if (day === null) {
     return (
       <aside aria-label="Selected day" className={shell}>
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <p className="text-[18px] font-semibold leading-tight">Pick a day</p>
+        <div className="flex flex-col gap-0.5">
+          <Eyebrow>{eyebrow}</Eyebrow>
+          <p className="text-[18px] font-semibold leading-tight">Pick a day</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Point at a tile to read it; click to keep it open.</p>
       </aside>
     );
   }
@@ -49,7 +53,7 @@ export function DayCard({ day, typical, mode, unit, rank = null, className }: { 
     <aside aria-label="Selected day" className={shell}>
       <div className="flex flex-col gap-0.5">
         <Eyebrow>{eyebrow}</Eyebrow>
-        <p className="text-[18px] font-semibold leading-tight tabular-nums">{`${weekdayDate(day.date)}, ${day.date.slice(0, 4)}`}</p>
+        <p className="truncate text-[18px] font-semibold leading-tight tabular-nums">{`${weekdayDate(day.date)}, ${day.date.slice(0, 4)}`}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3.5">
@@ -76,32 +80,27 @@ export function DayCard({ day, typical, mode, unit, rank = null, className }: { 
         />
       </div>
 
-      {hasTypical ? (
-        <div className="flex flex-col gap-2 border-t border-border pt-3">
-          <Eyebrow>{`Against a typical ${weekday}`}</Eyebrow>
-          <Meter
-            share={share}
-            label={`This ${weekday} against a typical one`}
-            color={day.value !== null && day.value >= (typical as number) ? "var(--chart-1)" : "var(--chart-2)"}
-          />
-          <p className="text-xs text-muted-foreground">{`A typical ${weekday} brings ${count(typical as number)} ${unit}.`}</p>
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <Eyebrow>{`Against a typical ${weekday}`}</Eyebrow>
+        <Meter
+          share={share}
+          label={`This ${weekday} against a typical one`}
+          color={hasTypical && day.value !== null && day.value >= (typical as number) ? "var(--chart-1)" : "var(--chart-2)"}
+        />
+        <p className="truncate text-xs text-muted-foreground">{hasTypical ? `A typical ${weekday} brings ${count(typical as number)} ${unit}.` : `No typical ${weekday} to compare with yet.`}</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+        <div className="flex flex-col gap-0.5">
+          <Eyebrow as="dt">In the year</Eyebrow>
+          <dd className="text-sm font-semibold tabular-nums">{rank ? (rank.day === 1 ? "Busiest day" : `${ordinal(rank.day)} busiest`) : DASH}</dd>
+          <dd className="text-[11px] text-muted-foreground">{rank ? `of ${count(rank.days)} days` : "no data"}</dd>
         </div>
-      ) : null}
-      {rank && day.value !== null ? (
-        // Where the day sits in the year and among its own weekdays: the two questions a busy day raises.
-        <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3">
-          <div className="flex flex-col gap-0.5">
-            <Eyebrow as="dt">In the year</Eyebrow>
-            <dd className="text-sm font-semibold tabular-nums">{rank.day === 1 ? "Busiest day" : `${ordinal(rank.day)} busiest`}</dd>
-            <dd className="text-[11px] text-muted-foreground">of {count(rank.days)} days</dd>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <Eyebrow as="dt">Among {weekday}s</Eyebrow>
-            <dd className="text-sm font-semibold tabular-nums">{rank.weekday === 1 ? "Busiest" : `${ordinal(rank.weekday)} busiest`}</dd>
-            <dd className="text-[11px] text-muted-foreground">of {count(rank.weekdays)} {weekday}s</dd>
-          </div>
-        </dl>
-      ) : null}
+        <div className="flex flex-col gap-0.5">
+          <Eyebrow as="dt">{`Among ${weekday}s`}</Eyebrow>
+          <dd className="text-sm font-semibold tabular-nums">{rank ? (rank.weekday === 1 ? "Busiest" : `${ordinal(rank.weekday)} busiest`) : DASH}</dd>
+          <dd className="text-[11px] text-muted-foreground">{rank ? `of ${count(rank.weekdays)} ${weekday}s` : "no data"}</dd>
+        </div>
+      </dl>
     </aside>
   );
 }
