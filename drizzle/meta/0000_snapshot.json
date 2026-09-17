@@ -1,0 +1,183 @@
+{
+  "id": "1142db24-a2cb-4b1b-852b-0e0325924fc2",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.breakdowns": {
+      "name": "breakdowns",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dimension": {
+          "name": "dimension",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dimension_value": {
+          "name": "dimension_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bookings": {
+          "name": "bookings",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_value": {
+          "name": "booking_value",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_breakdowns_date_dimension": {
+          "name": "idx_breakdowns_date_dimension",
+          "columns": [
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dimension",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "breakdowns_date_daily_metrics_date_fk": {
+          "name": "breakdowns_date_daily_metrics_date_fk",
+          "tableFrom": "breakdowns",
+          "tableTo": "daily_metrics",
+          "columnsFrom": [
+            "date"
+          ],
+          "columnsTo": [
+            "date"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "breakdowns_dimension_check": {
+          "name": "breakdowns_dimension_check",
+          "value": "\"breakdowns\".\"dimension\" in ('campaign', 'device', 'feeder_market')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.daily_metrics": {
+      "name": "daily_metrics",
+      "schema": "",
+      "columns": {
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "website_visits": {
+          "name": "website_visits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bookings": {
+          "name": "bookings",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_value": {
+          "name": "booking_value",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_visitors": {
+          "name": "new_visitors",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pages_per_session": {
+          "name": "pages_per_session",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

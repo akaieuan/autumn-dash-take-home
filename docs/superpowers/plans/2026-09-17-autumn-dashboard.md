@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-17-autumn-dashboard-design.md` — the plan argues from it; executors read both.
 
+> **Status 2026-09-17.** Task 1 done (commit 048b787). Tasks 3–5 were executed
+> against the owner's two-table schema (decisions D21–D25), not the eight-table
+> design written below; see `src/lib/db/schema.ts`, `scripts/seed/*`, and
+> `tests/seed-*.test.ts` for what is live. Tasks 6–7 (queries) and 9–12
+> (components, pages) must be re-planned from the two-table model before
+> execution; their DTO names still hold where the underlying data exists.
+> Task 2's `date-range.ts` is done; `format.ts` and `glossary.ts` are not.
+
 ## Global Constraints
 
 - Node 24, npm. Pin every dependency to the version `npm install` resolves; no `latest` in `package.json`.

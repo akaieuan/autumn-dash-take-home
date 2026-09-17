@@ -152,6 +152,29 @@ follow-up if timings say otherwise.
 
 ### Data model (Drizzle, Postgres)
 
+> **Corrected 2026-09-17 (owner ruling, decisions D21–D25).** The eight-table
+> model below was replaced by two tables at two grains before any code was
+> written. What is live is in `src/lib/db/schema.ts` and `drizzle/0000_*.sql`:
+>
+> - `daily_metrics` — one row per day, `date` primary key: `impressions`,
+>   `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`,
+>   `new_visitors`, `pages_per_session numeric(4,2)`.
+> - `breakdowns` — one row per day per dimension value, `dimension` ∈
+>   `campaign | device | feeder_market` (check constraint), `dimension_value`
+>   text, plus `impressions`, `clicks`, `bookings`, `booking_value`; index on
+>   `(date, dimension)`; FK to `daily_metrics(date)`.
+> - No `insights` table: computed at render time from `daily_metrics`.
+> - Money is `numeric` dollars in the database (owner's schema) and is
+>   converted to integer cents at the query boundary.
+>
+> Consequences for the screens: §4's direct-vs-OTA mix, lead-time, booking-hour
+> and recent-bookings sections are dropped (no bookings grain). §4 becomes:
+> context strip · campaigns in plain words · feeder markets · devices ·
+> engagement (website visits, new visitors, pages per session) trend. The seed
+> generates daily totals first (season × weekday × holiday × eight-week ramp ×
+> +22 %/yr growth), then splits each day across dimension values by exact
+> apportionment. The original text is kept below for the record.
+
 | Table | Grain | Key columns |
 |---|---|---|
 | `properties` | one row | `id`, `name`, `city`, `region`, `room_count`, `autumn_start_date`, `fee_rate_bps` (1500), `timezone` |
