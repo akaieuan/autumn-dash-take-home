@@ -81,36 +81,49 @@ export const insights: Insight[] = [
   { id: "mobile", kind: "action", title: "63% of visitors arrive on a phone", body: "Worth checking your booking page on your own phone now and then: that is where most guests decide.", chart: { kind: "share", segments: [{ label: "Phone", share: 0.63 }, { label: "Computer", share: 0.31 }, { label: "Tablet", share: 0.06 }] } },
 ];
 
-/** 53 weeks of daily visits ending 2026-09-16, a summer peak and a weekend lift, deterministic. */
-export const activity: ActivityDto = (() => {
+/** Two years of daily visits ending 2026-09-16, a summer peak and a weekend lift, deterministic. */
+export const activityAll: ActivityDto = (() => {
   const to = "2026-09-16";
   const days: ActivityDto["days"] = [];
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const end = Date.UTC(2026, 8, 16);
-  const start = end - 370 * 86400000;
-  const startDow = new Date(start).getUTCDay();
-  for (let t = start - startDow * 86400000; t <= end; t += 86400000) {
+  const start = end - 729 * 86400000;
+  for (let t = start; t <= end; t += 86400000) {
     const d = new Date(t);
     const doy = (t - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000;
     const season = 0.55 + 0.45 * Math.max(0, Math.cos(((doy - 185) / 365) * 2 * Math.PI));
     const weekend = d.getUTCDay() === 6 ? 1.4 : d.getUTCDay() === 5 ? 1.2 : 1;
-    const value = t < start ? null : Math.round((14 + 44 * season) * weekend * (0.8 + 0.4 * rnd()));
-    // The day card's other three readings, from the same deterministic stream: new visitors are two
+    const value = Math.round((14 + 44 * season) * weekend * (0.8 + 0.4 * rnd()));
+    // The day band's other three readings, from the same deterministic stream: new visitors are two
     // thirds of a day's traffic, a busy day books once or twice, and a visit reads three-odd pages.
     const newShare = 0.66 + 0.1 * rnd();
     const booked = rnd();
     days.push({
       date: d.toISOString().slice(0, 10),
       value,
-      newVisitors: value === null ? null : Math.round(value * newShare),
-      bookings: value === null ? null : booked > 0.88 ? 2 : booked > 0.55 ? 1 : 0,
-      pagesPerSession: value === null ? null : Math.round((2.6 + 1.6 * rnd()) * 10) / 10,
+      newVisitors: Math.round(value * newShare),
+      bookings: booked > 0.88 ? 2 : booked > 0.55 ? 1 : 0,
+      pagesPerSession: Math.round((2.6 + 1.6 * rnd()) * 10) / 10,
     });
   }
-  const values = days.flatMap((d) => (d.value === null ? [] : [d.value]));
-  return { metric: "website_visits", from: days[0].date, to, weeks: Math.ceil(days.length / 7), max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days };
+  const values = days.map((d) => d.value as number);
+  return { metric: "website_visits", from: days[0].date, to, weeks: Math.ceil((new Date(days[0].date).getUTCDay() + days.length) / 7), max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days };
 })();
+
+/** The calendar draws the page range (D41), so a specimen needs a window as well as days: the last 90. */
+const lastDays = (n: number): ActivityDto => {
+  const days = activityAll.days.slice(-n);
+  const values = days.map((d) => d.value as number);
+  return {
+    metric: "website_visits", from: days[0].date, to: days[days.length - 1].date,
+    weeks: Math.ceil((new Date(days[0].date).getUTCDay() + days.length) / 7),
+    max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days,
+  };
+};
+export const activity: ActivityDto = lastDays(90);
+export const activityRange = { preset: "90d" as const, from: activity.from, to: activity.to };
+export const activityAllRange = { preset: "all" as const, from: activityAll.from, to: activityAll.to };
 
 /** Ten daily buckets of paid visits by campaign, ranked by total, with one event pinned to its day. */
 export const campaignSeries: CampaignSeriesDto = {

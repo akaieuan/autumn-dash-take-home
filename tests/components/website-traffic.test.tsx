@@ -1,49 +1,59 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { ActivityCalendar, heatLevel, monthColumns } from "@/components/website-traffic";
 import { DayCard } from "@/components/website-traffic/day-card";
-import { MonthSummary, WeekStrip } from "@/components/website-traffic/day-context";
 import { WeekdayRhythm } from "@/components/website-traffic/weekday-rhythm";
 import { TrafficIntro } from "@/components/website-traffic/traffic-intro";
-import { parseRange } from "@/lib/date-range";
+import { parseRange, type RangePreset } from "@/lib/date-range";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
 
 const DAY = 86_400_000;
+const at = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+/** Local, so no fixture below borrows the helper the component under test also uses. */
+const weekdayOfDate = (d: string) => new Date(at(d)).getUTCDay();
 
-/**
- * Fifty-three whole weeks, Sunday 2025-08-31 through Saturday 2026-09-05, so each span has an exact
- * column count to claim: 53, 26 and 13. Three days are pinned to hand-picked values; everything else
- * stays under 80, which makes 2026-08-12 the unique busiest day and so the day the calendar opens on.
- */
 const OVERRIDES: Record<string, Partial<ActivityDay>> = {
-  "2026-08-12": { value: 900, bookings: 2 },  // Wednesday, the busiest day of the year
+  "2026-08-12": { value: 900, bookings: 2 },  // Wednesday, the busiest day in every window below
   "2026-08-15": { value: 123, bookings: 0 },  // Saturday, the hover target
   "2026-08-19": { value: 456, bookings: 0 },  // Wednesday, one arrow-right from the busiest day
 };
-const days: ActivityDay[] = Array.from({ length: 371 }, (_, i) => {
-  const date = iso(Date.UTC(2025, 7, 31) + i * DAY);
-  const value = i < 7 ? null : 20 + ((i * 13) % 60);
-  return {
-    date,
-    value,
-    newVisitors: value === null ? null : Math.round(value * 0.7),
-    bookings: value === null ? null : i % 9 === 0 ? 1 : 0,
-    pagesPerSession: value === null ? null : 3.1,
-    ...OVERRIDES[date],
+
+/** Values a reader can recompute: 20..79 on a 13-step cycle, with three days pinned by hand. */
+function makeDays(from: string, length: number): ActivityDay[] {
+  return Array.from({ length }, (_, i) => {
+    const date = iso(at(from) + i * DAY);
+    const value = 20 + ((i * 13) % 60);
+    return { date, value, newVisitors: Math.round(value * 0.7), bookings: i % 9 === 0 ? 1 : 0, pagesPerSession: 3.1, ...OVERRIDES[date] };
+  });
+}
+
+/** One DTO and the `?range=` that produced it: the calendar draws the page range, so each mode needs both. */
+function fixture(preset: RangePreset, from: string, length: number) {
+  const days = makeDays(from, length);
+  const values = days.map((d) => d.value as number);
+  const to = days[days.length - 1].date;
+  const activity: ActivityDto = {
+    metric: "website_visits", from, to,
+    weeks: Math.ceil((weekdayOfDate(from) + length) / 7),
+    max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days,
   };
-});
-const values = days.flatMap((d) => (d.value === null ? [] : [d.value]));
-const activity: ActivityDto = {
-  metric: "website_visits",
-  from: days[0].date,
-  to: days[days.length - 1].date,
-  weeks: 53,
-  max: Math.max(...values),
-  total: values.reduce((a, b) => a + b, 0),
-  days,
-};
+  return { activity, range: { preset, from, to } };
+}
+
+// 2026-08-18 is a Tuesday: two blanks lead the month grid, and 2 + 30 = 32 fills five rows of seven (35 cells, 3 trailing).
+const d30 = fixture("30d", "2026-08-18", 30);
+// 2026-06-15 is a Monday: one leading blank + 90 days = 91 cells, exactly thirteen columns of seven.
+const d90 = fixture("90d", "2026-06-15", 90);
+// 2026-01-01..2026-09-16 is nine calendar months and 259 days (31+28+31+30+31+30+31+31+16).
+const dYtd = fixture("ytd", "2026-01-01", 259);
+// 365 days from 2025-09-17 touch thirteen calendar months; the block grid draws the twelve whole ones.
+const d12m = fixture("12m", "2025-09-17", 365);
+// 730 days from 2024-09-17 touch twenty-five; the block grid draws twenty-four, 12 x 2.
+const dAll = fixture("all", "2024-09-17", 730);
+
+const days = d12m.activity.days;
 
 /** The original three-column window, kept for the two pure helpers the calendar re-exports. */
 const threeWeeks: ActivityDay[] = Array.from({ length: 19 }, (_, i) => {
@@ -52,10 +62,15 @@ const threeWeeks: ActivityDay[] = Array.from({ length: 19 }, (_, i) => {
   return { date, value: date in v ? v[date] : date < "2026-08-25" ? null : 0, newVisitors: null, bookings: null, pagesPerSession: null };
 });
 
-const tile = (container: HTMLElement, date: string) => container.querySelector(`[data-date="${date}"]`);
+const tile = (c: HTMLElement, date: string) => c.querySelector(`[data-date="${date}"]`);
 const card = () => screen.getByRole("complementary", { name: "Selected day" });
-
-beforeEach(() => { window.localStorage.clear(); document.cookie = "autumn-calendar-span=; path=/; max-age=0"; });
+const cells = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("[data-date]")];
+const blocks = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("[data-busiest]")];
+const dayStage = (c: HTMLElement) => c.querySelector<HTMLElement>("[data-stage=days]");
+const dayGrid = (c: HTMLElement) => c.querySelector<HTMLElement>("[data-grid=days]");
+const blockStage = (c: HTMLElement) => c.querySelector<HTMLElement>("[data-stage=blocks]");
+const blockGrid = (c: HTMLElement) => c.querySelector<HTMLElement>("[data-grid=blocks]");
+const legend = (c: HTMLElement) => c.querySelector<HTMLElement>("[data-legend]") as HTMLElement;
 
 describe("heatLevel and monthColumns", () => {
   it("is blank before the data, 0 for a quiet day, then quartiles of the window's own maximum", () => {
@@ -73,97 +88,113 @@ describe("heatLevel and monthColumns", () => {
   });
 });
 
-describe("DayCard height", () => {
+describe("DayCard band", () => {
+  it("is a horizontal band with a fixed height, so it never squeezes the grid beside it", () => {
+    render(<DayCard day={days[0]} typical={40} mode="pinned" unit="visits" rank={{ day: 3, days: 90, weekday: 2, weekdays: 13 }} />);
+    const band = card();
+    expect(band.className).toContain("min-h-(--card-day-stacked)"); // cells two abreast when narrow
+    expect(band.className).toContain("@lg:min-h-(--card-day)");     // two rows once its container is 32rem
+    expect(band.firstElementChild?.className).toContain("@lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]");
+  });
+  it("reads the day's rank as one line: where it sits in the range and among its own weekday", () => {
+    const day = days.find((d) => d.date === "2026-08-12") as ActivityDay;
+    render(<DayCard day={day} typical={600} mode="pinned" unit="visits" rank={{ day: 3, days: 90, weekday: 2, weekdays: 13 }} />);
+    expect(screen.getByText("3rd of 90 days · 2nd of 13 Wednesdays")).toBeInTheDocument();
+  });
   it("renders the same blocks for a full day, a day with no typical weekday and no rank, and no day at all", () => {
     const full = render(<DayCard day={{ date: "2026-09-05", value: 290, newVisitors: 200, bookings: 2, pagesPerSession: 3.4 }} typical={120} mode="pinned" unit="visits" rank={{ day: 3, days: 371, weekday: 1, weekdays: 53 }} />);
-    const blocks = (c: HTMLElement) => c.querySelectorAll("aside > *").length;
+    const count = (c: HTMLElement) => c.querySelectorAll("aside > *").length;
     const notes = (c: HTMLElement) => c.querySelectorAll("aside .text-\\[11px\\]").length;
-    const a = { blocks: blocks(full.container), notes: notes(full.container) };
+    const a = { blocks: count(full.container), notes: notes(full.container) };
     full.unmount();
     const bare = render(<DayCard day={{ date: "2026-09-06", value: 0, newVisitors: null, bookings: null, pagesPerSession: null }} typical={0} mode="hover" unit="visits" rank={null} />);
-    expect(blocks(bare.container)).toBe(a.blocks);   // typical and rank blocks are always there
-    expect(notes(bare.container)).toBe(a.notes);     // every stat keeps its note line
+    expect(count(bare.container)).toBe(a.blocks);   // typical and rank blocks are always there
+    expect(notes(bare.container)).toBe(a.notes);    // every stat keeps its note line
     expect(screen.getByText("No typical Sunday to compare with yet.")).toBeInTheDocument();
   });
 });
 
 describe("ActivityCalendar", () => {
-  // Under 28rem (42rem for a year) the same stage holds month blocks instead of day tiles: a square
-  // meaning four days still read as a day and hid the distance (owner, 2026-09-17, D40). Both grids
-  // are in the DOM at once and CSS shows exactly one, so these are class assertions, not layout ones.
-  const blocks = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("[data-busiest]")];
-  const blockGroup = (c: HTMLElement) => c.querySelector<HTMLElement>("#activity [role=group][aria-label^='Each block']");
-  const dayGroup = (c: HTMLElement) => c.querySelector<HTMLElement>("#activity [role=group]:not([aria-label^='Each block'])");
-
-  it("swaps the day grid for month blocks on a narrow panel: six for half a year, twelve for a year, none for 13 weeks", () => {
-    const half = render(<ActivityCalendar activity={activity} initialSpan="half" />);
-    expect(blocks(half.container)).toHaveLength(6);
-    expect(blocks(half.container)[0].getAttribute("aria-label")).toMatch(/^\w{3} \d{4}: [\d,]+ visits$/);
-    expect(blockGroup(half.container)?.parentElement?.className).toContain("@md:hidden");
-    expect(dayGroup(half.container)?.parentElement?.className).toContain("hidden @md:grid");
-    // The fixture's last day is 2026-09-05, so six months back is April and twelve is October 2025.
-    expect(screen.getByText("Apr – Sep 2026")).toBeInTheDocument();
-    expect(screen.getByText("Each block is a month.")).toBeInTheDocument();
-    fireEvent.click(blocks(half.container)[2]); // tapping a block keeps its busiest day open
-    expect(blocks(half.container)[2].getAttribute("aria-pressed")).toBe("true");
-    expect(half.container.querySelector("[data-date][aria-pressed='true']")?.getAttribute("data-date")).toBe(blocks(half.container)[2].getAttribute("data-busiest"));
-    half.unmount();
-
-    const year = render(<ActivityCalendar activity={activity} initialSpan="year" />);
-    expect(blocks(year.container)).toHaveLength(12);
-    expect(blockGroup(year.container)?.parentElement?.className).toContain("@2xl:hidden");
-    expect(dayGroup(year.container)?.parentElement?.className).toContain("hidden @2xl:grid");
-    expect(screen.getByText("Oct 2025 – Sep 2026")).toBeInTheDocument();
-    year.unmount();
-
-    const quarter = render(<ActivityCalendar activity={activity} initialSpan="quarter" />);
-    expect(blocks(quarter.container)).toHaveLength(0);
-    expect(screen.getByText("Each square is a day.")).toBeInTheDocument();
-    expect(dayGroup(quarter.container)?.parentElement?.className).not.toContain("hidden");
+  it("draws thirty days as five columns of squares, blanks before the first day, never a calendar of tiles", () => {
+    // 2026-08-18 is a Tuesday: two blanks lead, and 2 + 30 = 32 cells fill five columns of seven.
+    const { container } = render(<ActivityCalendar {...d30} />);
+    const grid = dayGrid(container) as HTMLElement;
+    expect(grid.children).toHaveLength(32);
+    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(2);
+    expect(cells(container)).toHaveLength(30);
+    expect(grid.className).toContain("grid-rows-7");
+    expect(container.querySelectorAll("[data-weekday-head]")).toHaveLength(0);
+    expect(tile(container, "2026-08-18")?.textContent).toBe("");                 // no number inside a square
+    // The grid is capped at 1.5rem a square, so five columns stay a compact block beside the legend.
+    const cap = dayStage(container)?.getAttribute("style") as string;
+    expect(cap).toContain("max-width: calc(");
+    expect(cap).toContain("7.5rem");   // 5 × 1.5rem of squares
+    expect(cap).toContain("12px");     // 4 gaps of 3px
+    expect(blocks(container)).toHaveLength(0);
   });
 
-  it("keeps the header readout on its own line under sm and at one width above it, so the span toggle never moves while hovering", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
+  it("draws thirteen columns of day squares for 90 days, with nothing written inside a square", () => {
+    const { container } = render(<ActivityCalendar {...d90} />);
+    const grid = dayGrid(container) as HTMLElement;
+    expect(grid.children).toHaveLength(91);                                  // 1 leading blank + 90 days
+    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(1);
+    expect(Math.ceil(grid.children.length / 7)).toBe(13);
+    expect(cells(container)).toHaveLength(90);
+    expect(tile(container, "2026-08-12")?.textContent).toBe("");
+    const cap = dayStage(container)?.getAttribute("style") as string;
+    expect(cap).toContain("19.5rem");  // 13 × 1.5rem of squares
+    expect(cap).toContain("36px");     // 12 gaps of 3px
+    expect(blocks(container)).toHaveLength(0);
+  });
+
+  it("keeps day squares wide and falls back to one block per month narrow, for year to date", () => {
+    const { container } = render(<ActivityCalendar {...dYtd} />);
+    expect(cells(container)).toHaveLength(259);
+    expect(dayStage(container)?.className).toContain("hidden @2xl:grid");
+    expect(blocks(container)).toHaveLength(9);                               // Jan..Sep
+    expect(blockStage(container)?.className).toContain("@2xl:hidden");
+    expect(blockGrid(container)?.className).toContain("grid-cols-4");        // 7..12 blocks
+  });
+
+  it("draws a year of squares wide and twelve month blocks narrow", () => {
+    const { container } = render(<ActivityCalendar {...d12m} />);
+    expect(cells(container)).toHaveLength(365);
+    expect(dayStage(container)?.className).toContain("hidden @2xl:grid");
+    expect(blocks(container)).toHaveLength(12);
+    expect(blockStage(container)?.className).toContain("@2xl:hidden");
+    expect(blockGrid(container)?.className).toContain("grid-cols-4");        // 4 x 3
+  });
+
+  it("is month blocks at every width for the whole history: twenty-four of them and no day grid at all", () => {
+    const { container } = render(<ActivityCalendar {...dAll} />);
+    expect(cells(container)).toHaveLength(0);
+    expect(dayStage(container)).toBeNull();
+    expect(blocks(container)).toHaveLength(24);
+    expect(blockStage(container)?.className).not.toContain("hidden");
+    expect(blockGrid(container)?.className).toContain("grid-cols-6");        // 6 x 4 on a phone
+    expect(blockGrid(container)?.className).toContain("@2xl:grid-cols-12");  // a year a row when there is room
+  });
+
+  it("carries the readout in the header and nothing else: no span toggle, no description", () => {
+    const { container } = render(<ActivityCalendar {...d90} />);
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.queryByText(/13 weeks/)).toBeNull();
+    const h2 = screen.getByRole("heading", { level: 2, name: "Every day people visited" });
+    expect(h2.parentElement?.querySelectorAll("p")).toHaveLength(0);
     const readout = container.querySelector("#activity p[aria-live]") as HTMLElement;
     expect(readout.className).toContain("basis-full");   // own line, left aligned, on a phone
-    expect(readout.className).toContain("sm:w-52");      // fixed width from sm, so the toggle never slides
+    expect(readout.className).toContain("sm:w-52");      // fixed width from sm, so nothing beside it slides
     expect(readout.className).toContain("sm:justify-end");
   });
 
-  it("never hides a single week any more: whole grids switch, so no tile carries a container-gated hide", () => {
-    for (const span of ["year", "half", "quarter"] as const) {
-      const { container, unmount } = render(<ActivityCalendar activity={activity} initialSpan={span} />);
-      const tiles = [...container.querySelectorAll<HTMLElement>("[data-date]")];
-      expect(tiles.length, span).toBeGreaterThan(0);
-      expect(tiles.some((t) => /@max-(md|2xl):hidden/.test(t.className)), span).toBe(false);
-      unmount();
-    }
+  it("names the total and the days it covers in the legend, and never a busiest day", () => {
+    const { container } = render(<ActivityCalendar {...d90} />);
+    expect(legend(container).textContent).toMatch(/^[\d,]+ visits · Jun 15 – Sep 12, 2026/);
+    expect(legend(container).textContent).not.toContain("busiest");
   });
 
-  it("draws one tile per visible day: six months by default, the whole year on demand", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Every day people visited" })).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-date]")).toHaveLength(182); // 26 columns
-    expect(tile(container, "2026-03-07")).toBeNull();                    // the Saturday before the half-year window
-    fireEvent.click(screen.getByRole("radio", { name: /Year/ }));
-    expect(container.querySelectorAll("[data-date]")).toHaveLength(371); // all 53 columns
-    expect(document.cookie).toContain("autumn-calendar-span=year"); // the server reads this next time, so the first paint matches
-  });
-
-  it("13 weeks draws thirteen columns and writes the number inside each tile", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
-    fireEvent.click(screen.getByRole("radio", { name: /13 weeks/ }));
-    const tiles = container.querySelectorAll("[data-date]");
-    expect(tiles).toHaveLength(91);
-    expect(Math.ceil(tiles.length / 7)).toBe(13);
-    expect(tile(container, "2026-06-07")).not.toBeNull();  // the window's first Sunday
-    expect(tile(container, "2026-06-06")).toBeNull();      // the day before it
-    expect(tile(container, "2026-08-19")?.textContent).toBe("456");
-    expect(tile(container, "2026-08-12")?.textContent).toBe("900");
-  });
-
-  it("opens on the busiest visible day and keeps the day that is clicked", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
+  it("opens on the busiest day of the range and keeps the day that is clicked", () => {
+    const { container } = render(<ActivityCalendar {...d90} />);
     expect(tile(container, "2026-08-12")?.getAttribute("aria-pressed")).toBe("true");
     expect(within(card()).getByText("Kept open")).toBeInTheDocument();
     fireEvent.click(tile(container, "2026-08-19")!);
@@ -173,81 +204,64 @@ describe("ActivityCalendar", () => {
     expect(within(card()).getByText("456")).toBeInTheDocument();
   });
 
-  it("reads the day under the pointer into the header and the card, without losing the kept day", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
+  it("reads the day under the pointer into the header and the band, without losing the kept day", () => {
+    const { container } = render(<ActivityCalendar {...d90} />);
     fireEvent.pointerMove(tile(container, "2026-08-15")!);
     expect(screen.getByText("Sat, Aug 15")).toBeInTheDocument();
     expect(screen.getByText("123 visits")).toBeInTheDocument();
     expect(within(card()).getByText("Pointing at")).toBeInTheDocument();
     expect(within(card()).getByText("Sat, Aug 15, 2026")).toBeInTheDocument();
-    fireEvent.pointerLeave(screen.getByRole("group", { name: /busiest day/ }));
+    fireEvent.pointerLeave(dayGrid(container) as HTMLElement);
     expect(within(card()).getByText("Kept open")).toBeInTheDocument();
     expect(within(card()).getByText("Wed, Aug 12, 2026")).toBeInTheDocument();
   });
 
   it("walks the kept day with the arrow keys: sideways a week, down a day", () => {
-    const { container } = render(<ActivityCalendar activity={activity} />);
-    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowRight" });
+    const { container } = render(<ActivityCalendar {...d90} />);
+    const grid = dayGrid(container) as HTMLElement;
+    fireEvent.keyDown(grid, { key: "ArrowRight" });
     expect(tile(container, "2026-08-19")?.getAttribute("aria-pressed")).toBe("true");
     expect(tile(container, "2026-08-19")?.getAttribute("tabindex")).toBe("0");
-    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowDown" });
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
     expect(tile(container, "2026-08-20")?.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowLeft" });
+    fireEvent.keyDown(grid, { key: "ArrowLeft" });
     expect(tile(container, "2026-08-13")?.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "End" });
-    expect(tile(container, "2026-09-05")?.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(grid, { key: "End" });
+    expect(tile(container, "2026-09-12")?.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("colours tiles and nothing else: no inner rings, and a smaller corner on a year's tiles", () => {
+  it("colours tiles and nothing else: no inner rings, and a smaller corner where a square is 10px", () => {
     // The amber booking ring was removed on 2026-09-17: nearly every day books, so it covered the
     // whole grid. Tiles carry colour and a corner, never an inset shadow.
-    const { container } = render(<ActivityCalendar activity={activity} />);
-    for (const t of container.querySelectorAll("[data-date]")) expect(t.className).not.toContain("inset");
-    expect(tile(container, "2026-08-12")?.className).toContain("rounded-(--radius-min)"); // half span
-    fireEvent.click(screen.getByRole("radio", { name: /Year/ }));
-    expect(tile(container, "2026-08-12")?.className).toContain("rounded-(--radius-tile)"); // a 4px corner on a 10px tile reads as a circle
-    for (const t of container.querySelectorAll("[data-date]")) expect(t.className).not.toContain("inset");
+    const ninety = render(<ActivityCalendar {...d90} />);
+    for (const t of cells(ninety.container)) expect(t.className).not.toContain("inset");
+    expect(tile(ninety.container, "2026-08-12")?.className).toContain("rounded-(--radius-min)");
+    ninety.unmount();
+    const year = render(<ActivityCalendar {...d12m} />);
+    expect(tile(year.container, "2026-08-12")?.className).toContain("rounded-(--radius-tile)"); // 53 columns: a 4px corner on a 10px square reads as a circle
+    for (const t of cells(year.container)) expect(t.className).not.toContain("inset");
   });
 
-  it("shows the kept day's week and its month beside the grid", () => {
-    render(<ActivityCalendar activity={activity} />);
-    const strip = screen.getByText("The week of Aug 9").parentElement as HTMLElement;
-    expect(within(strip).getAllByRole("button")).toHaveLength(7);
-    expect(within(strip).getByRole("button", { name: "Wed, Aug 12: 900 visits" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText("Aug 2026")).toBeInTheDocument();
+  it("reads the kept day's week and its month out in the band, as figures rather than a chart", () => {
+    render(<ActivityCalendar {...d90} />);
+    const band = card();
+    // The week of Sunday Aug 9: 75 + 28 + 41 + 900 + 67 + 20 + 123 = 1,254, and Wednesday's 900 is the top.
+    expect(within(band).getByText("The week of Aug 9")).toBeInTheDocument();
+    expect(within(band).getByText("1,254")).toBeInTheDocument();
+    expect(within(band).getByText("busiest on Wednesday")).toBeInTheDocument();
+    // August is 2,853 against July's 1,593: the busiest of the four months, +79%.
+    expect(within(band).getByText("Aug 2026")).toBeInTheDocument();
+    expect(within(band).getByText("2,853")).toBeInTheDocument();
+    expect(within(band).getByText("Your busiest month · +79% vs the month before")).toBeInTheDocument();
+    expect(within(band).queryAllByRole("button")).toHaveLength(0); // figures, not the week strip's bars
   });
-});
 
-describe("WeekStrip", () => {
-  const week = days.filter((d) => d.date >= "2026-08-09" && d.date <= "2026-08-15");
-  it("renders a column per day and presses the kept one", () => {
-    const picked: string[] = [];
-    render(<WeekStrip days={week} pinned="2026-08-12" onPick={(d) => picked.push(d)} unit="visits" />);
-    expect(screen.getAllByRole("button")).toHaveLength(7);
-    expect(screen.getByRole("button", { name: "Wed, Aug 12: 900 visits" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: "Sat, Aug 15: 123 visits" }).getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(screen.getByRole("button", { name: "Sat, Aug 15: 123 visits" }));
-    expect(picked).toEqual(["2026-08-15"]);
-  });
-  it("leaves a day the data does not cover as an empty column", () => {
-    render(<WeekStrip days={[null, ...week.slice(1)]} pinned={null} onPick={() => {}} unit="visits" />);
-    expect(screen.getAllByRole("button")).toHaveLength(6);
-    expect(screen.getByText("The week of Aug 10")).toBeInTheDocument();
-  });
-});
-
-describe("MonthSummary", () => {
-  it("names the rank and compares with the month before", () => {
-    const { rerender } = render(<MonthSummary label="Sep 2026" total={1200} rank={1} count={12} deltaPct={12} unit="visits" />);
-    expect(screen.getByText("1,200")).toBeInTheDocument();
-    expect(screen.getByText("Your busiest month of the year")).toBeInTheDocument();
-    expect(screen.getByText("+12% vs the month before")).toBeInTheDocument();
-    rerender(<MonthSummary label="Sep 2026" total={1200} rank={3} count={12} deltaPct={-4} unit="visits" />);
-    expect(screen.getByText("3rd busiest of 12 months")).toBeInTheDocument();
-    expect(screen.getByText("-4% vs the month before")).toBeInTheDocument();
-    rerender(<MonthSummary label="Sep 2025" total={40} rank={12} count={12} deltaPct={null} unit="visits" />);
-    expect(screen.getByText("12th busiest of 12 months")).toBeInTheDocument();
-    expect(screen.getByText("No month before it in the data")).toBeInTheDocument();
+  it("keeps a month block's tap on the day it stands for", () => {
+    const { container } = render(<ActivityCalendar {...dAll} />);
+    const august = blocks(container).find((b) => b.getAttribute("data-busiest")?.startsWith("2026-08")) as HTMLElement;
+    fireEvent.click(august);
+    expect(august.getAttribute("aria-pressed")).toBe("true");
+    expect(within(card()).getByText("Wed, Aug 12, 2026")).toBeInTheDocument(); // the month's busiest day
   });
 });
 
@@ -272,7 +286,8 @@ describe("DayCard", () => {
     expect(screen.getByText("Wed, Aug 12, 2026")).toBeInTheDocument();
     expect(screen.getByText("900")).toBeInTheDocument();
     expect(screen.getByText("+50% vs a typical Wed")).toBeInTheDocument(); // (900 − 600) / 600
-    expect(screen.getByText("A typical Wednesday brings 600 visits.")).toBeInTheDocument();
+    expect(screen.getByText("A typical Wednesday")).toBeInTheDocument();
+    expect(screen.getByText("600")).toBeInTheDocument();
     expect(screen.getByText("1 in 450 visits booked")).toBeInTheDocument(); // 2 bookings in 900 visits
   });
   it("asks for a day when none is chosen", () => {
@@ -284,7 +299,7 @@ describe("DayCard", () => {
   it("renders an em dash for a day the data does not cover", () => {
     render(<DayCard day={{ date: "2025-08-31", value: null, newVisitors: null, bookings: null, pagesPerSession: null }} typical={null} mode="hover" unit="visits" />);
     expect(screen.getByText("Pointing at")).toBeInTheDocument();
-    expect(screen.getAllByText("—")).toHaveLength(6); // four stats and, since 2026-09-17, the two rank cells: every block always renders so hovering never re-flows the card;
+    expect(screen.getAllByText("—")).toHaveLength(7); // four readings, then the typical day, the week and the month; the rank is one line, and it says so in words
   });
 });
 

@@ -1,11 +1,9 @@
 export { TrafficIntro, type TrafficTotals } from "./traffic-intro";
 export { TrafficPageSkeleton, TrafficBodySkeleton, TrafficIntroSkeleton } from "./traffic-skeleton";
-export { ActivityCalendar, heatLevel, monthColumns } from "./activity-calendar";
+export { ActivityCalendar, heatLevel, monthColumns, type CalendarRange } from "./activity-calendar";
 export { DayCard } from "./day-card";
-export { WeekStrip, MonthSummary } from "./day-context";
-export { MonthBlocks } from "./month-blocks";
+export { MonthBlocks, type BlockColumns } from "./month-blocks";
 export { WeekdayRhythm } from "./weekday-rhythm";
-export { useCalendarSpan, CALENDAR_SPANS, type CalendarSpan } from "./use-calendar-span";
 export { TRAFFIC_METRICS, TRAFFIC_METRIC_LABELS, isTrafficMetric, type TrafficMetric } from "./traffic-config";
 export { TrafficMetricSelect } from "./traffic-metric-select";
 export { CampaignTrafficChart, type EventHighlight } from "./campaign-traffic-chart";

@@ -1,9 +1,10 @@
-import { monthShort } from "./format";
+import { monthShort, shortDate } from "./format";
 
 /**
  * The arithmetic behind the activity calendar: heat steps, month labels, weekday rhythm, and the
- * padding a grid needs to sit its days under the right weekdays. The calendar draws the page range
- * (D41), so nothing here picks a window any more. Pure and UI-free, so every rule is proved by
+ * week, month and ranks a picked day sits inside. The calendar draws the page range (D41), so
+ * nothing here picks a window any more, and every range is the same geometry — weeks as columns —
+ * so nothing here lays out a month either. Pure and UI-free, so every rule is proved by
  * `tests/activity.test.ts` rather than by a rendered DOM.
  */
 
@@ -79,18 +80,6 @@ export function weekOf<T extends DayLike>(days: T[], date: string): (T | null)[]
   return Array.from({ length: 7 }, (_, i) => byDate.get(addUtcDays(sunday, i)) ?? null);
 }
 
-/**
- * The blanks a month calendar needs: `leading` invisible cells so the first day sits under its own
- * weekday, `trailing` so the last row is whole, and the rows those cells fill. Sunday is row one,
- * like every other grid here.
- */
-export function monthCalendar<T extends DayLike>(days: T[]): { leading: number; trailing: number; rows: number } {
-  if (days.length === 0) return { leading: 0, trailing: 0, rows: 0 };
-  const leading = weekdayOf(days[0].date);
-  const rows = Math.ceil((leading + days.length) / 7);
-  return { leading, trailing: rows * 7 - leading - days.length, rows };
-}
-
 /** Calendar months a range touches, both ends counted: "2026-01-01".."2026-09-16" is 9, two days across a month boundary are 2. */
 export function monthsBetween(from: string, to: string): number {
   const [fy, fm] = from.split("-").map(Number);
@@ -153,6 +142,34 @@ export function monthContext(days: DayLike[], date: string | null): MonthContext
 /** The week around the picked day, or nothing at all while no day is picked. */
 export function weekContext<T extends DayLike>(days: T[], date: string | null): (T | null)[] {
   return date === null ? [] : weekOf(days, date);
+}
+
+/**
+ * The picked day's own week, as the band under the calendar reads it out: the Sunday it starts on,
+ * what the seven days came to, and which of them was busiest. A day the data does not cover is
+ * skipped rather than counted as nothing, so a week half outside the range still totals honestly;
+ * a week with no data at all has no total to give.
+ */
+export interface WeekSummary {
+  label: string;
+  total: number | null;
+  busiest: string | null;
+}
+
+export function weekSummary(days: DayLike[], date: string | null): WeekSummary | null {
+  if (date === null) return null;
+  let total: number | null = null;
+  let busiest: string | null = null;
+  let best = -Infinity;
+  for (const d of weekOf(days, date)) {
+    if (d === null || d.value === null) continue;
+    total = (total ?? 0) + d.value;
+    if (d.value > best) {
+      best = d.value;
+      busiest = d.date;
+    }
+  }
+  return { label: shortDate(addUtcDays(date, -weekdayOf(date))), total, busiest };
 }
 
 /** "2026-01" back two months is "2025-11": month keys are arithmetic on y × 12 + m, never a Date. */

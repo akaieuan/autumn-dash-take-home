@@ -42,7 +42,7 @@ const SPACING = [
   { name: "--stack-gap", note: "between panels and rows" },
   { name: "--panel-pad", note: "inside every panel" },
   { name: "--plot-height", note: "the chart's minimum box" },
-  { name: "--card-day", note: "the day card's reserved height" },
+  { name: "--card-day", note: "the day band under the calendar, two rows from sm" },
   { name: "--card-event", note: "the event card's reserved height" },
   { name: "--card-compare", note: "the event card's before/after box" },
 ];

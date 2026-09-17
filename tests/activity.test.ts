@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   weekdayOf, weekdayAverages, monthTotals, weekOf, heatLevel, monthColumns,
-  dayRank, monthContext, weekContext, monthBlocks, monthCalendar, monthsBetween,
+  dayRank, monthContext, weekContext, weekSummary, monthBlocks, monthsBetween,
   monthBlocksInRange, type DayLike,
 } from "@/lib/activity";
 
@@ -138,6 +138,26 @@ describe("weekContext", () => {
   });
 });
 
+describe("weekSummary", () => {
+  it("sums the Sunday..Saturday week around a day and names its busiest", () => {
+    // The week of Sunday 2026-08-30: 6 + 20 + 30 + 97 + 2 + 6 + 290 = 451, and Saturday's 290 is the top.
+    expect(weekSummary(DAYS, "2026-09-02")).toEqual({ label: "Aug 30", total: 451, busiest: "2026-09-05" });
+  });
+  it("skips a slot with no data rather than counting it as zero", () => {
+    // The week of Sunday 2026-08-23: null + 10 + 50 + null + 0 + 4 + 8 = 72, busiest Tuesday's 50.
+    expect(weekSummary(DAYS, "2026-08-25")).toEqual({ label: "Aug 23", total: 72, busiest: "2026-08-25" });
+    // A week whose days are all present but all blank has no total at all — not a total of zero,
+    // which would read as "nobody came" instead of "we have no rows for that week".
+    const blank = [{ date: "2026-08-23", value: null }, { date: "2026-08-24", value: null }];
+    expect(weekSummary(blank, "2026-08-24")).toEqual({ label: "Aug 23", total: null, busiest: null });
+  });
+  it("has no total at all for a week the data never reached, and nothing without a day", () => {
+    // Sunday 2024-12-29 .. Saturday 2025-01-04, none of which is in DAYS.
+    expect(weekSummary(DAYS, "2025-01-01")).toEqual({ label: "Dec 29", total: null, busiest: null });
+    expect(weekSummary(DAYS, null)).toBeNull();
+  });
+});
+
 /**
  * Three calendar months, hand-built so every total below is a sum a reader can check:
  * July 20 (a tie on the busiest day), August 25 (one day with no data), September 50.
@@ -174,22 +194,6 @@ describe("monthBlocks", () => {
   });
   it("has nothing to draw without days", () => {
     expect(monthBlocks([], 6)).toEqual([]);
-  });
-});
-
-describe("monthCalendar", () => {
-  it("pads the first day under its weekday and the last row to seven", () => {
-    // 2026-09-01 is a Tuesday, so two blanks come first; 2 + 30 = 32 cells fill five rows of
-    // seven (35), which leaves three blanks at the end.
-    const thirty = Array.from({ length: 30 }, (_, i) => ({ date: addUtcDays("2026-09-01", i), value: 1 }));
-    expect(monthCalendar(thirty)).toEqual({ leading: 2, rows: 5, trailing: 3 });
-  });
-  it("pads nothing for four whole weeks that start on a Sunday", () => {
-    const twentyEight = Array.from({ length: 28 }, (_, i) => ({ date: addUtcDays("2026-08-23", i), value: 1 }));
-    expect(monthCalendar(twentyEight)).toEqual({ leading: 0, rows: 4, trailing: 0 });
-  });
-  it("has no rows at all for no days", () => {
-    expect(monthCalendar([])).toEqual({ leading: 0, rows: 0, trailing: 0 });
   });
 });
 

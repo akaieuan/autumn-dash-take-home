@@ -331,13 +331,15 @@ owner's review said the panel had dead space and a clicked day should
 surface its data immediately. Days before the data began are blank, never
 shown as zero.
 
-**How we know it holds:** `tests/queries/activity.test.ts` (starts on the
-Sunday before the window, null before the first row, totals by hand);
+**How we know it holds:** `tests/queries/activity.test.ts` (exactly the
+range's days, null before the first row, totals by hand);
 `tests/components/website-traffic.test.tsx` (heat levels, month labels, one
-tile per day, the 13-week span shows 13 columns, click pins, arrow keys
-move a week, the day card follows).
+tile per day, click pins, arrow keys move a week, the day band follows).
 
-**Status:** verified 2026-09-17.
+**Status:** verified 2026-09-17; the span part superseded by D41 the same day.
+The calendar no longer ends on the last seeded day or carries a per-browser
+span: it draws the page range, like every other panel (owner's ruling). The
+pinning, the blank-not-zero rule and the stretch-to-fit columns stand.
 
 ### D38. "What Autumn did" shows one change at a time
 
@@ -828,33 +830,57 @@ query does what the table says: at a 900px viewport (column 555px, between
 28rem and 42rem) six months draws 26 day columns and the year draws blocks;
 at 1440px (column 771px) all three draw day tiles, 13, 26 and 54 columns.
 
+**Status:** verified 2026-09-17; the span part superseded by D41 the same day.
+Blocks are still what a narrow panel draws, but the trigger is the page range
+rather than a span toggle, and the stage is no longer pinned to the 13-week
+grid's height.
+
+### D41. The calendar follows the page range
+
+**We chose:** the activity calendar draws the window `?range=` names, exactly
+as every other panel on the screen does, and has no control of its own. Every
+range is the same GitHub-style geometry: one column per week, Sunday at the
+top, small squares that never stretch (capped at 1.5rem, so thirty days are a
+compact five columns and a year fills the width) and carry no number. Where a
+square cannot be 12px the unit becomes a month and the legend says so:
+year-to-date and twelve months are squares from 42rem of panel and month
+blocks below it; the whole two-year history is twenty-four blocks at every
+width, 12 × 2 where there is room and 6 × 4 on a phone. The day the reader
+picked reads out in a fixed-height band — the day, its rank and four readings,
+then a typical day of its weekday, its week and its month as figures — which
+sits beside a short grid and drops under a long one by flex-wrap, with no
+measuring. The header keeps the hover readout and drops its description,
+because the legend already says darker is busier.
+
+**Instead of:** the calendar's own span toggle kept in a cookie (D35, D37,
+D40), which drew a year whatever the header said. Also rejected on
+2026-09-17, each after the owner saw it: a month calendar of tiles for thirty
+days (seven weekday columns, the number in the cell — "too large per square",
+"overwhelming"); a count written inside each square; and the week strip and
+month summary as their own row under the grid ("we don't need a chart for
+that, it can just be added to the card").
+
+**Why:** the owner's ruling, 2026-09-17 — "every other component across the
+entire site uses the buttons in the header for the time span change. We should
+be using that for the activity calendar as well"; "I wanted an activity
+calendar like GitHub, which we had a good version of"; "less double
+information"; "move the on click information under the tile grid". A panel
+that answers a different question from the one the header asks is a panel the
+reader has to reconcile. A capped square is the only way a five-column grid
+and a fifty-three-column grid can be the same object.
+
+**How we know it holds:** `tests/queries/activity.test.ts` — `getActivity(db,
+from, to, metric)` returns exactly the range's days. `tests/activity.test.ts`
+— `monthsBetween`, `monthBlocksInRange` (capped at 24) and `weekSummary`
+with hand-computed totals. `tests/components/website-traffic.test.tsx` — one
+test per preset asserting that mode's markers (30d: 32 cells in five columns
+with two leading blanks and a 7.5rem cap, no weekday heads, nothing written in
+a square; 90d: 91 cells in thirteen columns; ytd: 259 squares wide and 9 blocks
+narrow; 12m: 365 squares and 12 blocks; all: 24 blocks and no day grid), that
+the header has no toggle and no description, that the legend names the total
+and the range and never a busiest day, and that the band carries the kept
+day's week and month as figures with no buttons in it. Reversing the decision
+— a span control, a query that picks its own window, a calendar of tiles, or
+the week strip back — turns those red.
+
 **Status:** verified 2026-09-17.
-
----
-
-## 4. Superseded decisions, kept for the record
-
-| ID | What it was | Replaced by | Why |
-|---|---|---|---|
-| D2 | Second screen is a Bookings attribution page | D31 | The owner ruled the second screen must help decide the next campaign. |
-| D7 (original) | Light theme only | D7 as written above | A dark option that follows the device was added on 2026-09-17; the warm palette and light default stand. |
-| D8 (original) | A `properties` table | D8 as written above | The two-table model has no properties table; the property is a constant. |
-| D9 (original) | A pre-Autumn baseline inside the window | D9 as written above | The whole window is under Autumn with a ramp; simpler data, same story. |
-| D12 | Neon Postgres over an HTTP driver | D23 | Owner's platform choice; one-file change. |
-| D16 | Campaign metrics derived from a bookings table | D22 | Same principle, now enforced as exact apportionment of daily totals. |
-| D17 | Insights generated by the seed and stored | D24 | Stored insights can drift from the numbers under them. |
-
-## 5. Tried and dropped, with the number that decided it
-
-| Date | Tried | Result | Kept instead |
-|---|---|---|---|
-| 2026-09-17 | Before/after comparison as the causality test (D30) | An untouched control campaign moved 2.8% while the campaign with a 15% effect moved 0.6% | Regenerate with the effect switched off and compare |
-| 2026-09-17 | Binomial draw for daily bookings (D25) | July 2025 = 45, July 2026 = 42 despite 20% more impressions; monthly noise about 15% | Error diffusion with a carried remainder |
-| 2026-09-17 | Largest-remainder apportionment for bookings (D22) | Eight of ten markets showed zero bookings over 30 days | Weighted draw for clicks and bookings; largest remainder kept for impressions |
-| 2026-09-17 | Averaging daily pages-per-visit rates (D29) | Reads 3.5 where the true weighted figure is 3.68 on the fixture | Store both counts and divide the sums |
-
-## 6. Open questions for the owner
-
-| ID | Question | Current choice | Blocking? |
-|---|---|---|---|
-| D6 | Which fee percentage to display | 15%, the midpoint of the published range. One constant to change. | No |
