@@ -429,8 +429,8 @@ three) while monthly totals track the rate, so seasonality and growth are
 visible in the data rather than only in the parameters.
 
 **How we know it holds:** `tests/seed-generators.test.ts` ("shows
-seasonality and year-over-year growth"). Measured: July 2025 has 39
-bookings, July 2026 has 46, January about 10.
+seasonality and year-over-year growth"). Measured from the generator: July 2025 has 54
+bookings, July 2026 has 78, January 2026 has 19.
 
 **Status:** verified 2026-09-17.
 
