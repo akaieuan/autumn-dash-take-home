@@ -56,7 +56,7 @@ const threeWeeks: ActivityDay[] = Array.from({ length: 19 }, (_, i) => {
 const tile = (container: HTMLElement, date: string) => container.querySelector(`[data-date="${date}"]`);
 const card = () => screen.getByRole("complementary", { name: "Selected day" });
 
-beforeEach(() => window.localStorage.clear());
+beforeEach(() => { window.localStorage.clear(); document.cookie = "autumn-calendar-span=; path=/; max-age=0"; });
 
 describe("heatLevel and monthColumns", () => {
   it("is blank before the data, 0 for a quiet day, then quartiles of the window's own maximum", () => {
@@ -82,7 +82,7 @@ describe("ActivityCalendar", () => {
     expect(tile(container, "2026-03-07")).toBeNull();                    // the Saturday before the half-year window
     fireEvent.click(screen.getByRole("radio", { name: "Year" }));
     expect(container.querySelectorAll("[data-date]")).toHaveLength(371); // all 53 columns
-    expect(window.localStorage.getItem("autumn:calendar-span")).toBe("year");
+    expect(document.cookie).toContain("autumn-calendar-span=year"); // the server reads this next time, so the first paint matches
   });
 
   it("13 weeks draws thirteen columns and writes the number inside each tile", () => {
@@ -115,21 +115,21 @@ describe("ActivityCalendar", () => {
     expect(screen.getByText("123 visits")).toBeInTheDocument();
     expect(within(card()).getByText("Pointing at")).toBeInTheDocument();
     expect(within(card()).getByText("Sat, Aug 15, 2026")).toBeInTheDocument();
-    fireEvent.pointerLeave(screen.getByRole("grid"));
+    fireEvent.pointerLeave(screen.getByRole("group", { name: /busiest day/ }));
     expect(within(card()).getByText("Kept open")).toBeInTheDocument();
     expect(within(card()).getByText("Wed, Aug 12, 2026")).toBeInTheDocument();
   });
 
   it("walks the kept day with the arrow keys: sideways a week, down a day", () => {
     const { container } = render(<ActivityCalendar activity={activity} />);
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowRight" });
     expect(tile(container, "2026-08-19")?.getAttribute("aria-pressed")).toBe("true");
     expect(tile(container, "2026-08-19")?.getAttribute("tabindex")).toBe("0");
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowDown" });
     expect(tile(container, "2026-08-20")?.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowLeft" });
+    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "ArrowLeft" });
     expect(tile(container, "2026-08-13")?.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "End" });
+    fireEvent.keyDown(screen.getByRole("group", { name: /busiest day/ }), { key: "End" });
     expect(tile(container, "2026-09-05")?.getAttribute("aria-pressed")).toBe("true");
   });
 

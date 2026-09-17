@@ -30,8 +30,8 @@ const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: 
  * into a fixed-height readout and the day card beside it; a click keeps a day open so the keyboard,
  * the week strip and the month summary all have something to talk about.
  */
-export function ActivityCalendar({ activity, unit = "visits", title = "Every day people visited" }: { activity: ActivityDto; unit?: string; title?: string }) {
-  const [span, setSpan] = useCalendarSpan();
+export function ActivityCalendar({ activity, unit = "visits", title = "Every day people visited", initialSpan = "half" }: { activity: ActivityDto; unit?: string; title?: string; initialSpan?: CalendarSpan }) {
+  const [span, setSpan] = useCalendarSpan(initialSpan);
   const [hover, setHover] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -57,7 +57,7 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
   const columns = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
 
-  const dateUnder = (e: React.PointerEvent<HTMLDivElement>) => (e.target as HTMLElement).closest<HTMLElement>("[data-date]")?.dataset.date ?? null;
+  const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => (e.target as HTMLElement).closest<HTMLElement>("[data-date]")?.dataset.date ?? null;
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => setHover(dateUnder(e));
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const date = dateUnder(e);
@@ -85,6 +85,11 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
     setPin(date);
     setHover(null);
     focusDay(date);
+  };
+  // Enter and Space on a tile arrive here as a click; one handler on the group serves every tile.
+  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const date = dateUnder(e);
+    if (date !== null) pick(date);
   };
 
   return (
@@ -131,8 +136,9 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
         }
       />
       <PanelBody className="@container gap-(--stack-gap)">
-        <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem]">
-          <div className="flex min-w-0 flex-col gap-1.5">
+        {/* Source order is tiles, day card, context: on a phone the day card sits right under the tiles it describes; from lg it stands beside them and spans both rows. */}
+        <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:grid-rows-[auto_auto]">
+          <div className="flex min-w-0 flex-col gap-1.5 lg:col-start-1 lg:row-start-1">
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
               <div aria-hidden="true" />
               <div aria-hidden="true" className="col-start-2 row-start-1 grid h-4 text-[10px] leading-4 text-muted-foreground" style={columns}>
@@ -149,11 +155,12 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
               </div>
               <div
                 ref={gridRef}
-                role="grid"
+                role="group"
                 aria-label={summary}
                 onPointerMove={onMove}
                 onPointerDown={onDown}
                 onPointerLeave={() => setHover(null)}
+                onClick={onClick}
                 onKeyDown={onKeyDown}
                 className={cn("col-start-2 row-start-2 grid grid-flow-col grid-rows-7", span === "year" ? "gap-[2px]" : "gap-[3px]")}
                 style={columns}
@@ -170,7 +177,6 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                       aria-label={dayLabel(d, unit)}
                       aria-pressed={isPinned}
                       tabIndex={isPinned ? 0 : -1}
-                      onClick={() => pick(d.date)}
                       className={cn(
                         "flex aspect-square w-full items-end justify-end overflow-hidden transition-transform motion-safe:hover:scale-110",
                         // A 4px corner on a year's ~10px tile reads as a circle, so the year gets 2px (owner, 2026-09-17).
@@ -181,7 +187,7 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                       )}
                     >
                       {span === "quarter" && d.value !== null ? (
-                        <span className={cn("px-1 pb-0.5 text-[10px] font-medium leading-none tabular-nums", (level ?? 0) >= 3 ? "text-card" : "text-foreground")}>
+                        <span className={cn("px-1 pb-0.5 text-[10px] font-medium leading-none tabular-nums", level === 4 ? "text-card" : "text-foreground")}>
                           {count(d.value)}
                         </span>
                       ) : null}
@@ -208,20 +214,20 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
                 More
               </span>
             </div>
-
-            <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 md:grid-cols-[minmax(0,1fr)_15rem]">
-              <div className="min-w-0">
-                <WeekStrip days={weekContext(days, pinnedDate)} pinned={pinnedDate} onPick={pick} unit={unit} />
-              </div>
-              {month ? (
-                <div className="min-w-0 md:border-l md:border-border md:pl-4">
-                  <MonthSummary {...month} unit={unit} />
-                </div>
-              ) : null}
-            </div>
           </div>
 
-          <DayCard day={shown} typical={typical} mode={hovered ? "hover" : "pinned"} unit={unit} rank={rank} />
+          <DayCard day={shown} typical={typical} mode={hovered ? "hover" : "pinned"} unit={unit} rank={rank} className="lg:col-start-2 lg:row-start-1 lg:row-span-2" />
+
+          <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 md:grid-cols-[minmax(0,1fr)_15rem] lg:col-start-1 lg:row-start-2">
+            <div className="min-w-0">
+              <WeekStrip days={weekContext(days, pinnedDate)} pinned={pinnedDate} onPick={pick} unit={unit} />
+            </div>
+            {month ? (
+              <div className="min-w-0 md:border-l md:border-border md:pl-4">
+                <MonthSummary {...month} unit={unit} />
+              </div>
+            ) : null}
+          </div>
         </div>
       </PanelBody>
     </Panel>

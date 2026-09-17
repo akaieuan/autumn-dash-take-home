@@ -36,26 +36,27 @@ export function EventImpactCard({ impact, className }: { impact: EventImpactDto;
         <p className="flex min-h-(--card-compare) items-center justify-center rounded-(--r-in) bg-background p-3 text-xs text-muted-foreground">Too soon to compare</p>
       ) : (
         // The comparison sits in its own inset, header and rows in a steady rhythm, the visits delta as its own line.
-        <dl className="grid min-h-(--card-compare) grid-cols-[minmax(0,1fr)_auto_auto] content-start items-baseline gap-x-5 gap-y-2 rounded-(--r-in) bg-background p-3 text-xs">
-          <div className="contents">
-            <span className="text-[11px] text-muted-foreground">{days} days each side</span>
-            <span className={`${NUM} ${EYEBROW} whitespace-nowrap`}>Before</span>
-            <span className={`${NUM} ${EYEBROW} whitespace-nowrap`}>After</span>
-          </div>
-          {rows.map((r) => (
-            <div key={r.label} className="contents">
-              <dt className="truncate text-sm text-foreground">{r.label}</dt>
-              <dd className={`${NUM} text-sm text-muted-foreground`}>{r.before}</dd>
-              <dd className={`${NUM} text-sm font-semibold text-foreground`}>{r.after}</dd>
+        <div className="grid min-h-(--card-compare) grid-cols-[minmax(0,1fr)_auto_auto] content-start items-baseline gap-x-5 gap-y-2 rounded-(--r-in) bg-background p-3 text-xs">
+          <span className="text-[11px] text-muted-foreground">{days} days each side</span>
+          <span className={`${NUM} ${EYEBROW} whitespace-nowrap`}>Before</span>
+          <span className={`${NUM} ${EYEBROW} whitespace-nowrap`}>After</span>
+          {/* The list itself is display: contents, so the grid above places its terms and values; a dl may hold only dt/dd groups. */}
+          <dl className="contents">
+            {rows.map((r) => (
+              <div key={r.label} className="contents">
+                <dt className="truncate text-sm text-foreground">{r.label}</dt>
+                <dd className={`${NUM} text-sm text-muted-foreground`}>{r.before}</dd>
+                <dd className={`${NUM} text-sm font-semibold text-foreground`}>{r.after}</dd>
+              </div>
+            ))}
+            <div className="contents">
+              <dt className="sr-only">Change in visits</dt>
+              <dd className="col-span-3 border-t border-border pt-2 text-right">
+                <DeltaText current={after.clicks} previous={before.clicks} vsLabel="before" />
+              </dd>
             </div>
-          ))}
-          <div className="contents">
-            <dt className="sr-only">Change in visits</dt>
-            <dd className="col-span-3 border-t border-border pt-2 text-right">
-              <DeltaText current={after.clicks} previous={before.clicks} vsLabel="before" />
-            </dd>
-          </div>
-        </dl>
+          </dl>
+        </div>
       )}
     </article>
   );

@@ -1,39 +1,22 @@
 "use client";
-import { useSyncExternalStore } from "react";
+import { useState } from "react";
+import { CALENDAR_SPANS, writeCalendarSpanCookie, type CalendarSpan } from "@/lib/calendar-span";
 
-export type CalendarSpan = "year" | "half" | "quarter";
-export const CALENDAR_SPANS: CalendarSpan[] = ["year", "half", "quarter"];
-const KEY = "autumn:calendar-span";
-const EVENT = "autumn:calendar-span-change";
+export { CALENDAR_SPANS, type CalendarSpan };
 
-const read = (): CalendarSpan => {
-  try {
-    const v = window.localStorage.getItem(KEY);
-    return CALENDAR_SPANS.includes(v as CalendarSpan) ? (v as CalendarSpan) : "half";
-  } catch {
-    return "half";
-  }
-};
-
-const subscribe = (cb: () => void) => {
-  window.addEventListener("storage", cb);
-  window.addEventListener(EVENT, cb);
-  return () => {
-    window.removeEventListener("storage", cb);
-    window.removeEventListener(EVENT, cb);
-  };
-};
-
-/** How far back the calendar draws. Per browser; the server snapshot is always "half", so the first paint matches the server HTML. */
-export function useCalendarSpan(): [CalendarSpan, (s: CalendarSpan) => void] {
-  const span = useSyncExternalStore(subscribe, read, () => "half" as CalendarSpan);
+/**
+ * The span the server rendered is the span the browser starts with (it came from the cookie), so
+ * there is nothing to reconcile after hydration. A change writes the cookie for the next request.
+ */
+export function useCalendarSpan(initial: CalendarSpan = "half"): [CalendarSpan, (s: CalendarSpan) => void] {
+  const [span, setSpan] = useState<CalendarSpan>(initial);
   const set = (s: CalendarSpan) => {
+    setSpan(s);
     try {
-      window.localStorage.setItem(KEY, s);
+      writeCalendarSpanCookie(s);
     } catch {
-      /* private mode: the choice lasts for this render only */
+      /* no document: the choice lasts for this render only */
     }
-    window.dispatchEvent(new Event(EVENT));
   };
   return [span, set];
 }
