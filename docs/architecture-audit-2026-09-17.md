@@ -22,7 +22,7 @@ Verdict in one line: the layering is right and enforced, the server/client split
 
 2. **No caching for data that only changes on reseed.** Every navigation hits Supabase five or six times. Next.js 16 `"use cache"` with a long `cacheLife` on the query functions, keyed by range and metric, plus a tag the seed script revalidates, turns most navigations into cache hits. The root layout's `cookies()` read already makes everything dynamic, which is fine; caching belongs at the query layer, not the route.
 
-3. **Skeleton flash on every range or metric change.** A search-param change re-renders the page and trips `loading.tsx`, so the whole body flickers to a skeleton for a fast query. Wrap the pushes in `RangeSelect` and `MetricSelect` in `startTransition` and show a subtle pending state on the control instead; the old content stays until the new one is ready.
+3. ~~**Skeleton flash on every range or metric change.**~~ Fixed 2026-09-17 (D32): `useViewParam` pushes inside a transition with `scroll: false`. A search-param change re-renders the page and trips `loading.tsx`, so the whole body flickers to a skeleton for a fast query. Wrap the pushes in `RangeSelect` and `MetricSelect` in `startTransition` and show a subtle pending state on the control instead; the old content stays until the new one is ready.
 
 4. **Route structure for growth.** The two screens are flat routes that each hand `AppShell` the same props. Move them under a `(dashboard)` route group with one `layout.tsx` owning the top bar chrome, a shared `loading.tsx` and `error.tsx`. The range must stay per-page because layouts do not receive search params, which is why item 1's helper matters.
 

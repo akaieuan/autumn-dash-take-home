@@ -1,26 +1,25 @@
 // @vitest-environment jsdom
 // tests/components/shell.test.tsx
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RangeSegment, TopBar, SidebarProvider } from "@/components/layout";
 
-// The narrow-screen range dropdown navigates with the App Router; tests render outside one.
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+// The range controls navigate with the App Router; tests render outside one.
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 describe("RangeSegment", () => {
-  it("is five links that carry the range in the URL, with the current one marked", () => {
+  it("is five buttons; pressing one writes the range to the URL without moving the page", () => {
     render(<RangeSegment current="90d" basePath="/" metric="website_visits" />);
-    const links = screen.getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "/?range=30d&metric=website_visits",
-      "/?range=90d&metric=website_visits",
-      "/?range=ytd&metric=website_visits",
-      "/?range=12m&metric=website_visits",
-      "/?range=all&metric=website_visits",
-    ]);
-    expect(screen.getByRole("link", { name: "90d" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "30d" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["30d", "90d", "YTD", "12m", "All"]);
+    expect(screen.getByRole("button", { name: "90d" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "30d" }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "30d" }));
+    expect(push).toHaveBeenCalledWith("/?range=30d&metric=website_visits", { scroll: false }); // scroll: false is the whole point
+    push.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "90d" })); // already current: no navigation
+    expect(push).not.toHaveBeenCalled();
   });
 });
 

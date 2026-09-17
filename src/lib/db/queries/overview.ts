@@ -78,10 +78,11 @@ export function bucketStarts(from: string, to: string, g: Granularity): string[]
   return out;
 }
 
-const COLUMN: Record<TrendMetric, string> = { booking_value: "booking_value", bookings: "bookings", clicks: "clicks", impressions: "impressions", website_visits: "website_visits", new_visitors: "new_visitors" };
+/** daily_metrics column for each trend metric; shared with activity.ts. */
+export const METRIC_COLUMN: Record<TrendMetric, string> = { booking_value: "booking_value", bookings: "bookings", clicks: "clicks", impressions: "impressions", website_visits: "website_visits", new_visitors: "new_visitors" };
 
 async function series(db: AnyDb, from: string, to: string, g: Granularity, metric: TrendMetric): Promise<number[]> {
-  const rows = rowsOf<{ d: string; v: unknown }>(await db.execute(sql`select date::text as d, ${sql.raw(COLUMN[metric])} as v from daily_metrics where date between ${from} and ${to}`));
+  const rows = rowsOf<{ d: string; v: unknown }>(await db.execute(sql`select date::text as d, ${sql.raw(METRIC_COLUMN[metric])} as v from daily_metrics where date between ${from} and ${to}`));
   const byDay = new Map(rows.map((r) => [r.d, metric === "booking_value" ? toCents(r.v) : n(r.v)]));
   const starts = bucketStarts(from, to, g);
   return starts.map((s, i) => {

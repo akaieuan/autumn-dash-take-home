@@ -8,3 +8,5 @@ export { getCampaignMeta, getEvents, getEventImpact, getRecentEventImpacts } fro
 export type { CampaignMetaDto, EventDto, EventImpactDto, WindowTotals } from "./events";
 export { getTrafficByCampaign, getCampaignEfficiency, bucketEnd } from "./traffic";
 export type { CampaignSeriesDto, CampaignSeries, CampaignSeriesMetric, EventMarker, CampaignEfficiencyDto, CampaignEfficiencyRow } from "./traffic";
+export { getActivity } from "./activity";
+export type { ActivityDay, ActivityDto } from "./activity";

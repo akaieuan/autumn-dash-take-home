@@ -25,7 +25,11 @@ describe("architecture gates (CLAUDE.md §2 invariants)", () => {
     for (const f of walk("src").filter((p) => !p.endsWith("src/lib/format.ts"))) expect(read(f), f).not.toMatch(/Intl\.NumberFormat/);
   });
   it("pages import barrels, never a file inside a component folder", () => {
-    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|bookings|assistant)\/[a-z]/);
+    for (const f of walk("src/app")) expect(read(f), f).not.toMatch(/from\s+["']@\/components\/(layout|copy|charts|dashboard|website-traffic|bookings|assistant|design-system)\/[a-z]/);
+  });
+  it("the design-system reference is a path only: nothing in the product links to it", () => {
+    const product = [...walk("src/components"), ...walk("src/lib"), ...walk("src/app/(dashboard)")].filter((p) => !p.includes("/design-system/"));
+    for (const f of product) expect(read(f), f).not.toMatch(/["'`]\/design-system/);
   });
   it("globals.css carries the layout tokens and a dark theme block", () => {
     const css = read("src/app/globals.css");

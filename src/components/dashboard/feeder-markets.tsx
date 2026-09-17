@@ -24,7 +24,7 @@ export function FeederMarkets({ markets }: { markets: MarketDto[] }) {
           </a>
         }
       />
-      <PanelBody className="gap-4">
+      <PanelBody className="flex-1 gap-4">
         {markets.length === 0 ? (
           <EmptyState title="No bookings in this period yet" />
         ) : (
@@ -33,7 +33,8 @@ export function FeederMarkets({ markets }: { markets: MarketDto[] }) {
               <ShareBar segments={segments} label="Share of bookings by city" />
               <ShareLegend segments={segments} />
             </div>
-            <div role="table" aria-labelledby="markets-h" className="divide-y divide-border">
+            {/* Rows share the panel's spare height (the campaigns beside it are taller), so the list never stops short. */}
+            <div role="table" aria-labelledby="markets-h" className="flex flex-1 flex-col divide-y divide-border [&>[role=row]:not(:first-child)]:flex-1 [&>[role=row]:not(:first-child)]:items-center">
               <div role="row" className={`grid gap-x-4 pb-2 ${MARKET_COLS}`}>
                 <span role="columnheader" className={th}>City</span>
                 <span role="columnheader" className={`hidden text-right @md:block ${th}`}>Clicks</span>

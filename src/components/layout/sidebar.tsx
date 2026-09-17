@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { PanelLeft } from "lucide-react";
-import { NAV_GROUPS } from "@/lib/navigation";
+import { NAV_GROUPS, type NavGroup } from "@/lib/navigation";
 import { PROPERTY } from "@/lib/property";
 import { cn } from "@/lib/utils";
 import { IconButton } from "./icon-button";
@@ -77,17 +77,29 @@ export function Sidebar() {
           </IconButton>
         </div>
 
+        {/* Main groups stack from the top and take the spare height; footer groups sit at the bottom behind a hairline. */}
         <div className="flex flex-1 flex-col gap-6">
-          {NAV_GROUPS.map((g) => (
-            <nav key={g.label} aria-label={g.label} className="flex flex-col gap-1.5">
-              <span className="h-4 truncate whitespace-nowrap px-2.5 text-xs font-medium text-muted-foreground transition-opacity duration-200 sm:group-data-[collapsed=true]/sidebar:opacity-0 max-sm:group-data-[drawer=false]/sidebar:opacity-0">
-                {g.label}
-              </span>
-              <NavList items={g.items} collapsed={collapsed} onNavigate={closeDrawer} />
-            </nav>
+          {NAV_GROUPS.filter((g) => g.placement === "main").map((g) => (
+            <NavGroupBlock key={g.label} group={g} collapsed={collapsed} onNavigate={closeDrawer} />
+          ))}
+        </div>
+        <div className="flex flex-col gap-6 border-t border-sidebar-border pt-3">
+          {NAV_GROUPS.filter((g) => g.placement === "footer").map((g) => (
+            <NavGroupBlock key={g.label} group={g} collapsed={collapsed} onNavigate={closeDrawer} />
           ))}
         </div>
       </aside>
     </>
+  );
+}
+
+function NavGroupBlock({ group: g, collapsed, onNavigate }: { group: NavGroup; collapsed: boolean; onNavigate: () => void }) {
+  return (
+    <nav aria-label={g.label} className="flex flex-col gap-1.5">
+      <span className="h-4 truncate whitespace-nowrap px-2.5 text-xs font-medium text-muted-foreground transition-opacity duration-200 sm:group-data-[collapsed=true]/sidebar:opacity-0 max-sm:group-data-[drawer=false]/sidebar:opacity-0">
+        {g.label}
+      </span>
+      <NavList items={g.items} collapsed={collapsed} onNavigate={onNavigate} />
+    </nav>
   );
 }
