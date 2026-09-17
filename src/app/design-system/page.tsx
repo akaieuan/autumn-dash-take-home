@@ -120,7 +120,7 @@ export default function DesignSystemPage() {
           <Spec name="CampaignEfficiencyTable" file="website-traffic/campaign-efficiency-table.tsx" note="Ranked by value per visit; the total row reads daily_metrics, so it never drifts from the Overview."><CampaignEfficiencyTable data={efficiency} /></Spec>
           <Spec name="GlossaryPanel" file="dashboard/glossary-panel.tsx"><GlossaryPanel /></Spec>
           <Spec name="ActivityCalendar" file="website-traffic/activity-calendar.tsx" note="Three spans on 1fr columns; hover reads into the header, a click pins the day and drives the card, the week and the month."><ActivityCalendar activity={activity} /></Spec>
-          <Spec name="TrafficIntro" file="website-traffic/traffic-intro.tsx"><TrafficIntro range={range} totals={{ visits: 1548, newVisitors: 1116, previousVisits: 1402 }} /></Spec>
+          <Spec name="TrafficIntro" file="website-traffic/traffic-intro.tsx"><TrafficIntro range={range} totals={{ visits: 1548, allVisits: 12679, newVisitors: 1116, previousVisits: 1402 }} /></Spec>
           <Spec name="OverviewBodySkeleton" file="dashboard/overview-skeleton.tsx" note="Reserves the plot height so the chart never shifts the page."><OverviewBodySkeleton /></Spec>
         </DsSection>
 

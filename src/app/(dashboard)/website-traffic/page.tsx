@@ -48,7 +48,7 @@ export default async function WebsiteTrafficPage({ searchParams }: { searchParam
       basePath="/website-traffic"
       metric={metric === "clicks" ? undefined : metric}
     >
-      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
+      <TrafficIntro range={range} totals={{ visits: totals.websiteVisits, allVisits: totals.siteSessions, newVisitors: totals.newVisitors, previousVisits: previous?.websiteVisits ?? null }} />
       <Suspense fallback={<TrafficBodySkeleton />}>
         <TrafficBody range={range} metric={metric} dataThrough={bounds.max} />
       </Suspense>
