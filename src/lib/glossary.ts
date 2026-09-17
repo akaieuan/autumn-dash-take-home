@@ -6,7 +6,7 @@
 export type CampaignKey = "brand_protection" | "discovery" | "hotel_ads" | "retargeting";
 export type DeviceKey = "device_mobile" | "device_desktop" | "device_tablet";
 export type GlossaryKey =
-  | "bookings" | "booking_value" | "autumn_fee" | "net_revenue" | "avg_booking_value"
+  | "direct_bookings" | "booking_value" | "autumn_fee" | "net_revenue" | "avg_booking_value"
   | "impressions" | "clicks" | "website_visits" | "ctr" | "conversion"
   | "cost_per_booking" | "ota_commission" | "new_visitors" | "pages_per_session"
   | "campaign" | "device" | "feeder_market"
@@ -15,7 +15,7 @@ export type GlossaryKey =
 export interface GlossaryEntry { label: string; industryTerm?: string; meaning: string; purpose?: string }
 
 export const glossary: Record<GlossaryKey, GlossaryEntry> = {
-  bookings: { label: "Direct bookings from Autumn", industryTerm: "attributed bookings", meaning: "Stays booked on your own website after a guest saw or clicked an ad Autumn ran for you." },
+  direct_bookings: { label: "Direct bookings from Autumn", industryTerm: "attributed bookings", meaning: "Stays booked on your own website after a guest saw or clicked an ad Autumn ran for you." },
   booking_value: { label: "Booking value", meaning: "The room revenue from those stays, before any fee." },
   autumn_fee: { label: "Autumn's fee", meaning: "Autumn pays for the ads and charges a percentage only on bookings it brought you. This is that amount for the period." },
   net_revenue: { label: "What you kept", meaning: "Booking value minus Autumn's fee. Money that stayed with the hotel." },
@@ -40,8 +40,6 @@ export const glossary: Record<GlossaryKey, GlossaryEntry> = {
   device_desktop: { label: "Computer", meaning: "Visits and bookings made on a laptop or desktop computer." },
   device_tablet: { label: "Tablet", meaning: "Visits and bookings made on a tablet." },
 };
-
-export const isGlossaryKey = (k: string): k is GlossaryKey => k in glossary;
 
 /** Seeded `breakdowns.value` → glossary key. Null for a label the glossary does not know. */
 const CAMPAIGN_KEYS: Record<string, CampaignKey> = {

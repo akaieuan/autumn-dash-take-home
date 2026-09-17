@@ -24,8 +24,13 @@ describe("glossary", () => {
     expect(campaignKey("Nope")).toBeNull();
     expect(deviceKey("Nope")).toBeNull();
   });
-  it("has a drive hint for every named feeder market except Other", () => {
+  it("has a drive hint for every named feeder market except Other, and hints nothing the seed never produces", () => {
     for (const d of DIMENSION_DEFS.feeder_market) if (d.label !== "Other") expect(MARKET_HINTS[d.label], d.label).toBeTruthy();
+    const seeded = new Set(DIMENSION_DEFS.feeder_market.map((d) => d.label));
+    for (const hinted of Object.keys(MARKET_HINTS)) expect(seeded.has(hinted), hinted).toBe(true);
+  });
+  it("names the headline metric direct_bookings, the key every screen asks for", () => {
+    expect(glossary.direct_bookings.label).toBe("Direct bookings from Autumn");
   });
   it("valueLabel gives campaigns their plain name and passes cities through unchanged", () => {
     expect(valueLabel("Chicago, IL")).toBe("Chicago, IL");
