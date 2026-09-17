@@ -1,53 +1,102 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
 import { count, longDate, monthShort, weekdayDate, weekdayShort } from "@/lib/format";
+import { heatLevel, lastWeeks, monthColumns, monthTotals, weekOf, weekdayAverages, weekdayOf } from "@/lib/activity";
 import { Panel, PanelHeader, PanelBody } from "@/components/layout";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { CALENDAR_SPANS, useCalendarSpan, type CalendarSpan } from "./use-calendar-span";
+import { DayCard } from "./day-card";
+import { MonthSummary, WeekStrip } from "./day-context";
+
+/** The barrel takes these from here; the arithmetic itself lives in `@/lib/activity`. */
+export { heatLevel, monthColumns } from "@/lib/activity";
 
 /** Five static classes so Tailwind can see them; the tokens follow the theme. */
 const LEVEL = ["bg-(--heat-0)", "bg-(--heat-1)", "bg-(--heat-2)", "bg-(--heat-3)", "bg-(--heat-4)"] as const;
 const EMPTY = "bg-transparent";
+const SPAN_LABEL: Record<CalendarSpan, string> = { year: "Year", half: "6 months", quarter: "13 weeks" };
+/** Narrow screens get the same three choices in two characters; the long label stays in `aria-label`. */
+const SPAN_SHORT: Record<CalendarSpan, string> = { year: "1y", half: "6m", quarter: "13w" };
+const SPAN_WEEKS: Record<CalendarSpan, number> = { year: 0, half: 26, quarter: 13 };
+const STEP: Record<string, number> = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1, PageDown: 28, PageUp: -28 };
 
-/** 0 for a quiet day, then quartiles of the window's own maximum, so any hotel gets a readable spread. */
-export function heatLevel(value: number | null, max: number): number | null {
-  if (value === null) return null;
-  if (value <= 0 || max <= 0) return 0;
-  return Math.min(4, Math.max(1, Math.ceil((value / max) * 4)));
-}
-
-/** Column index (1-based) → label, for weeks whose first day starts a new month; a stub month at the left edge is skipped. */
-export function monthColumns(days: ActivityDay[]): { column: number; label: string }[] {
-  const out: { column: number; label: string }[] = [];
-  let last = "";
-  for (let i = 0; i * 7 < days.length; i++) {
-    const m = days[i * 7].date.slice(0, 7);
-    if (m !== last) {
-      if (last !== "" || i === 0 && days[Math.min(days.length - 1, 21)].date.slice(0, 7) === m) out.push({ column: i + 1, label: monthShort(days[i * 7].date) });
-      last = m;
-    }
-  }
-  return out;
-}
+const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: ${day.value === null ? "no data" : `${count(day.value)} ${unit}`}`;
 
 /**
  * A year of days as a heatmap, one column per week, Sunday at the top. The grid's columns are `1fr`,
- * so the whole year always fits its panel and the squares shrink instead of the page scrolling sideways.
- * One delegated pointer handler writes the hovered day into a fixed-height readout in the header, so
- * nothing floats and nothing can overflow the page.
+ * so whichever span is chosen the whole window fits its panel: fewer weeks simply means bigger tiles,
+ * and the year never scrolls sideways. One delegated pointer handler writes the day under the pointer
+ * into a fixed-height readout and the day card beside it; a click keeps a day open so the keyboard,
+ * the week strip and the month summary all have something to talk about.
  */
-export function ActivityCalendar({ activity, unit = "visits", title = "Every day of the last year" }: { activity: ActivityDto; unit?: string; title?: string }) {
-  const [hover, setHover] = useState<ActivityDay | null>(null);
-  const { days, weeks, max, total, from, to } = activity;
-  const busiest = days.reduce<ActivityDay | null>((b, d) => (d.value !== null && (b === null || d.value > (b.value ?? 0)) ? d : b), null);
+export function ActivityCalendar({ activity, unit = "visits", title = "Every day people visited" }: { activity: ActivityDto; unit?: string; title?: string }) {
+  const [span, setSpan] = useCalendarSpan();
+  const [hover, setHover] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const { days, total, from, to } = activity;
+
+  const visible = span === "year" ? days : lastWeeks(days, SPAN_WEEKS[span]);
+  const visibleMax = Math.max(0, ...visible.map((d) => d.value ?? 0));
+  const weeks = Math.max(1, Math.ceil(visible.length / 7));
+  const busiest = visible.reduce<ActivityDay | null>((b, d) => (d.value !== null && (b === null || d.value > (b.value ?? 0)) ? d : b), null);
+
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const pinnedDate = pin !== null && visible.some((d) => d.date === pin) ? pin : busiest?.date ?? null;
+  const pinned = pinnedDate === null ? null : byDate.get(pinnedDate) ?? null;
+  const hovered = hover === null ? null : byDate.get(hover) ?? null;
+  const shown = hovered ?? pinned;
+
+  const averages = weekdayAverages(days);
+  const typical = shown === null ? null : averages[weekdayOf(shown.date)].average;
+  const rank = useMemo(() => {
+    if (shown === null || shown.value === null) return null;
+    const withData = days.filter((d) => d.value !== null);
+    const sameWeekday = withData.filter((d) => weekdayOf(d.date) === weekdayOf(shown.date));
+    const above = (xs: typeof withData) => xs.filter((d) => (d.value as number) > (shown.value as number)).length + 1;
+    return { day: above(withData), days: withData.length, weekday: above(sameWeekday), weekdays: sameWeekday.length };
+  }, [days, shown]);
+
+  const months = monthTotals(days);
+  const monthIndex = pinnedDate === null ? -1 : months.findIndex((m) => m.key === pinnedDate.slice(0, 7));
+  const month = monthIndex === -1 ? null : months[monthIndex];
+  const monthRank = month === null ? 0 : months.filter((m) => m.total > month.total).length + 1;
+  const monthBefore = monthIndex > 0 ? months[monthIndex - 1] : null;
+  const monthDelta = month === null || monthBefore === null || monthBefore.total === 0 ? null : Math.round(((month.total - monthBefore.total) / monthBefore.total) * 100);
+
   const columns = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}${busiest ? `; busiest day ${longDate(busiest.date)} with ${count(busiest.value ?? 0)}` : ""}`;
 
-  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-date]");
-    if (!el) return setHover(null);
-    const v = el.dataset.value;
-    setHover({ date: el.dataset.date as string, value: v === undefined || v === "" ? null : Number(v) });
+  const dateUnder = (e: React.PointerEvent<HTMLDivElement>) => (e.target as HTMLElement).closest<HTMLElement>("[data-date]")?.dataset.date ?? null;
+  const onMove = (e: React.PointerEvent<HTMLDivElement>) => setHover(dateUnder(e));
+  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const date = dateUnder(e);
+    setHover(date);
+    if (date !== null) setPin(date);
+  };
+
+  const focusDay = (date: string) => gridRef.current?.querySelector<HTMLElement>(`[data-date="${date}"]`)?.focus();
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (visible.length === 0) return;
+    const at = Math.max(0, visible.findIndex((d) => d.date === pinnedDate));
+    let next: number;
+    if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = visible.length - 1;
+    else if (e.key in STEP) next = at + STEP[e.key];
+    else return;
+    e.preventDefault();
+    const date = visible[Math.min(visible.length - 1, Math.max(0, next))].date;
+    setPin(date);
+    setHover(null);
+    focusDay(date);
+  };
+
+  const pick = (date: string) => {
+    setPin(date);
+    setHover(null);
+    focusDay(date);
   };
 
   return (
@@ -55,67 +104,143 @@ export function ActivityCalendar({ activity, unit = "visits", title = "Every day
       <PanelHeader
         headingId="activity-h"
         title={title}
-        description={`Website ${unit}, day by day, up to ${longDate(to)}. Darker is busier.`}
+        description="Darker is busier. Point at a day to read it, click to keep it open."
         action={
-          <p aria-live="polite" className="flex h-8 items-center whitespace-nowrap tabular-nums text-muted-foreground">
-            {hover ? (
-              <>
-                <span className="text-foreground">{weekdayDate(hover.date)}</span>
-                <span aria-hidden="true" className="px-1.5">·</span>
-                {hover.value === null ? "no data" : `${count(hover.value)} ${unit}`}
-              </>
-            ) : (
-              `Point at a day`
-            )}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p aria-live="polite" className="flex h-8 items-center whitespace-nowrap tabular-nums text-muted-foreground">
+              {shown ? (
+                <>
+                  <span className="text-foreground">{weekdayDate(shown.date)}</span>
+                  <span aria-hidden="true" className="px-1.5">·</span>
+                  {shown.value === null ? "no data" : `${count(shown.value)} ${unit}`}
+                </>
+              ) : (
+                "Point at a day"
+              )}
+            </p>
+            <ToggleGroup
+              type="single"
+              value={span}
+              onValueChange={(v) => {
+                if (CALENDAR_SPANS.includes(v as CalendarSpan)) setSpan(v as CalendarSpan);
+              }}
+              aria-label="How far back"
+              className="rounded-full border border-border bg-card p-0.5"
+            >
+              {CALENDAR_SPANS.map((s) => (
+                <ToggleGroupItem
+                  key={s}
+                  value={s}
+                  aria-label={SPAN_LABEL[s]}
+                  className="h-7 rounded-full px-2.5 text-xs font-medium text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-card sm:px-3"
+                >
+                  <span className="sm:hidden">{SPAN_SHORT[s]}</span>
+                  <span className="hidden sm:inline">{SPAN_LABEL[s]}</span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
         }
       />
-      <PanelBody className="@container gap-3">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
-          <div aria-hidden="true" />
-          <div aria-hidden="true" className="col-start-2 grid h-4 text-[10px] leading-4 text-muted-foreground" style={columns}>
-            {monthColumns(days).map((m, i) => (
-              <span key={m.column} className={cn("whitespace-nowrap", i % 2 === 1 && "hidden @md:inline")} style={{ gridColumnStart: m.column }}>{m.label}</span>
-            ))}
+      <PanelBody className="@container gap-(--stack-gap)">
+        <div className="grid grid-cols-1 gap-(--stack-gap) lg:grid-cols-[minmax(0,1fr)_17.5rem]">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
+              <div aria-hidden="true" />
+              <div aria-hidden="true" className="col-start-2 row-start-1 grid h-4 text-[10px] leading-4 text-muted-foreground" style={columns}>
+                {monthColumns(visible).map((m, i) => (
+                  <span key={m.column} className={cn("whitespace-nowrap", i % 2 === 1 && "hidden @md:inline")} style={{ gridColumnStart: m.column }}>
+                    {m.label}
+                  </span>
+                ))}
+              </div>
+              <div aria-hidden="true" className="col-start-1 row-start-2 hidden grid-rows-7 gap-[2px] text-[10px] leading-none text-muted-foreground @md:grid">
+                {[0, 1, 2, 3, 4, 5, 6].map((r) => (
+                  <span key={r} className="flex items-center">{r % 2 === 1 ? weekdayShort(r) : ""}</span>
+                ))}
+              </div>
+              <div
+                ref={gridRef}
+                role="grid"
+                aria-label={summary}
+                onPointerMove={onMove}
+                onPointerDown={onDown}
+                onPointerLeave={() => setHover(null)}
+                onKeyDown={onKeyDown}
+                className={cn("col-start-2 row-start-2 grid grid-flow-col grid-rows-7", span === "year" ? "gap-[2px]" : "gap-[3px]")}
+                style={columns}
+              >
+                {visible.map((d) => {
+                  const level = heatLevel(d.value, visibleMax);
+                  const isPinned = d.date === pinnedDate;
+                  return (
+                    <button
+                      key={d.date}
+                      type="button"
+                      data-date={d.date}
+                      data-level={level ?? undefined}
+                      aria-label={dayLabel(d, unit)}
+                      aria-pressed={isPinned}
+                      tabIndex={isPinned ? 0 : -1}
+                      onClick={() => pick(d.date)}
+                      className={cn(
+                        "flex aspect-square w-full items-end justify-end overflow-hidden transition-transform motion-safe:hover:scale-110",
+                        // A 4px corner on a year's ~10px tile reads as a circle, so the year gets 2px (owner, 2026-09-17).
+                        span === "year" ? "rounded-(--radius-tile)" : "rounded-(--radius-min)",
+                        level === null ? EMPTY : LEVEL[level],
+                        isPinned && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
+                        !isPinned && hover === d.date && "ring-2 ring-foreground/50",
+                      )}
+                    >
+                      {span === "quarter" && d.value !== null ? (
+                        <span className={cn("px-1 pb-0.5 text-[10px] font-medium leading-none tabular-nums", (level ?? 0) >= 3 ? "text-card" : "text-foreground")}>
+                          {count(d.value)}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                <span className="font-medium tabular-nums text-foreground">{count(total)}</span> {unit} in the last year
+                {busiest ? (
+                  <>
+                    , busiest on <span className="text-foreground">{longDate(busiest.date)}</span>
+                  </>
+                ) : null}
+              </span>
+              <span aria-hidden="true" className="inline-flex items-center gap-1">
+                Fewer
+                {LEVEL.map((c) => (
+                  <span key={c} className={cn("size-2.5", span === "year" ? "rounded-(--radius-tile)" : "rounded-(--radius-min)", c)} />
+                ))}
+                More
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+              <div className="min-w-0">
+                <WeekStrip days={pinnedDate === null ? [] : weekOf(days, pinnedDate)} pinned={pinnedDate} onPick={pick} unit={unit} />
+              </div>
+              {month ? (
+                <div className="min-w-0 md:border-l md:border-border md:pl-4">
+                  <MonthSummary
+                    label={`${monthShort(`${month.key}-01`)} ${month.key.slice(0, 4)}`}
+                    total={month.total}
+                    rank={monthRank}
+                    count={months.length}
+                    deltaPct={monthDelta}
+                    unit={unit}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
-          <div aria-hidden="true" className="col-start-1 row-start-2 hidden grid-rows-7 gap-[2px] text-[10px] leading-none text-muted-foreground @md:grid">
-            {[0, 1, 2, 3, 4, 5, 6].map((r) => (
-              <span key={r} className="flex items-center">{r % 2 === 1 ? weekdayShort(r) : ""}</span>
-            ))}
-          </div>
-          <div
-            role="img"
-            aria-label={summary}
-            onPointerMove={onMove}
-            onPointerDown={onMove}
-            onPointerLeave={() => setHover(null)}
-            className="col-start-2 row-start-2 grid grid-flow-col grid-rows-7 gap-[2px]"
-            style={columns}
-          >
-            {days.map((d) => {
-              const level = heatLevel(d.value, max);
-              return (
-                <span
-                  key={d.date}
-                  data-date={d.date}
-                  data-value={d.value ?? ""}
-                  data-level={level ?? undefined}
-                  className={cn("aspect-square w-full rounded-(--radius-min)", level === null ? EMPTY : LEVEL[level], hover?.date === d.date && "ring-2 ring-foreground/60")}
-                />
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>
-            <span className="font-medium tabular-nums text-foreground">{count(total)}</span> {unit} in the last year
-            {busiest ? <>, busiest on <span className="text-foreground">{longDate(busiest.date)}</span></> : null}
-          </span>
-          <span aria-hidden="true" className="inline-flex items-center gap-1">
-            Fewer
-            {LEVEL.map((c) => <span key={c} className={cn("size-2.5 rounded-(--radius-min)", c)} />)}
-            More
-          </span>
+
+          <DayCard day={shown} typical={typical} mode={hovered ? "hover" : "pinned"} unit={unit} rank={rank} />
         </div>
       </PanelBody>
     </Panel>

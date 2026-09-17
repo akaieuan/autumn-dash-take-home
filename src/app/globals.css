@@ -160,6 +160,7 @@
   --radius-panel: 1.5rem;   /* outer cards, popovers */
   --panel-pad: 1rem;        /* inset of anything directly inside a panel */
   --radius-min: 4px;
+  --radius-tile: 2px;       /* calendar tiles at year span: a 4px corner on a 10px square reads as a circle */
   --r-in: max(var(--radius-min), calc(var(--radius-panel) - var(--panel-pad)));   /* 8px: rows, chips, empty states inside a panel */
   --radius-float: 1rem;     /* chart tooltips */
   --float-pad: 0.75rem;

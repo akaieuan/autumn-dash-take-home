@@ -16,9 +16,10 @@ describe("getActivity", () => {
     expect(a.to).toBe("2026-09-10");
     expect(a.days).toHaveLength(19);
     expect(a.weeks).toBe(3);
-    expect(a.days[0]).toEqual({ date: "2026-08-23", value: null });   // before any fixture row: blank, not zero
-    expect(a.days[2]).toEqual({ date: "2026-08-25", value: 50 });
-    expect(a.days[13]).toEqual({ date: "2026-09-05", value: 290 });
+    // Every field of a day the fixture does not cover is null, so the day card reads "—" rather than a zero.
+    expect(a.days[0]).toEqual({ date: "2026-08-23", value: null, newVisitors: null, bookings: null, pagesPerSession: null });
+    expect(a.days[2]).toEqual({ date: "2026-08-25", value: 50, newVisitors: 200, bookings: 1, pagesPerSession: 3.2 });
+    expect(a.days[13]).toEqual({ date: "2026-09-05", value: 290, newVisitors: 1500, bookings: 1, pagesPerSession: 4 });
     // Fixture rows inside the window: 08-25 = 50, 09-02 = 97, 09-05 = 290, 09-10 = 195.
     expect(a.max).toBe(290);
     expect(a.total).toBe(50 + 97 + 290 + 195);

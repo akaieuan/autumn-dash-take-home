@@ -3,7 +3,17 @@ import { n, rowsOf, toCents, type AnyDb } from "./types";
 import { addDays, dayOfWeek, eachDay } from "@/lib/date-range";
 import { METRIC_COLUMN, type TrendMetric } from "./overview";
 
-export interface ActivityDay { date: string; value: number | null }
+/**
+ * One cell of the calendar. `value` is the chosen metric; the other three are what the day card
+ * reads out beside it. All four are null together for a day the data does not cover.
+ */
+export interface ActivityDay {
+  date: string;
+  value: number | null;
+  newVisitors: number | null;
+  bookings: number | null;
+  pagesPerSession: number | null;
+}
 
 export interface ActivityDto {
   metric: TrendMetric;
@@ -26,11 +36,24 @@ export interface ActivityDto {
 export async function getActivity(db: AnyDb, to: string, metric: TrendMetric, weeks = 53): Promise<ActivityDto> {
   const earliest = addDays(to, -(weeks * 7 - 1));
   const from = addDays(earliest, -dayOfWeek(earliest));
-  const rows = rowsOf<{ d: string; v: unknown }>(
-    await db.execute(sql`select date::text as d, ${sql.raw(METRIC_COLUMN[metric])} as v from daily_metrics where date between ${from} and ${to}`),
+  const rows = rowsOf<{ d: string; v: unknown; nv: unknown; bk: unknown; pps: unknown }>(
+    await db.execute(
+      sql`select date::text as d, ${sql.raw(METRIC_COLUMN[metric])} as v, new_visitors as nv, bookings as bk, pages_per_session as pps from daily_metrics where date between ${from} and ${to}`,
+    ),
   );
-  const byDay = new Map(rows.map((r) => [r.d, metric === "booking_value" ? toCents(r.v) : n(r.v)]));
-  const days = eachDay(from, to).map((date) => ({ date, value: byDay.has(date) ? (byDay.get(date) as number) : null }));
+  const byDay = new Map(
+    rows.map((r) => [
+      r.d,
+      {
+        value: metric === "booking_value" ? toCents(r.v) : n(r.v),
+        newVisitors: n(r.nv),
+        bookings: n(r.bk),
+        pagesPerSession: n(r.pps),
+      },
+    ]),
+  );
+  const blank = { value: null, newVisitors: null, bookings: null, pagesPerSession: null };
+  const days: ActivityDay[] = eachDay(from, to).map((date) => ({ date, ...(byDay.get(date) ?? blank) }));
   const values = days.flatMap((d) => (d.value === null ? [] : [d.value]));
   return {
     metric, from, to,
