@@ -6,7 +6,6 @@ import { DayCard } from "@/components/website-traffic/day-card";
 import { MonthSummary, WeekStrip } from "@/components/website-traffic/day-context";
 import { WeekdayRhythm } from "@/components/website-traffic/weekday-rhythm";
 import { TrafficIntro } from "@/components/website-traffic/traffic-intro";
-import { glossary } from "@/lib/glossary";
 import { parseRange } from "@/lib/date-range";
 import type { ActivityDay, ActivityDto } from "@/lib/db/queries";
 

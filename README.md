@@ -102,18 +102,20 @@ npm install
 ```
 
 **2. Create a database.** In Supabase, create a project, then open
-**Connect → Connection String**. Copy two strings into a new `.env` file
-(never committed; `.env.example` shows the shape):
+**Connect → Connection String**. Copy the connection string into a new
+`.env` file (never committed; `.env.example` shows the shape):
 
 ```
 DATABASE_URL="postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres?sslmode=require"
 DIRECT_URL="postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres?sslmode=require"
 ```
 
-`DATABASE_URL` is the **Transaction pooler** (port 6543), used by the app
-and the seed. `DIRECT_URL` is the **Session pooler** (port 5432), used only to
-run migrations. Keep `?sslmode=require` on both; Supabase refuses plain
-connections.
+`DATABASE_URL` is the **Transaction pooler** (port 6543). The app, the
+migrate step, the seed and the verify script all use it, so it is the only
+string you need. `DIRECT_URL` is the **Session pooler** (port 5432) and is
+read only by the Drizzle CLI when generating a new migration file
+(`npm run db:generate`); leave it out unless you change the schema. Keep
+`?sslmode=require` on both; Supabase refuses plain connections.
 
 **3. Create the tables**
 
