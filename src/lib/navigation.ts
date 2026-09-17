@@ -26,10 +26,17 @@ export const SECONDARY_NAV: NavItem[] = [
   { key: "help", label: "Help", href: null },
 ];
 
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+  /** `main` groups stack from the top; `footer` groups sit at the bottom of the sidebar behind a hairline. */
+  placement: "main" | "footer";
+}
+
 /** The sidebar renders these groups in order, each under a small heading. */
-export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  { label: "General", items: PRIMARY_NAV },
-  { label: "Other", items: SECONDARY_NAV },
+export const NAV_GROUPS: NavGroup[] = [
+  { label: "General", items: PRIMARY_NAV, placement: "main" },
+  { label: "Other", items: SECONDARY_NAV, placement: "footer" },
 ];
 
 /** Dashboard's own tabs; the top bar renders these, the sidebar treats them as one destination. */

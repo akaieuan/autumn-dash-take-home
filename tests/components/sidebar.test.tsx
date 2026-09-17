@@ -29,7 +29,9 @@ describe("Sidebar", () => {
     expect(calendar).not.toHaveTextContent("Soon"); // "coming soon" lives in the tooltip, not the label
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByRole("navigation", { name: "General" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Other" })).toBeInTheDocument();
+    const other = screen.getByRole("navigation", { name: "Other" });
+    expect(other.parentElement?.className).toContain("border-t"); // pinned at the bottom, behind a hairline
+    expect(screen.getByRole("navigation", { name: "General" }).parentElement?.className).toContain("flex-1"); // what pushes it there
   });
   it("snaps between the panel and the rail from its top-row control, remembering the state in a cookie", () => {
     wrap();
