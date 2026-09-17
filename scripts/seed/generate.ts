@@ -42,9 +42,15 @@ export function generateDaily(rng: Rng): DailyMetricRow[] {
     carry = expected - bookings;
     let valueCents = 0;
     for (let i = 0; i < bookings; i++) valueCents += Math.round(avgBookingValueCents(date) * (0.75 + rng.next() * 0.5));
-    const newVisitors = rng.poisson(clicks * 5.2 * (0.9 + rng.next() * 0.2) + 12 * demandMultiplier(date));
-    const pagesPerSession = Math.min(5, Math.max(2.2, rng.normal(3.4, 0.28)));
-    return { date, impressions, clicks, websiteVisits, bookings, bookingValue: cents(valueCents), newVisitors, pagesPerSession: Math.round(pagesPerSession * 100) / 100, spend: 0 };
+    // Site-wide sessions: the paid visits plus the organic, direct and referral traffic around them, which
+    // together run several times paid and grow with the program. New visitors are a share of those sessions
+    // and never more than all of them; pageviews come from a per-session rate. Storing both denominators is
+    // what lets a range compute pages per visit correctly instead of averaging daily averages.
+    const siteSessions = websiteVisits + rng.poisson(clicks * 6.4 * (0.9 + rng.next() * 0.2) + 18 * demandMultiplier(date));
+    const newVisitors = Math.min(siteSessions, rng.poisson(siteSessions * (0.66 + rng.next() * 0.08)));
+    const pageviews = Math.round(siteSessions * Math.min(5, Math.max(2.2, rng.normal(3.4, 0.28))));
+    const pagesPerSession = siteSessions ? Math.round((pageviews / siteSessions) * 100) / 100 : 0;
+    return { date, impressions, clicks, websiteVisits, bookings, bookingValue: cents(valueCents), newVisitors, siteSessions, pageviews, pagesPerSession, spend: 0 };
   });
 }
 

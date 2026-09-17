@@ -54,7 +54,7 @@ Wipes both tables and inserts a deterministic two-year dataset. It prints one
 line that a partial or wrong run could not produce:
 
 ```
-Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 916 bookings, $407166.90 booking value, $29490.05 ad spend, 4 campaigns, 24 events
+Seeded 730 days 2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 918 bookings, $408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events
 ```
 
 Running it again produces byte-identical rows; the generator is seeded with a
@@ -84,7 +84,7 @@ reasoning is in [docs/decisions.md](docs/decisions.md) (D21–D28).
 
 | Table | Grain | Columns |
 |---|---|---|
-| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `pages_per_session numeric(4,2)`, `spend numeric(10,2)` |
+| `daily_metrics` | one row per day; `date` is the primary key | `impressions`, `clicks`, `website_visits`, `bookings`, `booking_value numeric(10,2)`, `new_visitors`, `site_sessions`, `pageviews`, `pages_per_session numeric(4,2)`, `spend numeric(10,2)` |
 | `breakdowns` | one row per day per dimension value | `date` (FK), `dimension` ∈ `campaign` \| `device` \| `feeder_market` (check constraint), `dimension_value`, `impressions`, `clicks`, `bookings`, `booking_value`, `spend`; index on `(date, dimension)` |
 | `campaigns` | one row per campaign | `name` (matches `dimension_value`), `objective`, `focus`, `launched_on`, `status`, `monthly_budget` |
 | `campaign_events` | one row per thing Autumn did | `date`, `campaign_name` (FK, null = whole program), `kind` ∈ launched \| budget_change \| copy_refresh \| bid_change \| seasonal_push, `title`, `note` |
@@ -111,7 +111,7 @@ Generated in `scripts/seed/`, daily totals first, then breakdowns.
 - **Program shape:** an eight-week ramp to full delivery, +22% per year
   compounding, and 24 dated events (launches, budget and bid changes, ad
   refreshes, seasonal pushes) whose effects the generator applies from their
-  dates. July 2025 to July 2026 bookings go 57 → 80.
+  dates. July 2025 to July 2026 bookings go 54 → 78.
 - **Rates in the reference dashboard's bands:** blended click-through 16%,
   conversion 4%, average booking about $445, rising with the season; ad spend
   about 7% of booking value against Autumn's 15% fee.

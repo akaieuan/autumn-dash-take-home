@@ -4,6 +4,20 @@ import { DIMENSIONS } from "@/lib/db/schema";
 import { EVENTS, DIMENSION_DEFS, WINDOW } from "../scripts/seed/profile";
 
 const data = generateAll();
+
+/** Regenerate with one event's effect neutralised, then restore it. The controlled half of a causality test. */
+function generateWithout(id: number, key: "impressions" | "ctr" | "cvr") {
+  const event = EVENTS.find((e) => e.id === id);
+  if (!event?.effect) throw new Error(`event ${id} has no effect to neutralise`);
+  const original = event.effect[key];
+  event.effect[key] = 1;
+  try {
+    return generateAll();
+  } finally {
+    event.effect[key] = original;
+  }
+}
+
 const byMonth = (prefix: string) => data.daily.filter((d) => d.date.startsWith(prefix));
 const sum = <T,>(rows: T[], f: (r: T) => number) => rows.reduce((s, r) => s + f(r), 0);
 
@@ -38,6 +52,18 @@ describe("seed generators", () => {
       expect(a.spendCents, k).toBe(Math.round((d.spend ?? 0) * 100));
     }
   });
+  it("stores the denominators behind pages per visit, and the daily rate agrees with them", () => {
+    for (const d of data.daily) {
+      const sessions = d.siteSessions ?? 0, pageviews = d.pageviews ?? 0;
+      expect(sessions, d.date).toBeGreaterThanOrEqual(d.websiteVisits);   // paid visits are a subset of all sessions
+      expect(d.newVisitors, d.date).toBeLessThanOrEqual(sessions);        // you cannot have more new visitors than visits
+      expect(pageviews, d.date).toBeGreaterThan(0);
+      expect(d.pagesPerSession, d.date).toBe(Math.round((pageviews / sessions) * 100) / 100);
+    }
+    const weighted = sum(data.daily, (d) => d.pageviews ?? 0) / sum(data.daily, (d) => d.siteSessions ?? 0);
+    expect(weighted).toBeGreaterThan(2.9);
+    expect(weighted).toBeLessThan(3.9);
+  });
   it("spend is a plausible fraction of booking value and only campaigns with clicks spend", () => {
     const spend = sum(data.daily, (d) => d.spend ?? 0), value = sum(data.daily, (d) => d.bookingValue);
     expect(spend / value).toBeGreaterThan(0.04); expect(spend / value).toBeLessThan(0.15);
@@ -54,20 +80,36 @@ describe("seed generators", () => {
     expect(data.events).toHaveLength(EVENTS.length);
     expect(data.campaigns.map((c) => c.name).sort()).toEqual([...names].sort());
   });
-  it("events cause the data: a budget raise lifts that campaign's impressions, a copy refresh lifts its click-through", () => {
-    const win = (value: string, from: string, to: string) => data.breakdowns.filter((b) => b.dimensionValue === value && b.date >= from && b.date <= to);
-    // Event 9: Discovery budget raised 2025-04-14 (×1.3). Fourteen days either side, same month, same weekday mix.
-    const before = sum(win("Discovery & Competitors", "2025-03-31", "2025-04-13"), (b) => b.impressions);
-    const after = sum(win("Discovery & Competitors", "2025-04-14", "2025-04-27"), (b) => b.impressions);
-    expect(after / before).toBeGreaterThan(1.15);
-    // Event 22: Discovery copy refreshed 2026-08-03 (ctr ×1.15). Four weeks either side.
-    const ctr = (rows: typeof data.breakdowns) => sum(rows, (b) => b.clicks) / sum(rows, (b) => b.impressions);
-    expect(ctr(win("Discovery & Competitors", "2026-08-03", "2026-08-30"))).toBeGreaterThan(ctr(win("Discovery & Competitors", "2026-07-06", "2026-08-02")) * 1.05);
-    // A brand-protection event must not move discovery: event 7 (2025-02-10) lifts BP impressions ×1.15, not Discovery.
-    const bpBefore = sum(win("Brand Protection", "2025-01-27", "2025-02-09"), (b) => b.impressions), bpAfter = sum(win("Brand Protection", "2025-02-10", "2025-02-23"), (b) => b.impressions);
-    const dBefore = sum(win("Discovery & Competitors", "2025-01-27", "2025-02-09"), (b) => b.impressions), dAfter = sum(win("Discovery & Competitors", "2025-02-10", "2025-02-23"), (b) => b.impressions);
-    expect(bpAfter / bpBefore).toBeGreaterThan((dAfter / dBefore) * 1.05);
+  it("events cause the data: an effect moves only its own campaign, and only from its own date", () => {
+    // A before/after comparison on one run cannot prove causality: season, weekday mix and other events
+    // drift across the boundary too. Toggling the effect and regenerating from the same seed can.
+    const D = "Discovery & Competitors";
+    const ctr = (d: typeof data, value: string, from: string, to: string) => {
+      const r = d.breakdowns.filter((b) => b.dimensionValue === value && b.date >= from && b.date <= to);
+      return sum(r, (b) => b.clicks) / sum(r, (b) => b.impressions);
+    };
+    const impressions = (d: typeof data, value: string, from: string, to: string) =>
+      sum(d.breakdowns.filter((b) => b.dimensionValue === value && b.date >= from && b.date <= to), (b) => b.impressions);
+    // `spend` is priced from campaign clicks and written back after the whole daily pass, so it inherits the
+    // shifted random stream on every day. Everything generateDaily itself produced must be untouched.
+    const before = (d: typeof data, date: string) =>
+      d.daily.filter((x) => x.date < date).map(({ spend: _spend, ...rest }) => rest);
+
+    // Event 22: Discovery ad copy refreshed on 2026-08-03, click-through x1.15.
+    const noRefresh = generateWithout(22, "ctr");
+    expect(ctr(data, D, "2026-08-03", "2026-08-30") / ctr(noRefresh, D, "2026-08-03", "2026-08-30")).toBeGreaterThan(1.05);
+    expect(before(noRefresh, "2026-08-03")).toEqual(before(data, "2026-08-03")); // strictly forward-acting
+
+    // Event 9: Discovery budget raised on 2025-04-14, impressions x1.3.
+    const noBudget = generateWithout(9, "impressions");
+    expect(impressions(data, D, "2025-04-14", "2025-05-11") / impressions(noBudget, D, "2025-04-14", "2025-05-11")).toBeGreaterThan(1.15);
+    expect(before(noBudget, "2025-04-14")).toEqual(before(data, "2025-04-14"));
+
+    // Event 7 lifts Brand Protection only: with it off, Discovery's impressions in the window are unchanged.
+    const noBidRaise = generateWithout(7, "impressions");
+    expect(impressions(data, "Brand Protection", "2025-02-10", "2025-03-09") / impressions(noBidRaise, "Brand Protection", "2025-02-10", "2025-03-09")).toBeGreaterThan(1.05);
   });
+
   it("never has more clicks than impressions or more bookings than clicks in any row", () => {
     for (const r of [...data.daily, ...data.breakdowns]) { expect(r.clicks).toBeLessThanOrEqual(r.impressions); expect(r.bookings).toBeLessThanOrEqual(r.clicks); }
     for (const r of data.daily) expect(r.websiteVisits).toBeLessThanOrEqual(r.clicks);

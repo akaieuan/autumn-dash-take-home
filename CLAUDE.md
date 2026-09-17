@@ -219,8 +219,8 @@ prediction, never a README's claim, never your own earlier summary.
 **Inspect before you write.** Read the schema, the DTO type, the component's
 props — never assume a field exists. **Prefer a derived acceptance line** that
 a wrong or missing input could not produce (`Seeded 730 days
-2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 916 bookings,
-$407166.90 booking value, $29490.05 ad spend, 4 campaigns, 24 events`; re-measure
+2024-09-17..2026-09-16: 730 daily rows, 12286 breakdown rows, 918 bookings,
+$408745.44 booking value, $29521.54 ad spend, 4 campaigns, 24 events`; re-measure
 after any generator change)
 over a boolean "ok". **A fixture built to match the code cannot falsify the
 code.** **Run `typecheck` before `test`:** Vitest does not typecheck, and on
@@ -398,7 +398,8 @@ live in `docs/decisions.md` under the same identifier.
   all under Autumn with an eight-week ramp and +22 %/yr growth; the seeded
   property is "Harbor House Inn", South Haven, Michigan, for copy only. Fee
   15% of attributed booking value (D6). Measured 2026-09-17: 730 daily rows,
-  12,286 breakdown rows, 581 bookings, $257,770.90; blended click-through
+  12,286 breakdown rows, 581 bookings, $257,770.90 (superseded by the
+  D26–D28 and D29 entries below); blended click-through
   16.0%, conversion 4.0%, average booking $444. Live on Supabase 2026-09-17:
   `db:verify` matched the seed line, all three dimensions reconcile; warm
   query times 32–69 ms over the transaction pooler, ~450 ms on a cold
@@ -406,12 +407,21 @@ live in `docs/decisions.md` under the same identifier.
   `?sslmode=require` on both URLs.
 - **2026-09-17 — Events, campaign metadata, spend (D26–D28, owner's ruling).**
   `campaign_events` (24 rows) drives the generator: each event's effect
-  applies from its date, so before/after comparisons anchored on an event
-  are true by construction. `campaigns` (4 rows) holds objective, focus,
+  applies from its date. Corrected 2026-09-17 (D30): that makes the effect
+  real, not the before/after comparison sound. Drift across the boundary can
+  exceed the effect, so a causal claim needs a controlled regeneration. `campaigns` (4 rows) holds objective, focus,
   launch date, status, budget. `spend` on both metric tables, priced per
-  campaign click. After this change the seed measures 916 bookings,
-  $407,167 booking value, $29,490 spend over 730 days (re-measured from
-  `db:verify`).
+  campaign click. Re-measured after D29 on 2026-09-17: 918 bookings,
+  $408,745 booking value, $29,522 spend over 730 days.
+- **2026-09-17 — Pages per visit is weighted (D29).** `daily_metrics` stores
+  `site_sessions` and `pageviews`; a range reads their sums, never an average
+  of daily averages. The stored daily rate stays for single-day views. On the
+  live data the correction moves the figure by 0.2% over 30 days and 0.4%
+  over two years, because the seeded rate is drawn from a tight band.
+- **2026-09-17 — Causality is proven by a controlled regeneration (D30).**
+  A before/after comparison across an event date cannot separate the event
+  from season, weekday mix and other events. The seed tests neutralise one
+  effect, regenerate from the same seed, and compare.
 - **2026-09-17 — Light theme only (D7).** Warm paper palette measured from the
   marketing site. The `vercel:shadcn` skill's "dark by default for dashboards"
   guidance is overridden on purpose.

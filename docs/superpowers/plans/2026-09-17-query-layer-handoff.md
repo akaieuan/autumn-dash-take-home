@@ -44,4 +44,4 @@ files, 53 tests.
 | `computeInsights` input gains optional `events?: EventImpactDto[]` | rule 7 emits one `action` card for the newest event with ≥ 7 days after it | already wired if the page passes `events` |
 | `glossary.spend`, `glossary.events`, `EVENT_KIND_LABELS` | copy | labels for the new panels |
 
-Seed totals changed (events lift the numbers): 916 bookings, $407,167 value, $29,490 spend. Component fixtures that build `PeriodTotals`, `BreakdownRowDto` or `CampaignDto` literals need `spendCents`; the two under `tests/components` were updated with zeros on this branch.
+Seed totals: 918 bookings, $408,745 value, $29,522 spend. `PeriodTotals` also carries `siteSessions` and `pageviews`; `pagesPerSession` is now weighted over the window (D29), so component fixtures building a `PeriodTotals` literal need the two new fields. Component fixtures that build `PeriodTotals`, `BreakdownRowDto` or `CampaignDto` literals need `spendCents`; the two under `tests/components` were updated with zeros on this branch.
