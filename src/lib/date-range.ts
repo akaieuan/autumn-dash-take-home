@@ -14,7 +14,9 @@ export interface DateRange {
   } | null;
 }
 
-const PRESETS: RangePreset[] = ["30d", "90d", "ytd", "12m", "all"];
+/** The presets the range control offers, in the order it lists them (D3). */
+export const RANGE_PRESETS: RangePreset[] = ["30d", "90d", "ytd", "12m", "all"];
+const PRESETS = RANGE_PRESETS;
 const LABELS: Record<RangePreset, string> = {
   "30d": "Last 30 days", "90d": "Last 90 days", ytd: "Year to date", "12m": "Last 12 months", all: "Since the beginning",
 };
