@@ -22,12 +22,14 @@ export function OverviewBodySkeleton() {
         <PanelSkeleton rows={1} plot />
         <PanelSkeleton rows={3} />
       </Grid>
-      <Grid variant="wide-three">
+      <Grid variant="two">
         <PanelSkeleton rows={6} />
         <PanelSkeleton rows={3} />
-        <PanelSkeleton rows={1} />
       </Grid>
-      <PanelSkeleton rows={0} />
+      <Grid variant="detail">
+        <PanelSkeleton rows={3} />
+        <PanelSkeleton rows={4} />
+      </Grid>
     </Stack>
   );
 }

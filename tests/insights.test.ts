@@ -20,10 +20,17 @@ describe("computeInsights", () => {
     const up = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range });
     expect(up[0]).toMatchObject({ id: "value-up", kind: "win", title: "Booking value up 20% vs the previous 30 days" });
     const down = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 1600000 }), lastYear: totals({ bookingValueCents: 1500000 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range });
-    expect(down[0]).toMatchObject({ id: "value-down", kind: "watch", anchor: "trend" });
+    expect(down[0]).toMatchObject({ id: "value-down", kind: "watch" });
+    // The card's graph is the three figures its sentence compares, in cents, labelled from the range.
+    expect(down[0].chart).toEqual({ kind: "bars", format: "money", bars: [
+      { label: "This period", value: 1600000, tone: "current" },
+      { label: "The previous 30 days", value: 2000000, tone: "previous" },
+      { label: "This time last year", value: 1500000, tone: "lastYear" },
+    ] });
     expect(down[0].body).toMatch(/season/);
     const worse = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 1600000 }), lastYear: totals({ bookingValueCents: 1900000 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range });
-    expect(worse[0]).toMatchObject({ id: "value-down", anchor: "campaigns" });
+    expect(worse[0]).toMatchObject({ id: "value-down" });
+    expect(worse[0].body).toMatch(/campaigns/);
   });
   it("year-over-year growth of 15% or more is a win with both counts", () => {
     const out = computeInsights({ overview: overview({ current: totals({ bookings: 46 }), lastYear: totals({ bookings: 39 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range });
@@ -57,7 +64,8 @@ describe("computeInsights", () => {
       after: { from: "", to: "", impressions: 3000, clicks: 375, bookings: 14, bookingValueCents: 650000, spendCents: 60000, ctr: 0.125, conversion: 0.037 } };
     const out = computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range, events: [impact] });
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ id: "event-22", kind: "action", title: "Ads refreshed: Discovery ad copy refreshed", anchor: "campaigns" });
+    expect(out[0]).toMatchObject({ id: "event-22", kind: "action", title: "Ads refreshed: Discovery ad copy refreshed" });
+    expect(out[0].chart).toEqual({ kind: "bars", format: "count", bars: [{ label: "Now", value: 14, tone: "current" }, { label: "28 days before", value: 9, tone: "previous" }] });
     expect(out[0].body).toBe("On Aug 3, 2026. In the 28 days since, Discovery ads brought 14 bookings worth $6,500, against 9 in the 28 days before. 1 in 8 clicked, against 1 in 10 before.");
     expect(computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range, events: [{ ...impact, days: 3 }] })).toEqual([]);
   });

@@ -19,7 +19,7 @@ import {
   Headline,
   QuickAnalytics,
   InsightList,
-  GlossarySection,
+  GlossaryPanel,
   OverviewBodySkeleton,
 } from "@/components/dashboard";
 import type { OverviewDto, PeriodTotals, QuickAnalyticsDto } from "@/lib/db/queries";
@@ -113,7 +113,7 @@ describe("QuickAnalytics", () => {
 });
 
 describe("InsightList", () => {
-  it("renders cards with tags and anchor links, and an explicit empty state", () => {
+  it("renders cards with tags and each insight's own small graph, and an explicit empty state", () => {
     wrap(
       <InsightList
         insights={[
@@ -122,13 +122,15 @@ describe("InsightList", () => {
             kind: "watch",
             title: "Chicago, IL sent fewer visitors",
             body: "Visits fell 12%.",
-            anchor: "markets",
+            chart: { kind: "bars", format: "count", bars: [{ label: "Now", value: 880, tone: "current" }, { label: "Before", value: 1000, tone: "previous" }] },
           },
         ]}
       />,
     );
     expect(screen.getByText("Watch")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "See where your guests come from" }).getAttribute("href")).toBe("#markets");
+    expect(screen.queryByRole("link")).toBeNull(); // nothing to click: the graph is the evidence
+    expect(screen.getByText("Now").nextElementSibling?.firstElementChild).toHaveStyle({ width: "88%" }); // 880 of the largest bar, 1000
+    expect(screen.getByText("1,000")).toBeInTheDocument();
     wrap(<InsightList insights={[]} />);
     expect(screen.getByText("Nothing needs your attention this period")).toBeInTheDocument();
   });
@@ -167,15 +169,15 @@ describe("CollapsibleSection", () => {
   });
 });
 
-describe("GlossarySection and skeleton", () => {
-  it("groups the glossary into tabs and shows the first group's terms with their industry names", () => {
-    wrap(<GlossarySection groups={[{ id: "money", label: "Bookings and money", keys: ["direct_bookings", "autumn_fee"] }, { id: "ads", label: "Your ads", keys: ["ctr"] }]} />);
+describe("GlossaryPanel and skeleton", () => {
+  it("is a panel that shows every group's terms at once, with their industry names", () => {
+    wrap(<GlossaryPanel groups={[{ id: "money", label: "Bookings and money", keys: ["direct_bookings", "autumn_fee"] }, { id: "ads", label: "Your ads", keys: ["ctr"] }]} />);
     expect(screen.getByRole("heading", { level: 2, name: "What these numbers mean" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /^Bookings and money/ }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("tab", { name: /^Your ads/ })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Bookings and money" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Your ads" })).toBeInTheDocument();
     expect(screen.getByText("Direct bookings from Autumn")).toBeInTheDocument();
     expect(screen.getByText("attributed bookings")).toBeInTheDocument();
-    expect(screen.queryByText("People who clicked")).toBeNull(); // the second tab's term is not rendered until chosen
+    expect(screen.getByText("People who clicked")).toBeInTheDocument(); // nothing is hidden behind a tab
   });
   it("skeleton reserves the plot height so the chart never shifts the page", () => {
     const { container } = render(<OverviewBodySkeleton />);

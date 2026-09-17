@@ -21,7 +21,7 @@ import {
   Headline,
   QuickAnalytics,
   InsightList,
-  GlossarySection,
+  GlossaryPanel,
   OverviewBodySkeleton,
   FeederMarkets,
   CampaignSummary,
@@ -105,12 +105,14 @@ async function OverviewBody({
         </Panel>
         <InsightList insights={insights} />
       </Grid>
-      <Grid variant="wide-three">
+      <Grid variant="two">
         <FeederMarkets markets={markets} />
         <CampaignSummary summary={campaigns} />
-        <FunnelSection funnel={funnel} />
       </Grid>
-      <GlossarySection />
+      <Grid variant="detail">
+        <FunnelSection funnel={funnel} />
+        <GlossaryPanel />
+      </Grid>
     </Stack>
   );
 }

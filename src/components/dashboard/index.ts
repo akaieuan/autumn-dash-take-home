@@ -1,9 +1,10 @@
 export { Headline } from "./headline";
 export { QuickStat } from "./quick-stat";
 export { QuickAnalytics } from "./quick-analytics";
+export { InsightChart } from "./insight-chart";
 export { InsightCard } from "./insight-card";
 export { InsightList } from "./insight-list";
-export { GlossarySection, GLOSSARY_GROUPS, type GlossaryGroup } from "./glossary-section";
+export { GlossaryPanel, GLOSSARY_GROUPS, type GlossaryGroup } from "./glossary-panel";
 export { OverviewBodySkeleton, OverviewPageSkeleton } from "./overview-skeleton";
 export { MarketRow } from "./market-row";
 export { FeederMarkets } from "./feeder-markets";
