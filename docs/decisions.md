@@ -44,10 +44,11 @@ Each entry ends with a status:
   reasoning is not lost.
 
 Numbers quoted here were measured on 2026-09-17 against the live database,
-not copied from a plan. On that date the gates read: typecheck clean, 28
-test files and 193 tests passing, seed and verify agreeing on
+not copied from a plan. On that date the gates read: typecheck clean, 31
+test files and 241 tests passing, seed and verify agreeing on
 `730 days, 730 daily rows, 12,286 breakdown rows, 918 bookings, $408,745.44
-booking value, $29,521.54 ad spend, 4 campaigns, 24 events`.
+booking value, $29,521.54 ad spend, 4 campaigns, 24 events, 1,503 direct
+bookings in all` (last segment added 2026-09-17, D42).
 
 Identifiers (D1, D2, ...) are shared with the design spec in
 `docs/superpowers/specs/` and with the project's operating contract in
@@ -362,6 +363,34 @@ selection is reported, and that arrows disable at the ends.
 
 ---
 
+### D41. The dashboard warns about two more things
+
+**We chose:** two more Watch rules. Ad spend per booking up 30% or more
+against the previous period, paired with what Autumn does about it; and a
+feeder market that sent three or more bookings the period before and none
+now. The "Other" bucket is exempt, because it is every small market folded
+together, not a place.
+
+**Instead of:** leaving "Is anything concerning?" to the two rules that
+existed (booking value down, click-through down), which would stay silent
+while a booking quietly took twice the advertising to win or a city stopped
+sending guests.
+
+**Why:** those are the two things an account manager notices first. Spend
+per booking is Autumn's cost, not the owner's, and the copy says so; it is
+still the earliest signal of competition or a slow stretch, and the owner
+should hear it from the dashboard before a slower month.
+
+**How we know it holds:** `tests/insights.test.ts` builds the fixtures by
+hand: $1,500 over 40 bookings against $1,500 over 60 fires (up 50%); against
+50 does not (up 25%); a previous period under five bookings never compares.
+Chicago at 4 then 0 fires; Detroit at 2 then 0 and Other at 6 then 0 do not.
+Both tests were red before the rules existed.
+
+**Status:** verified 2026-09-17.
+
+---
+
 ## 2. The data and how it is generated
 
 ### D21. Two tables at two grains
@@ -582,6 +611,44 @@ against travel-agency commission, a rising campaign, a click-through drop
 paired with what Autumn does about it, a new market, phone share, the
 latest event) with titles and ordering computed by hand. Watches sort
 first.
+
+**Status:** verified 2026-09-17.
+
+---
+
+### D42. All direct bookings are stored beside Autumn's
+
+**We chose:** a column on `daily_metrics`, `all_direct_bookings`: every
+direct booking the property took that day, from any source. Autumn's
+`bookings` is a subset, enforced by a check constraint. The headline reads
+"80 of your 112 direct bookings" instead of "80", the way the traffic page
+already reads "1,548 people, about 1 in 8 of the 12,679 visits". The seed
+draws the organic part (season, a slow 5%/yr drift, no ramp, no campaign
+events) from its own random stream, seeded one past the main constant.
+
+**Instead of:** leaving the headline as Autumn's count alone, which answers
+"did Autumn grow" when the owner asked "did Autumn help". 80 out of 85 and
+80 out of 800 read the same and mean the opposite. A bookings table with a
+source per row was the other option and was not taken: the two-grain model
+(D21) stands, and one denominator is what the question needs.
+
+**Why:** the brief's first question is "Did Autumn help me get more direct
+bookings?", and "more" wants a baseline the schema did not hold. A separate
+stream for the organic draw means every column seeded before it kept its
+bytes (918 bookings, $408,745.44, the same acceptance line plus one
+segment), so no screenshot or quoted figure moved.
+
+**How we know it holds:** `tests/seed-generators.test.ts` asserts the
+column is never below Autumn's on any day, that Autumn's share rises from
+the first winter to the last 90 days (48% to 69% measured), and that
+neutralising a campaign event leaves the organic part identical on all 730
+days while Autumn's bookings move. Drawing the organic part from the shared
+stream instead turned that last test red, and the existing causality test
+with it. `tests/queries/schema.test.ts` inserts a day with more Autumn
+bookings than direct bookings and expects the constraint to refuse it.
+`tests/queries/overview.test.ts` reads 3 of 10 from hand-built rows.
+`db:verify` re-derives the total from `SUM`. The migration is three files,
+because a live table needs the backfill before the check.
 
 **Status:** verified 2026-09-17.
 

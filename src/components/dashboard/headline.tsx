@@ -1,6 +1,6 @@
 import type { OverviewDto } from "@/lib/db/queries";
 import { comparisonsCoincide, type DateRange } from "@/lib/date-range";
-import { money, rangeLabel } from "@/lib/format";
+import { count, money, rangeLabel } from "@/lib/format";
 import { DeltaText } from "@/components/copy";
 
 /** The answer, in one sentence (D1). The only large type on the page. */
@@ -13,7 +13,16 @@ export function Headline({ overview: o, range }: { overview: OverviewDto; range:
         {range.label} · {rangeLabel(o.current.from, o.current.to)}
       </p>
       <h1 className="max-w-4xl text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-        Autumn brought you <span className="tabular-nums">{o.current.bookings} direct bookings</span> worth{" "}
+        Autumn brought you{" "}
+        {o.current.shareOfDirectBookings !== null ? (
+          <>
+            <span className="tabular-nums">{o.current.bookings} of your {count(o.current.allDirectBookings)} direct bookings</span>, worth{" "}
+          </>
+        ) : (
+          <>
+            <span className="tabular-nums">{o.current.bookings} direct bookings</span> worth{" "}
+          </>
+        )}
         <span className="tabular-nums">{money(o.current.bookingValueCents)}</span>. You kept{" "}
         <span className="tabular-nums">{money(o.current.netCents)}</span> after Autumn&apos;s {o.feeRateBps / 100}% fee.
       </h1>

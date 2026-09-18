@@ -15,6 +15,7 @@ const totals = (p: Partial<PeriodTotals>): PeriodTotals => ({
   bookingValueCents: 3799300, feeCents: 569895, netCents: 3229405,
   newVisitors: 1116, siteSessions: 1594, pageviews: 5420, pagesPerSession: 3.4, spendCents: 262000,
   ctr: 0.167, conversion: 0.05, avgBookingValueCents: 48709,
+  allDirectBookings: 131, shareOfDirectBookings: 78 / 131,
   ...p,
 });
 

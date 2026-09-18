@@ -5,7 +5,7 @@ import type { BreakdownRowDto } from "@/lib/db/queries/breakdowns";
 import { parseRange } from "@/lib/date-range";
 
 const range = parseRange("30d", "2024-09-17", "2026-09-16");
-const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, siteSessions: 7142, pageviews: 24283, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, spendCents: 150000, ...o });
+const totals = (o: Partial<PeriodTotals> = {}): PeriodTotals => ({ from: "", to: "", days: 30, impressions: 6000, clicks: 1000, websiteVisits: 970, bookings: 40, bookingValueCents: 2000000, feeCents: 300000, netCents: 1700000, newVisitors: 5000, siteSessions: 7142, pageviews: 24283, pagesPerSession: 3.4, ctr: 1 / 6, conversion: 0.04, avgBookingValueCents: 50000, spendCents: 150000, allDirectBookings: 100, shareOfDirectBookings: 0.4, ...o });
 const overview = (o: Partial<OverviewDto> = {}): OverviewDto => ({ current: totals(), previous: totals(), lastYear: totals(), feeRateBps: 1500, costPerBookingCents: 7500, otaCommissionPerBookingCents: 9000, commissionAvoidedCents: 360000, ...o });
 const row = (value: string, o: Partial<BreakdownRowDto> = {}): BreakdownRowDto => ({ value, label: value, impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, feeCents: 37500, spendCents: 10000, ctr: 0.1, conversion: 0.05, shareOfBookings: 0.5, shareOfClicks: 0.5, previous: { impressions: 1000, clicks: 100, bookings: 5, bookingValueCents: 250000, spendCents: 0 }, ...o });
 const none = { campaign: [], device: [], feeder_market: [] };
@@ -46,6 +46,27 @@ describe("computeInsights", () => {
     expect(out.map((i) => i.kind)).toEqual(["watch", "win", "action"]);
     expect(out[0].title).toBe("Fewer people clicked the discovery & competitors ads");
     expect(out[1].title).toBe("Brand Protection brought 4 more bookings than before");
+  });
+  it("ad spend per booking up 30% or more is a watch with Autumn's response paired to it", () => {
+    // Now: $1,500 over 40 bookings = $37.50 each. Before: $1,500 over 60 = $25.00. Up 50%.
+    const out = computeInsights({ overview: overview({ previous: totals({ bookings: 60 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range });
+    expect(out.map((i) => i.id)).toEqual(["spend-per-booking-up", "spend-action"]);
+    expect(out[0]).toMatchObject({ kind: "watch", title: "Each booking took more advertising to win" });
+    expect(out[0].body).toContain("$37.50");
+    expect(out[0].body).toContain("$25.00");
+    expect(out[0].chart).toEqual({ kind: "bars", format: "money", bars: [{ label: "Now", value: 3750, tone: "current" }, { label: "Before", value: 2500, tone: "previous" }] });
+    expect(out[1].kind).toBe("action");
+    // Up 25% ($37.50 vs $30.00) stays quiet; so does a previous period too small to compare against.
+    expect(computeInsights({ overview: overview({ previous: totals({ bookings: 50 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range })).toEqual([]);
+    expect(computeInsights({ overview: overview({ previous: totals({ bookings: 4, spendCents: 5000 }), costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: none, range })).toEqual([]);
+  });
+  it("a city that sent three or more bookings and now sends none is a watch; the Other bucket never is", () => {
+    const quiet = (value: string, before: number) => row(value, { bookings: 0, previous: { impressions: 500, clicks: 50, bookings: before, bookingValueCents: 150000, spendCents: 0 } });
+    const out = computeInsights({ overview: overview({ costPerBookingCents: null, otaCommissionPerBookingCents: null }), breakdowns: { ...none, feeder_market: [quiet("Chicago, IL", 4), quiet("Other", 6), quiet("Detroit, MI", 2)] }, range });
+    expect(out.map((i) => i.id)).toEqual(["market-quiet-Chicago, IL"]);
+    expect(out[0]).toMatchObject({ kind: "watch", title: "No bookings from Chicago, IL this period" });
+    expect(out[0].body).toContain("4 the period before");
+    expect(out[0].chart).toEqual({ kind: "bars", format: "count", bars: [{ label: "Now", value: 0, tone: "current" }, { label: "Before", value: 4, tone: "previous" }] });
   });
   it("new market and phone share, and the limit holds", () => {
     const out = computeInsights({ overview: overview({ current: totals({ bookingValueCents: 2400000, bookings: 60 }) }), breakdowns: {

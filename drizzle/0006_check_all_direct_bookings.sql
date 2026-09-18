@@ -1,0 +1,1 @@
+ALTER TABLE "daily_metrics" ADD CONSTRAINT "daily_metrics_all_direct_bookings_check" CHECK ("daily_metrics"."all_direct_bookings" >= "daily_metrics"."bookings");

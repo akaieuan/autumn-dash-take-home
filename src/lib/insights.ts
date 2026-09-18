@@ -3,7 +3,7 @@ import type { BreakdownRowDto } from "./db/queries/breakdowns";
 import type { EventImpactDto } from "./db/queries/events";
 import type { Dimension } from "./db/schema";
 import type { DateRange } from "./date-range";
-import { cap, delta, longDate, money, oneIn, pct } from "./format";
+import { cap, delta, longDate, money, moneyExact, oneIn, pct } from "./format";
 import { comparisonsCoincide } from "./date-range";
 
 /**
@@ -76,6 +76,23 @@ export function computeInsights({ overview, breakdowns, range, events = [] }: In
       out.push({ id: `ctr-action-${c.value}`, kind: "action", title: `What Autumn does when clicks fall`, body: `Ad copy and bids on ${c.label.toLowerCase()} searches are refreshed automatically; you don't need to do anything.` });
       break;
     }
+  }
+
+  // 4b. Ad spend per booking. Autumn funds the ads, so this is not the owner's cost, but a booking that takes
+  // more advertising to win is the earliest sign of competition or a slow stretch, and an owner would want to hear
+  // it from the dashboard before hearing it from a slower month.
+  if (prev && cmp && prev.bookings >= 5 && cur.bookings > 0 && !comparisonsCoincide(range)) {
+    const now = Math.round(cur.spendCents / cur.bookings), before = Math.round(prev.spendCents / prev.bookings);
+    if (before > 0 && now >= before * 1.3) {
+      out.push({ id: "spend-per-booking-up", kind: "watch", title: "Each booking took more advertising to win", body: `Autumn spent ${moneyExact(now)} on ads for each booking, up from ${moneyExact(before)} ${cmp.prevLabel}. Autumn pays for the ads, not you, but it usually means more competition for the same searches.`, chart: nowBefore("money", now, before) });
+      out.push({ id: "spend-action", kind: "action", title: "What Autumn does when bookings cost more", body: "Budget moves toward the campaigns and cities that are still converting, and bids come down where they are not; you don't need to do anything." });
+    }
+  }
+
+  // 4c. A city that used to send guests and sent none this period. "Other" is every small market folded together, not a place.
+  for (const m of breakdowns.feeder_market ?? []) {
+    if (m.value === "Other" || !m.previous || m.previous.bookings < 3 || m.bookings !== 0) continue;
+    out.push({ id: `market-quiet-${m.value}`, kind: "watch", title: `No bookings from ${m.label} this period`, body: `It sent ${m.previous.bookings} the period before. One quiet stretch is normal for a drive market; two in a row is worth asking Autumn about.`, chart: nowBefore("count", 0, m.previous.bookings) });
   }
 
   // 5. A market that produced bookings for the first time.

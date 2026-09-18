@@ -9,7 +9,7 @@ export type GlossaryKey =
   | "direct_bookings" | "booking_value" | "autumn_fee" | "net_revenue" | "avg_booking_value"
   | "impressions" | "clicks" | "website_visits" | "ctr" | "conversion"
   | "cost_per_booking" | "ota_commission" | "new_visitors" | "pages_per_session"
-  | "campaign" | "device" | "feeder_market" | "spend" | "events"
+  | "campaign" | "device" | "feeder_market" | "spend" | "events" | "all_direct_bookings"
   | CampaignKey | DeviceKey;
 
 export interface GlossaryEntry { label: string; industryTerm?: string; meaning: string; purpose?: string }
@@ -18,6 +18,7 @@ export const glossary: Record<GlossaryKey, GlossaryEntry> = {
   spend: { label: "What Autumn spent on ads", industryTerm: "ad spend", meaning: "The money Autumn paid Google to show your ads. Autumn funds this; you only pay the fee on bookings it brings." },
   events: { label: "What Autumn did", meaning: "Changes Autumn made to your campaigns: launches, budget and bid changes, refreshed ads, seasonal pushes. Each one can be compared before and after." },
   direct_bookings: { label: "Direct bookings from Autumn", industryTerm: "attributed bookings", meaning: "Stays booked on your own website after a guest saw or clicked an ad Autumn ran for you." },
+  all_direct_bookings: { label: "All your direct bookings", industryTerm: "total direct bookings", meaning: "Every stay booked with you directly in the period, whether or not Autumn had a hand in it: guests who typed your name, phoned, or came back on their own. Autumn's bookings are part of this number, never on top of it." },
   booking_value: { label: "Booking value", meaning: "The room revenue from those stays, before any fee." },
   autumn_fee: { label: "Autumn's fee", meaning: "Autumn pays for the ads and charges a percentage only on bookings it brought you. This is that amount for the period." },
   net_revenue: { label: "What you kept", meaning: "Booking value minus Autumn's fee. Money that stayed with the hotel." },

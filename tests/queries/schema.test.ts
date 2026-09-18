@@ -21,4 +21,12 @@ describe("migration", () => {
     await expect(db.execute(sql`insert into breakdowns (date, dimension, dimension_value, impressions, clicks, bookings, booking_value) values ('2026-01-01', 'typo', 'x', 0, 0, 0, 0)`)).rejects.toThrow();
     await close();
   });
+  it("refuses a day where Autumn's bookings exceed all direct bookings", async () => {
+    const { db, close } = await makeTestDb();
+    await db.execute(sql`insert into daily_metrics values ('2026-01-02', 1, 1, 1, 2, 0, 1, 3.1, 0, 0, 0, 2)`);
+    await expect(db.execute(sql`insert into daily_metrics values ('2026-01-03', 1, 1, 1, 2, 0, 1, 3.1, 0, 0, 0, 1)`)).rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/all_direct_bookings_check/) }) });
+    const rows = await db.execute(sql`select count(*)::int as n from daily_metrics where date >= '2026-01-02'`);
+    expect(rows.rows[0].n).toBe(1);
+    await close();
+  });
 });

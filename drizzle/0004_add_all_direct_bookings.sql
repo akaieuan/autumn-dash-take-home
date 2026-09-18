@@ -1,0 +1,1 @@
+ALTER TABLE "daily_metrics" ADD COLUMN "all_direct_bookings" integer DEFAULT 0 NOT NULL;

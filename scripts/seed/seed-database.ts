@@ -21,13 +21,15 @@ export async function seedDatabase(db: AnyDb, data: SeedData, chunk = 1000): Pro
     bookings: data.daily.reduce((s, d) => s + d.bookings, 0),
     bookingValue: sumCents(data.daily, "bookingValue"), spend: sumCents(data.daily, "spend"),
     campaigns: data.campaigns.length, events: data.events.length,
+    allDirectBookings: data.daily.reduce((s, d) => s + d.allDirectBookings, 0),
   };
 }
 
 /** Re-measure from the database itself. Also proves every dimension reconciles with the daily totals, spend included. */
 export async function verifyDatabase(db: AnyDb): Promise<{ acceptance: Acceptance; reconciled: Record<string, boolean> }> {
   const [d] = rowsOf<Record<string, number | string>>(await db.execute(sql`select count(*)::int as n, count(distinct date)::int as days, min(date)::text as lo, max(date)::text as hi,
-    coalesce(sum(bookings), 0)::int as bookings, coalesce(sum(booking_value), 0)::float8 as value, coalesce(sum(spend), 0)::float8 as spend from daily_metrics`));
+    coalesce(sum(bookings), 0)::int as bookings, coalesce(sum(booking_value), 0)::float8 as value, coalesce(sum(spend), 0)::float8 as spend,
+    coalesce(sum(all_direct_bookings), 0)::int as all_direct from daily_metrics`));
   const [b] = rowsOf<{ n: number }>(await db.execute(sql`select count(*)::int as n from breakdowns`));
   const [c] = rowsOf<{ n: number }>(await db.execute(sql`select count(*)::int as n from campaigns`));
   const [e] = rowsOf<{ n: number }>(await db.execute(sql`select count(*)::int as n from campaign_events`));
@@ -44,7 +46,7 @@ export async function verifyDatabase(db: AnyDb): Promise<{ acceptance: Acceptanc
     acceptance: {
       days: Number(d.days), from: String(d.lo), to: String(d.hi), dailyRows: Number(d.n), breakdownRows: Number(b.n),
       bookings: Number(d.bookings), bookingValue: Math.round(Number(d.value) * 100) / 100, spend: Math.round(Number(d.spend) * 100) / 100,
-      campaigns: Number(c.n), events: Number(e.n),
+      campaigns: Number(c.n), events: Number(e.n), allDirectBookings: Number(d.all_direct),
     },
     reconciled,
   };

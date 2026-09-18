@@ -26,7 +26,9 @@ describe("getOverview", () => {
       bookingValueCents: 125050, feeCents: 18758, netCents: 106292, newVisitors: 2700,
       siteSessions: 3600, pageviews: 13250, pagesPerSession: 3.68,
       avgBookingValueCents: 41683, spendCents: 4500,
+      allDirectBookings: 10, shareOfDirectBookings: 0.3, // 3 of 5 + 3 + 2
     });
+    expect(o.previous).toMatchObject({ allDirectBookings: 4, shareOfDirectBookings: 0.25 });
     expect(o.current.ctr).toBeCloseTo(0.12, 6);
     expect(o.current.conversion).toBeCloseTo(0.005, 6);
     expect(o.previous).toMatchObject({ bookings: 1, bookingValueCents: 30000, clicks: 50 });

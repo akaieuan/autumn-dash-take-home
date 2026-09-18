@@ -3,7 +3,7 @@ import { DIMENSIONS } from "@/lib/db/schema";
 import { dayOfWeek, daysBetween, eachDay } from "@/lib/date-range";
 import { makeRng, type Rng } from "./rng";
 import { apportion, apportionByDraw } from "./apportion";
-import { BASE_IMPRESSIONS_PER_DAY, CAMPAIGN_META, CAMPAIGN_WEIGHT_TOTAL, CLICK_THROUGH_RATE, DIMENSION_DEFS, EVENTS, SEED, WINDOW, avgBookingValueCents, conversionRate, demandMultiplier, eventMultipliers, growth, ramp } from "./profile";
+import { BASE_IMPRESSIONS_PER_DAY, CAMPAIGN_META, CAMPAIGN_WEIGHT_TOTAL, CLICK_THROUGH_RATE, DIMENSION_DEFS, EVENTS, ORGANIC_BOOKINGS_PER_DAY, SEED, WINDOW, avgBookingValueCents, conversionRate, demandMultiplier, eventMultipliers, growth, organicGrowth, ramp } from "./profile";
 
 const cents = (c: number) => Math.round(c) / 100;
 
@@ -24,8 +24,13 @@ export function campaignPlan(date: string): CampaignPlan[] {
 }
 
 /** Step 1: one row per day. The level is the sum of the campaigns' plans, so launches and budget changes move the totals. */
-export function generateDaily(rng: Rng): DailyMetricRow[] {
-  let carry = 0;
+/**
+ * `organicRng` is its own stream: the bookings Autumn did not bring must not shift when a campaign
+ * effect changes, and adding them must not move a single byte of the columns seeded before them.
+ */
+export type DailyRow = DailyMetricRow & { allDirectBookings: number };
+export function generateDaily(rng: Rng, organicRng: Rng = makeRng(SEED + 1)): DailyRow[] {
+  let carry = 0, organicCarry = 0;
   return eachDay(WINDOW.start, WINDOW.end).map((date) => {
     const plan = campaignPlan(date);
     const planned = plan.reduce((s, p) => s + p.weight, 0);
@@ -50,7 +55,11 @@ export function generateDaily(rng: Rng): DailyMetricRow[] {
     const newVisitors = Math.min(siteSessions, rng.poisson(siteSessions * (0.66 + rng.next() * 0.08)));
     const pageviews = Math.round(siteSessions * Math.min(5, Math.max(2.2, rng.normal(3.4, 0.28))));
     const pagesPerSession = siteSessions ? Math.round((pageviews / siteSessions) * 100) / 100 : 0;
-    return { date, impressions, clicks, websiteVisits, bookings, bookingValue: cents(valueCents), newVisitors, siteSessions, pageviews, pagesPerSession, spend: 0 };
+    // Direct bookings from every other source, same error diffusion, no ramp and no event effects.
+    const organicExpected = ORGANIC_BOOKINGS_PER_DAY * demandMultiplier(date) * organicGrowth(date) * (0.8 + organicRng.next() * 0.4) + organicCarry;
+    const organic = Math.max(0, Math.floor(organicExpected));
+    organicCarry = organicExpected - organic;
+    return { date, impressions, clicks, websiteVisits, bookings, bookingValue: cents(valueCents), newVisitors, siteSessions, pageviews, pagesPerSession, spend: 0, allDirectBookings: bookings + organic };
   });
 }
 
@@ -71,7 +80,7 @@ function weightsFor(dim: Dimension, date: string): number[] {
  * devices and markets then split that spend by their clicks. Every metric,
  * spend included, sums exactly to the day.
  */
-export function generateBreakdowns(rng: Rng, daily: DailyMetricRow[]): BreakdownRow[] {
+export function generateBreakdowns(rng: Rng, daily: DailyRow[]): BreakdownRow[] {
   const rows: BreakdownRow[] = [];
   for (const day of daily) {
     const plan = campaignPlan(day.date);
@@ -119,7 +128,7 @@ export function generateEvents(): CampaignEventRow[] {
 
 export function generateAll(seed = SEED) {
   const rng = makeRng(seed);
-  const daily = generateDaily(rng);
+  const daily = generateDaily(rng, makeRng(seed + 1));
   const breakdowns = generateBreakdowns(rng, daily); // also fills daily[].spend
   return { daily, breakdowns, campaigns: generateCampaigns(), events: generateEvents() };
 }
