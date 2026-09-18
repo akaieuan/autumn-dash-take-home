@@ -49,7 +49,8 @@ export function DayCard({
 }) {
   const eyebrow = mode === "hover" ? "Pointing at" : "Kept open";
   const shell = cn("flex min-h-(--card-day-stacked) min-w-0 flex-col gap-3 rounded-(--r-in) bg-background p-(--panel-pad) @lg:min-h-(--card-day)", className);
-  const row1 = "grid grid-cols-2 gap-3 @lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]";
+  // Two abreast when narrow; from 32rem the date takes a line of its own over four readings; from 42rem one row of five.
+  const row1 = "grid grid-cols-2 gap-3 @lg:grid-cols-4 @2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]";
   const row2 = "grid grid-cols-2 gap-3 border-t border-border pt-3 @md:grid-cols-3";
 
   if (day === null) {
@@ -75,16 +76,17 @@ export function DayCard({
     : "No ranking for a day without data";
 
   const weekNote = week?.busiest ? `busiest on ${WEEKDAY_FULL[weekdayOf(week.busiest)]}` : week ? "no data that week" : null;
+  // Short enough for a third of the band: "Busiest month · +8% vs Aug", "3rd of 9 months · -4% vs Jul".
   const monthNote = month
-    ? `${month.rank === 1 ? "Your busiest month" : `${ordinal(month.rank)} busiest of ${count(month.count)} months`}${
-        month.deltaPct === null ? "" : ` · ${month.deltaPct > 0 ? "+" : ""}${month.deltaPct}% vs the month before`
+    ? `${month.rank === 1 ? "Busiest month" : `${ordinal(month.rank)} of ${count(month.count)} months`}${
+        month.deltaPct === null || month.before === null ? "" : ` · ${month.deltaPct > 0 ? "+" : ""}${month.deltaPct}% vs ${month.before}`
       }`
     : null;
 
   return (
     <aside aria-label="Selected day" className={shell}>
       <div className={row1}>
-        <div className="col-span-2 flex min-w-0 flex-col gap-0.5 @lg:col-span-1">
+        <div className="col-span-2 flex min-w-0 flex-col gap-0.5 @lg:col-span-4 @2xl:col-span-1">
           <Eyebrow>{eyebrow}</Eyebrow>
           <p className="truncate text-[18px] font-semibold leading-tight tabular-nums">{`${weekdayDate(day.date)}, ${day.date.slice(0, 4)}`}</p>
           <span className="min-h-4 truncate text-[11px] text-muted-foreground">{rankLine}</span>

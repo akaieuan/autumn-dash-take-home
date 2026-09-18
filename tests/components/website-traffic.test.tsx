@@ -94,7 +94,8 @@ describe("DayCard band", () => {
     const band = card();
     expect(band.className).toContain("min-h-(--card-day-stacked)"); // cells two abreast when narrow
     expect(band.className).toContain("@lg:min-h-(--card-day)");     // two rows once its container is 32rem
-    expect(band.firstElementChild?.className).toContain("@lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]");
+    expect(band.firstElementChild?.className).toContain("@lg:grid-cols-4");   // the date on its own line over four readings
+    expect(band.firstElementChild?.className).toContain("@2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]"); // one row of five
   });
   it("reads the day's rank as one line: where it sits in the range and among its own weekday", () => {
     const day = days.find((d) => d.date === "2026-08-12") as ActivityDay;
@@ -119,31 +120,40 @@ describe("ActivityCalendar", () => {
     // 2026-08-18 is a Tuesday: two blanks lead, and 2 + 30 = 32 cells fill five columns of seven.
     const { container } = render(<ActivityCalendar {...d30} />);
     const grid = dayGrid(container) as HTMLElement;
-    expect(grid.children).toHaveLength(32);
-    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(2);
+    // Padded to twenty-six columns, the days at the right: 21 empty columns, two cells to bring the
+    // first day to its weekday, the thirty days, then three to finish the last column.
+    expect(grid.children).toHaveLength(182);
+    expect(grid.querySelectorAll("[data-outside]")).toHaveLength(147);
+    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(5);
+    expect(grid.children[146].hasAttribute("data-outside")).toBe(true);
+    // Every cell outside the range is drawn, never hidden, so the block is a solid rectangle.
+    for (const b of grid.querySelectorAll("[data-blank]")) expect(b.className).not.toContain("invisible");
+    // Half the padding is the wide panel's: below 42rem the grid keeps thirteen columns.
+    expect(grid.querySelector("[data-outside]")?.className).toContain("hidden");
+    expect(grid.querySelector("[data-outside]")?.className).toContain("@2xl:block");
+    // and there it caps the squares, so five columns are not five slabs on a phone
+    expect(dayStage(container)?.getAttribute("style")).toContain("13 * 2.25rem");
+    expect(dayStage(container)?.className).toContain("@2xl:max-w-none");
     expect(cells(container)).toHaveLength(30);
+    expect([...grid.children].at(-1)?.hasAttribute("data-blank")).toBe(true);
     expect(grid.className).toContain("grid-rows-7");
     expect(container.querySelectorAll("[data-weekday-head]")).toHaveLength(0);
     expect(tile(container, "2026-08-18")?.textContent).toBe("");                 // no number inside a square
     // The grid is capped at 1.5rem a square, so five columns stay a compact block beside the legend.
-    const cap = dayStage(container)?.getAttribute("style") as string;
-    expect(cap).toContain("max-width: calc(");
-    expect(cap).toContain("7.5rem");   // 5 × 1.5rem of squares
-    expect(cap).toContain("12px");     // 4 gaps of 3px
+
     expect(blocks(container)).toHaveLength(0);
   });
 
   it("draws thirteen columns of day squares for 90 days, with nothing written inside a square", () => {
     const { container } = render(<ActivityCalendar {...d90} />);
     const grid = dayGrid(container) as HTMLElement;
-    expect(grid.children).toHaveLength(91);                                  // 1 leading blank + 90 days
-    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(1);
-    expect(Math.ceil(grid.children.length / 7)).toBe(13);
+    expect(grid.children).toHaveLength(182);                                 // the same twenty-six columns
+    expect(grid.querySelectorAll("[data-outside]")).toHaveLength(91);        // thirteen empty columns lead
+    expect(grid.querySelectorAll("[data-blank]")).toHaveLength(1);           // 2026-06-15 is a Monday
     expect(cells(container)).toHaveLength(90);
     expect(tile(container, "2026-08-12")?.textContent).toBe("");
-    const cap = dayStage(container)?.getAttribute("style") as string;
-    expect(cap).toContain("19.5rem");  // 13 × 1.5rem of squares
-    expect(cap).toContain("36px");     // 12 gaps of 3px
+    // The band is always under the grid, never beside it (owner, 2026-09-17), so it is not in the grid's row.
+    expect(dayStage(container)?.parentElement?.contains(card())).toBe(false);
     expect(blocks(container)).toHaveLength(0);
   });
 
@@ -235,10 +245,12 @@ describe("ActivityCalendar", () => {
     // whole grid. Tiles carry colour and a corner, never an inset shadow.
     const ninety = render(<ActivityCalendar {...d90} />);
     for (const t of cells(ninety.container)) expect(t.className).not.toContain("inset");
+    // A padded ninety days is twenty-six columns, where the 4px corner still reads; a year is
+    // fifty-three, where a square is ~16px and 4px would read as a circle.
     expect(tile(ninety.container, "2026-08-12")?.className).toContain("rounded-(--radius-min)");
     ninety.unmount();
     const year = render(<ActivityCalendar {...d12m} />);
-    expect(tile(year.container, "2026-08-12")?.className).toContain("rounded-(--radius-tile)"); // 53 columns: a 4px corner on a 10px square reads as a circle
+    expect(tile(year.container, "2026-08-12")?.className).toContain("rounded-(--radius-tile)");
     for (const t of cells(year.container)) expect(t.className).not.toContain("inset");
   });
 
@@ -252,7 +264,7 @@ describe("ActivityCalendar", () => {
     // August is 2,853 against July's 1,593: the busiest of the four months, +79%.
     expect(within(band).getByText("Aug 2026")).toBeInTheDocument();
     expect(within(band).getByText("2,853")).toBeInTheDocument();
-    expect(within(band).getByText("Your busiest month · +79% vs the month before")).toBeInTheDocument();
+    expect(within(band).getByText("Busiest month · +79% vs Jul")).toBeInTheDocument();
     expect(within(band).queryAllByRole("button")).toHaveLength(0); // figures, not the week strip's bars
   });
 

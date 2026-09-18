@@ -25,10 +25,16 @@ export type CalendarRange = Pick<DateRange, "preset" | "from" | "to">;
 type Stage = "squares" | "both" | "blocks";
 const STAGE: Record<DateRange["preset"], Stage> = { "30d": "squares", "90d": "squares", ytd: "both", "12m": "both", all: "blocks" };
 
-/** A square is never wider than this: five columns of thirty days must not become five 150px slabs (owner, 2026-09-17). */
-const TILE_MAX_REM = 1.5;
-/** The weekday gutter (w-7) plus its gap (gap-x-2), so the capped width covers the whole grid row. */
-const GUTTER_REM = 2.25;
+/**
+ * A short range is padded out with empty cells so the grid always fills the row and the days sit at
+ * the right, the way a year of contributions reads: the window runs backwards from the last day with
+ * data (owner, 2026-09-17). The pad is half a year on a wide panel and a quarter on a narrow one,
+ * which is what keeps a square in the same size band at every range and every width — padding every
+ * range out to a full year made a square 16px on a desktop, and padding none made thirty days five
+ * slabs on a phone. A range longer than the pad simply draws its own columns.
+ */
+const PAD_WIDE = 26;
+const PAD_NARROW = 13;
 
 const STEP: Record<string, number> = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1, PageDown: 28, PageUp: -28 };
 
@@ -70,17 +76,23 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
   const week = weekSummary(days, shownDate);
   const month = monthContext(days, shownDate);
 
-  // The grid pads its first column so day one sits under its own weekday; the columns are the weeks
-  // the padded days fill. Fifty-three columns of squares are 10px wide: a 4px corner reads as a
-  // circle and a 3px gap eats the tile, so past twenty-six columns both tighten.
+  // The grid pads its first column so day one sits under its own weekday, and its tail so the row is
+  // always fifty-three columns. A square at that width is ~16px, where a 4px corner reads as a circle
+  // and a 3px gap eats the tile, so the whole grid uses the 2px corner and the 2px gap.
   const leading = days.length === 0 ? 0 : weekdayOf(days[0].date);
-  const columns = Math.ceil((leading + days.length) / 7);
   const lead = days.length === 0 ? [] : Array.from({ length: leading }, (_, i) => addDays(days[0].date, i - leading));
-  const dense = columns > 26;
-  const gapPx = dense ? 2 : 3;
-  // One inline size, computed from the column count, never from the viewport: the cap that keeps a
-  // square a square. Thirty days are a compact five columns; a year still uses the whole width.
-  const gridMax = `calc(${columns} * ${TILE_MAX_REM}rem + ${Math.max(0, columns - 1)} * ${gapPx}px + ${GUTTER_REM}rem)`;
+  // The range ends at the right edge and the empty cells lead, because the window runs backwards from
+  // the last day with data — the same way a year of contributions reads (owner, 2026-09-17). `head` is
+  // whole columns, so every day still sits on its own weekday row; `tail` finishes the last column.
+  const head = Math.max(0, Math.floor((PAD_WIDE * 7 - leading - days.length) / 7) * 7);
+  const tail = (7 - ((head + leading + days.length) % 7)) % 7;
+  const columns = (head + leading + days.length + tail) / 7;
+  /** Head columns past the narrow pad: drawn only from 42rem, so a phone keeps the bigger square. */
+  const wideOnlyColumns = Math.max(0, Math.min(head / 7, columns - PAD_NARROW));
+  const gapPx = 2;
+  // Below 42rem the grid draws only its own columns, so it needs the old cap or thirty days become
+  // five 55px slabs on a phone; from 42rem the empty cells fill the row and no cap applies.
+  const narrowMax = `calc(${PAD_NARROW} * 2.25rem + ${PAD_NARROW - 1} * ${gapPx}px + 2.25rem)`;
 
   // A month block is drawn wherever a day square cannot be. "12m" is 365 days, which touch thirteen
   // calendar months; the grid draws the twelve whole ones, so 4 x 3 never hangs a block alone.
@@ -90,8 +102,11 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
 
   // One cell per column for the month row: the label sits on the column its month starts in, blank otherwise.
   const monthByColumn = new Map(monthColumns([...lead.map((date) => ({ date })), ...days]).map((m, i) => [m.column, { label: m.label, odd: i % 2 === 1 }]));
-  const columnCells = Array.from({ length: columns }, (_, i) => ({ column: i + 1, month: monthByColumn.get(i + 1) ?? null }));
+  // A month label only over a column the range covers; the empty lead columns carry none.
+  const headColumns = head / 7;
+  const columnCells = Array.from({ length: columns }, (_, i) => ({ column: i + 1, head: i < wideOnlyColumns, month: i < headColumns ? null : monthByColumn.get(i + 1 - headColumns) ?? null }));
   const summary = `${count(total)} ${unit} from ${longDate(from)} to ${longDate(to)}`;
+
 
   // A day tile carries data-date; a month block carries data-busiest (its busiest day). Either pins that day.
   const dateUnder = (e: React.SyntheticEvent<HTMLDivElement>) => {
@@ -156,22 +171,23 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
           </p>
         }
       />
-      <PanelBody>
-        {/* One wrapping row, no measuring: the grid comes first at its capped width with its legend
-            under it; the band takes whatever is left beside a short grid (thirty or ninety days) and
-            drops under a long one (a year fills the row). The row is its own container, so a year
-            becomes month blocks by the room it actually has, never by the viewport (CLAUDE.md §2). */}
-        <div className="@container flex min-w-0 flex-wrap items-start gap-x-8 gap-y-5">
-          <div className="flex min-w-0 grow flex-col gap-3" style={{ flexBasis: gridMax, maxWidth: `max(${gridMax}, 18rem)` }}>
+      <PanelBody className="gap-(--stack-gap)">
+        {/* One column, always: the grid on top, the band under it, each the panel's full width. Side by
+            side was tried on 2026-09-17 and rejected by the owner — a short grid left half the row empty
+            and the band stretched to fill it, and the two columns re-proportioned at every width. The
+            row is its own container, so a year becomes month blocks by the room it has (CLAUDE.md §2). */}
+        <div className="@container flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-6 gap-y-3">
             {stage === "blocks" ? null : (
               <div
                 data-stage="days"
-                style={{ maxWidth: gridMax }}
-                className={cn("grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1", stage === "both" && "hidden @2xl:grid")}
+                data-columns={columns}
+                style={{ "--grid-max": narrowMax } as React.CSSProperties}
+                className={cn("grid min-w-0 basis-full grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 max-w-(--grid-max) @2xl:max-w-none", stage === "both" && "hidden @2xl:grid")}
               >
                 <div aria-hidden="true" className="col-start-2 row-start-1 grid h-4 grid-flow-col auto-cols-[minmax(0,1fr)] text-[10px] leading-4 text-muted-foreground" style={{ gap: gapPx }}>
                   {columnCells.map((w) => (
-                    <span key={w.column} className="min-w-0 overflow-visible whitespace-nowrap">
+                    <span key={w.column} className={cn("min-w-0 overflow-visible whitespace-nowrap", w.head && "hidden @2xl:block")}>
                       {w.month ? <span className={cn(w.month.odd && "hidden @md:inline")}>{w.month.label}</span> : null}
                     </span>
                   ))}
@@ -191,8 +207,22 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
                   className="col-start-2 row-start-2 grid grid-flow-col grid-rows-7 auto-cols-[minmax(0,1fr)]"
                   style={{ gap: gapPx }}
                 >
+                  {/* Before the range: the same cell, drawn empty, so every range is one shape filling the
+                      row. Only from 42rem, where a fifty-third of the panel is still a square you can see;
+                      below that the grid drops the padding and draws the range's own columns. */}
+                  {Array.from({ length: head }, (_, i) => (
+                    <div
+                      key={`head-${i}`}
+                      aria-hidden="true"
+                      data-outside=""
+                      className={cn("aspect-square w-full rounded-(--radius-min) bg-muted/40", i < wideOnlyColumns * 7 && "hidden @2xl:block")}
+                    />
+                  ))}
+                  {/* The days before the first one in its own week, and the rest of the last week after
+                      the last one: drawn as empty cells like the pad, so the block has no notch at
+                      either end (owner, 2026-09-17). */}
                   {lead.map((d) => (
-                    <div key={d} aria-hidden="true" data-blank="" className="invisible aspect-square w-full" />
+                    <div key={d} aria-hidden="true" data-blank="" className="aspect-square w-full rounded-(--radius-min) bg-muted/40" />
                   ))}
                   {days.map((d) => {
                     const level = heatLevel(d.value, max);
@@ -207,7 +237,7 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
                         tabIndex={d.date === pinnedDate ? 0 : -1}
                         className={cn(
                           "aspect-square w-full transition-transform motion-safe:hover:scale-110",
-                          dense ? "rounded-(--radius-tile)" : "rounded-(--radius-min)",
+                          columns > 26 ? "rounded-(--radius-tile)" : "rounded-(--radius-min)",
                           level === null ? EMPTY : LEVEL[level],
                           d.date === pinnedDate && "ring-2 ring-foreground ring-offset-1 ring-offset-card",
                           d.date !== pinnedDate && hover === d.date && "ring-2 ring-foreground/50",
@@ -215,6 +245,9 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
                       />
                     );
                   })}
+                  {Array.from({ length: tail }, (_, i) => (
+                    <div key={`tail-${i}`} aria-hidden="true" data-blank="" className="aspect-square w-full rounded-(--radius-min) bg-muted/40" />
+                  ))}
                 </div>
               </div>
             )}
@@ -225,14 +258,14 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
                 role="group"
                 aria-label={`Each block is a month: ${summary}`}
                 {...pointer}
-                className={cn("min-w-0", stage === "both" && "@2xl:hidden")}
+                className={cn("min-w-0 flex-1 basis-full", stage === "both" && "@2xl:hidden")}
               >
                 <MonthBlocks blocks={blocks} columns={blockColumns} unit={unit} pinnedDate={pinnedDate} max={blockMax} />
               </div>
             ) : null}
 
-            {/* What the window holds, what a block stands for while blocks are showing, and the ramp. */}
-            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {/* Beside a short grid where there is room for it, under a full-width one. */}
+            <div className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
               <span data-legend="">
                 <span className="font-medium tabular-nums text-foreground">{count(total)}</span> {unit} · {rangeLabel(from, to)}
               </span>
@@ -240,17 +273,17 @@ export function ActivityCalendar({ activity, range, unit = "visits", title = "Ev
               <span aria-hidden="true" className="inline-flex items-center gap-1">
                 Fewer
                 {LEVEL.map((c) => (
-                  <span key={c} className={cn("size-2.5", dense ? "rounded-(--radius-tile)" : "rounded-(--radius-min)", c)} />
+                  <span key={c} className={cn("size-2.5", columns > 26 ? "rounded-(--radius-tile)" : "rounded-(--radius-min)", c)} />
                 ))}
                 More
               </span>
             </div>
           </div>
+        </div>
 
-          {/* The band is its own container: five readings abreast when it has the room, two when it does not. */}
-          <div className="@container min-w-0 grow basis-[30rem]">
-            <DayCard day={shown} typical={typical} mode={hovered ? "hover" : "pinned"} unit={unit} rank={rank} week={week} month={month} />
-          </div>
+        {/* The band is its own container: five readings abreast when it has the room, two when it does not. */}
+        <div className="@container min-w-0">
+          <DayCard day={shown} typical={typical} mode={hovered ? "hover" : "pinned"} unit={unit} rank={rank} week={week} month={month} />
         </div>
       </PanelBody>
     </Panel>

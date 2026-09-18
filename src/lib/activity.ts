@@ -121,6 +121,8 @@ export interface MonthContext {
   rank: number;
   count: number;
   deltaPct: number | null;
+  /** The month before, by its short name, so a note can say "+8% vs Aug" in the room it has. Null with no month before. */
+  before: string | null;
 }
 
 export function monthContext(days: DayLike[], date: string | null): MonthContext | null {
@@ -136,6 +138,7 @@ export function monthContext(days: DayLike[], date: string | null): MonthContext
     rank: months.filter((m) => m.total > month.total).length + 1,
     count: months.length,
     deltaPct: before === null || before.total === 0 ? null : Math.round(((month.total - before.total) / before.total) * 100),
+    before: before === null ? null : monthShort(`${before.key}-01`),
   };
 }
 

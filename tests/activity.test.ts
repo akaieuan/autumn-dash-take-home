@@ -120,8 +120,8 @@ describe("dayRank", () => {
 describe("monthContext", () => {
   it("names the month, ranks it in the year and compares it with the month before", () => {
     // Aug 98, Sep 425 (monthTotals above): September is the busier and grew 334%.
-    expect(monthContext(DAYS, "2026-09-02")).toEqual({ label: "Sep 2026", total: 425, rank: 1, count: 2, deltaPct: 334 });
-    expect(monthContext(DAYS, "2026-08-24")).toEqual({ label: "Aug 2026", total: 98, rank: 2, count: 2, deltaPct: null });
+    expect(monthContext(DAYS, "2026-09-02")).toEqual({ label: "Sep 2026", total: 425, rank: 1, count: 2, deltaPct: 334, before: "Aug" });
+    expect(monthContext(DAYS, "2026-08-24")).toEqual({ label: "Aug 2026", total: 98, rank: 2, count: 2, deltaPct: null, before: null });
   });
   it("is null with no day picked, or for a month outside the data", () => {
     expect(monthContext(DAYS, null)).toBeNull();
