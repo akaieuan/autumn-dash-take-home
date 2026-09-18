@@ -6,6 +6,7 @@ export { EmptyState } from "./empty-state";
 export { CollapsibleSection } from "./collapsible-section";
 export { RangeSegment } from "./range-segment";
 export { RangeSelect } from "./range-select";
+export { ScreenSelect } from "./screen-select";
 export { TopBar, type Screen } from "./top-bar";
 export { AppShell } from "./app-shell";
 export { AppFrame } from "./app-frame";

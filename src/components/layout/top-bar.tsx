@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { MenuButton } from "./menu-button";
 import { RangeSegment } from "./range-segment";
 import { RangeSelect } from "./range-select";
+import { ScreenSelect } from "./screen-select";
 import { ThemeToggle } from "./theme-toggle";
 
 export type { Screen };
@@ -31,11 +32,14 @@ export function TopBar({
   metric?: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 px-(--page-gutter) pt-2 sm:px-[calc(var(--page-gutter)+0.5rem)]">
-      {/* One line at every width. The tabs can scroll if a screen is narrower than their text; nothing wraps. */}
-      <div className="flex h-14 items-center gap-1.5 rounded-(--r-header) border border-border/70 bg-background/75 px-2 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 lg:gap-4 lg:px-4">
+    <header className="sticky top-0 z-30 px-[calc(var(--page-gutter)+0.75rem)] pt-2 sm:px-[calc(var(--page-gutter)+0.5rem)]">
+      {/* One line at every width. On a phone the bar is shorter and inset further than the content
+          under it, a capsule rather than a full-width band (owner, 2026-09-17), and the two screens
+          collapse into one dropdown beside the menu button; from sm they are tabs. */}
+      <div className="flex h-12 items-center gap-1.5 rounded-(--r-header) border border-border/70 bg-background/75 px-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 sm:h-14 sm:px-2 lg:gap-4 lg:px-4">
         <MenuButton />
-        <nav aria-label="Screens" className="flex shrink-0 gap-1">
+        <ScreenSelect active={active} range={range} className="sm:hidden" />
+        <nav aria-label="Screens" className="hidden shrink-0 gap-1 sm:flex">
           {DASHBOARD_SCREENS.map((s) => (
             <Link
               key={s.key}

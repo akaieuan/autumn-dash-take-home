@@ -34,6 +34,15 @@ describe("TopBar", () => {
     fireEvent.click(menu);
     expect(menu.getAttribute("aria-expanded")).toBe("true");
   });
+  it("collapses the two screens into a dropdown on a phone, beside the menu button, and shows tabs from sm", () => {
+    const { container } = render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="website-traffic" range="90d" dataThrough="2026-09-16" basePath="/website-traffic" /></SidebarProvider></TooltipProvider>);
+    const select = screen.getByRole("combobox", { name: "Screen" });
+    expect(select.className).toContain("sm:hidden");
+    expect(select).toHaveTextContent("Website Traffic");
+    expect(container.querySelector("nav[aria-label=Screens]")?.className).toContain("hidden");
+    expect(container.querySelector("nav[aria-label=Screens]")?.className).toContain("sm:flex");
+    expect(container.querySelector("header")?.className).toContain("px-[calc(var(--page-gutter)+0.75rem)]"); // inset further than the content on a phone
+  });
   it("names the section, the two screens and the data date", () => {
     render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range="30d" dataThrough="2026-09-16" basePath="/" /></SidebarProvider></TooltipProvider>);
     expect(screen.queryByText("Dashboard")).toBeNull(); // the bar carries only the tabs and controls
@@ -45,7 +54,8 @@ describe("TopBar", () => {
   it("renders same-height placeholders while loading so the header never jumps", () => {
     const { container } = render(<TooltipProvider><SidebarProvider initialState="expanded"><TopBar active="overview" range={null} dataThrough={null} basePath="/" /></SidebarProvider></TooltipProvider>);
     expect(container.querySelector("header")?.className).toContain("sticky"); // the bar sticks on scroll
-    expect(container.querySelector("header > div")?.className).toContain("h-14"); // one fixed-height line at every width
+    expect(container.querySelector("header > div")?.className).toContain("h-12 "); // one fixed-height line: shorter on a phone
+    expect(container.querySelector("header > div")?.className).toContain("sm:h-14");
     expect(screen.queryByText(/Data through/)).toBeNull();
     expect(container.querySelectorAll("[data-slot=skeleton]").length).toBeGreaterThan(0);
   });
