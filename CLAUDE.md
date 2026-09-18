@@ -393,9 +393,12 @@ live in `docs/decisions.md` under the same identifier.
   next campaign, so it is `/website-traffic`, traffic explained through the
   campaigns that produce it (D31). Product-judgment value; changing it is a
   §4 gate.
-- **2026-09-17 — Default range (D3).** Last 30 days, compared to the previous
-  30 days AND the same 30 days one year earlier. Presets 30d, 90d, ytd, 12m,
-  all. The range lives in the URL (`?range=`) so both screens share it.
+- **2026-09-17 — Default range (D3).** First ruled as the last 30 days,
+  compared to the previous 30 days AND the same 30 days one year earlier.
+  Corrected 2026-09-17: the owner ruled the screens open on year to date, the
+  span the reference product shows; 30 days remains one click away and keeps
+  both comparisons. Presets 30d, 90d, ytd, 12m, all. The range lives in the
+  URL (`?range=`) so both screens share it.
 - **2026-09-17 — Data model (D21–D25, owner's ruling).** Two tables at two
   grains: `daily_metrics` (date PK) and `breakdowns` (day × dimension value,
   dimension ∈ campaign | device | feeder_market). Supabase Postgres over

@@ -106,23 +106,31 @@ pinned to their buckets, efficiency figures computed by hand),
 
 **Status:** verified 2026-09-17. D2 (Bookings) is superseded by D31.
 
-### D3. The default range is 30 days with two comparisons
+### D3. The screens open on year to date
 
-**We chose:** the last 30 days, compared to the previous 30 days and to the
-same 30 days one year earlier. Presets: 30 days, 90 days, year to date, 12
-months, all time. The range lives in the URL so both screens share it and
-links can be sent to someone else.
+**We chose:** year to date, compared with the same period last year. Presets:
+30 days, 90 days, year to date, 12 months, all time. The range lives in the
+URL so both screens share it and a link can be sent to someone else.
 
-**Instead of:** year to date, which is the reference product's default.
+**Instead of:** the last 30 days, which was the first ruling and is now one
+click away. That version compared the previous 30 days and the same 30 days a
+year earlier, and those two comparisons still appear on every preset short
+enough for them to mean different things.
 
-**Why:** "what changed since last month?" needs the previous period. "Is
-this seasonal or a problem?" needs last year. Year to date hides both behind
-a denominator that grows every day.
+**Why:** the owner's ruling, 2026-09-17. Two reasons, in order. The reference
+product opens on year to date, so an owner who knows the old dashboard lands
+somewhere familiar. And the year is the span that shows the season, which is
+what a hotel's numbers are mostly made of: thirty days of a shoulder month
+tells an owner less than the shape of the year around it. The first ruling
+argued the opposite, that "what changed since last month?" needs the previous
+period; that question is still answered, by one click and by the insights,
+which read the range they are given.
 
-**How we know it holds:** `tests/date-range.test.ts` checks the 30-day
-default, both comparison windows, that year-to-date collapses to one
-comparison and all-time has none, and that garbage input falls back to the
-default.
+**How we know it holds:** `tests/date-range.test.ts` checks that no range
+parameter, and a garbage one, both resolve to year to date anchored on the
+last day with data, that it starts on 1 January, that it buckets by week, and
+that its two comparison windows coincide so the page shows one line. Every
+other preset's windows are checked in the same file.
 
 **Status:** tested.
 

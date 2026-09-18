@@ -15,17 +15,18 @@ describe("date helpers", () => {
 });
 
 describe("parseRange", () => {
-  it("defaults to 30d anchored on dataMax with two comparisons", () => {
+  it("defaults to year to date, anchored on dataMax", () => {
+    // The owner's ruling, 2026-09-17: the span the screens open on is the year so far.
     const r = parseRange(undefined, MIN, MAX);
-    expect(r.preset).toBe("30d");
+    expect(r.preset).toBe("ytd");
     expect(r.to).toBe(MAX);
-    expect(r.from).toBe("2026-08-18");
-    expect(r.days).toBe(30);
-    expect(r.granularity).toBe("day");
-    expect(r.comparison?.prevTo).toBe("2026-08-17");
-    expect(r.comparison?.prevFrom).toBe("2026-07-19");
-    expect(r.comparison?.lastYearFrom).toBe("2025-08-18");
-    expect(r.comparison?.lastYearTo).toBe("2025-09-16");
+    expect(r.from).toBe("2026-01-01");
+    expect(r.days).toBe(259);
+    expect(r.granularity).toBe("week");
+    // Year-shaped, so both comparisons are the same period last year and the page shows one line.
+    expect(r.comparison?.prevFrom).toBe("2025-01-01");
+    expect(r.comparison?.prevTo).toBe("2025-09-16");
+    expect(comparisonsCoincide(r)).toBe(true);
   });
   it("ytd starts on 1 Jan of the dataMax year and uses weeks", () => {
     const r = parseRange("ytd", MIN, MAX);
@@ -54,8 +55,8 @@ describe("parseRange", () => {
     expect(all.granularity).toBe("month");
     expect(all.comparison).toBeNull();
   });
-  it("falls back to 30d on garbage", () => {
-    expect(parseRange("evil", MIN, MAX).preset).toBe("30d");
+  it("falls back to the default on garbage", () => {
+    expect(parseRange("evil", MIN, MAX).preset).toBe("ytd");
   });
   it("clamps from to dataMin when the window is short", () => {
     expect(parseRange("12m", "2026-06-01", MAX).from).toBe("2026-06-01");

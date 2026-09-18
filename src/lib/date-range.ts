@@ -44,7 +44,7 @@ export function granularityFor(days: number): Granularity {
 
 /** Resolve a URL preset into concrete dates anchored on the last day that has data (never the wall clock). */
 export function parseRange(param: string | undefined, dataMin: string, dataMax: string): DateRange {
-  const preset: RangePreset = PRESETS.includes(param as RangePreset) ? (param as RangePreset) : "30d";
+  const preset: RangePreset = PRESETS.includes(param as RangePreset) ? (param as RangePreset) : "ytd";
   const to = dataMax;
   let from: string;
   switch (preset) {

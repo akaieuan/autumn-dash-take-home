@@ -87,7 +87,7 @@ with the decision-log entry that records the alternative and the reason.
 - **Useful without feeling like homework.** Nothing needs decoding, nothing
   needs clicking to be understood, and nothing floats over the page. Changing
   the range keeps the owner's place on the page (D32). The default range is
-  the last 30 days, the span an owner-operator actually thinks in (D3). The
+  the year so far, the span the reference product opens on (D3). The
   palette is the warm paper of Autumn's own site, not an ad platform's (D7).
 
 ## Run it locally
