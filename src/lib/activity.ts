@@ -2,7 +2,7 @@ import { monthShort, shortDate } from "./format";
 
 /**
  * The arithmetic behind the activity calendar: heat steps, month labels, weekday rhythm, and the
- * week, month and ranks a picked day sits inside. The calendar draws the page range (D41), so
+ * week, month and ranks a picked day sits inside. The calendar draws the page range (D43), so
  * nothing here picks a window any more, and every range is the same geometry — weeks as columns —
  * so nothing here lays out a month either. Pure and UI-free, so every rule is proved by
  * `tests/activity.test.ts` rather than by a rendered DOM.

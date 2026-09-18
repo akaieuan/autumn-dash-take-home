@@ -112,7 +112,7 @@ export const activityAll: ActivityDto = (() => {
   return { metric: "website_visits", from: days[0].date, to, weeks: Math.ceil((new Date(days[0].date).getUTCDay() + days.length) / 7), max: Math.max(...values), total: values.reduce((a, b) => a + b, 0), days };
 })();
 
-/** The calendar draws the page range (D41), so a specimen needs a window as well as days: the last 90. */
+/** The calendar draws the page range (D43), so a specimen needs a window as well as days: the last 90. */
 const lastDays = (n: number): ActivityDto => {
   const days = activityAll.days.slice(-n);
   const values = days.map((d) => d.value as number);

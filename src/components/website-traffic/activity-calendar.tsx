@@ -17,7 +17,7 @@ export { heatLevel, monthColumns } from "@/lib/activity";
 export type CalendarRange = Pick<DateRange, "preset" | "from" | "to">;
 
 /**
- * What a range is drawn as (D41). A square is always a day where it can be at least 12px; where it
+ * What a range is drawn as (D43). A square is always a day where it can be at least 12px; where it
  * cannot, the unit becomes a month and the legend says so. "both" means the panel decides by its own
  * width: day squares from 42rem, month blocks below it. Two years is 105 weeks, so it is blocks at
  * every width — a 7px square is not a calendar.
@@ -43,7 +43,7 @@ const dayLabel = (day: ActivityDay, unit: string) => `${weekdayDate(day.date)}: 
 /**
  * The days of the page's own range as a GitHub-style heatmap: one column per week, Sunday at the top,
  * small squares that never stretch. The calendar follows `?range=` like every other panel on the
- * screen (owner, 2026-09-17, D41), so it has no span control of its own: thirty days are five
+ * screen (owner, 2026-09-17, D43), so it has no span control of its own: thirty days are five
  * columns, ninety are thirteen, a year fifty-three; a panel too narrow for 12px squares, and the
  * whole two-year history, fall back to month blocks by container query, with both stages in the DOM
  * and CSS showing exactly one.

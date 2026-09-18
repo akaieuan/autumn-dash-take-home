@@ -365,60 +365,48 @@ sense on the traffic screen.
 
 ## What I learned, and what I would do next
 
-The full record is in [docs/decisions.md](docs/decisions.md); these are the
-parts I would bring up first.
+The full record, with the test that holds each call, is in
+[docs/decisions.md](docs/decisions.md). The short version:
 
 **What I learned**
 
-- **A before-and-after comparison is not proof of cause.** The first
-  causality test compared the weeks either side of an ad-copy refresh. An
-  untouched control campaign moved 2.8% across the same date while the
-  campaign with the real effect moved 0.6%: the test was reading season and
-  weekday mix, and it broke the moment the random stream shifted. The fix
-  was to regenerate the dataset with one effect switched off and compare the
-  two runs (D30). Every "what Autumn did" card on the traffic screen rests on
-  that.
-- **Small counts break the obvious sampling.** With about one booking a day,
-  a coin-flip per day hid a 22% annual trend behind noise (D25), and
-  largest-remainder rounding handed every single booking to the biggest
-  market, leaving eight of ten at zero over a month (D22). Both were caught
-  by tests that pin a shape ("July beats January", "no market is empty")
-  rather than a number.
-- **A rate stored without its denominator cannot be re-aggregated.** Pages
-  per visit was an average of daily averages until a test showed 3.5 where
-  the true figure was 3.68 (D29). The daily table now stores both counts.
-- **Derived facts belong in code, not in tables.** The spec started with
-  eight tables including a stored insights table. Two metric tables at two
-  grains, with insights computed at render time, removed every way the
-  numbers could disagree with the sentence beside them (D21, D24).
-- **A seed that prints a derived line is worth more than a green check.**
-  The acceptance line the seed prints and the verify script recomputes from
-  the live database caught a partial insert on the first hosted run.
+- **Before-and-after is not proof.** To check that a campaign change really
+  moved traffic, I first compared the weeks either side of it. Then I ran the
+  same check on a campaign nothing had happened to, and it moved more. The
+  comparison was reading the season, not the change. The honest test turns one
+  effect off in the generator, re-runs it, and compares the two runs (D30).
+- **Rare events need care.** With about one booking a day, the simple way of
+  spreading bookings across days and cities buried a real yearly trend in
+  noise and left most cities on zero (D22, D25). The tests that caught it
+  check a shape, "July beats January", "no city is empty", rather than a
+  number.
+- **Store counts, not rates.** Pages per visit was an average of daily
+  averages, which read 3.5 when the real figure was 3.68. The table now keeps
+  both counts and the rate is worked out when it is asked for (D29).
+- **Fewer tables, fewer ways to disagree.** The plan began with eight tables,
+  one of them storing insights. It ended as two, with the insights written in
+  code, so a number and the sentence beside it come from the same rows
+  (D21, D24).
+- **My first instinct on the calendar was wrong.** I drew it as a month of
+  large tiles. It was heavy, and it answered a different date range from the
+  one in the header. It is now one heat grid that follows the page's range,
+  with the chosen day read out underneath (D43).
 
-**What I would do next, with more time**
+**What I would do next**
 
-- **A per-booking grain.** The two-table model gave up lead time, booking
-  hour and a recent-bookings list (D21). Those are the owner's "who booked
-  last night?" questions and would be the first table added.
-- **Real traffic sources.** Channels, page paths and time of day are on the
-  reference product but not in this data, and were not faked (D31). With a
-  real analytics feed the traffic screen gains a "where visits come from"
-  section without changing its shape.
-- **Ask Autumn as a working assistant.** The popover is an honest preview
-  of the interaction, wired to nothing. The next step is a model that
-  answers over the same query layer the screens use, so it can never quote
-  a number the page does not show.
-- **Warm the cold path.** Lighthouse is green on both screens (table under
-  Gates), but the first request after the function has gone idle takes about
-  1.7 s to answer while it opens a database connection; warm requests take
-  under 60 ms. A keep-warm ping or a cached first payload would remove the
-  one slow load an owner might ever see.
-- **Negative controls for every decision.** Eleven decisions are marked
-  "tested" rather than "verified": the proving test exists but has not been
-  deliberately broken once. Finishing that pass is a morning's work and would
-  make the log fully falsified.
-- **The fee rate as a per-property setting** (D6), the first step toward the
-  multi-property switching the contract keeps out of scope.
+- **A row per booking**, so the screen can answer "who booked last night?"
+  and how far ahead people book (D21).
+- **Real traffic sources.** Channels, pages and time of day belong on the
+  traffic screen, but that data does not exist here and I did not invent it
+  (D31).
+- **Make Ask Autumn work.** The panel is a preview of the interaction, wired
+  to nothing. It should answer from the same queries the screens use, so it
+  can never quote a number the page does not show.
+- **Warm the first request.** Every page is fast once running, but the first
+  hit after the server has been idle spends about 1.7 s opening the database
+  connection, against under 60 ms when warm.
+- **Per-property settings**, starting with the fee rate (D6), which is the
+  first step towards handling more than one hotel.
 
 ## Docs
 

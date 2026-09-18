@@ -17,7 +17,7 @@ export interface ActivityDay {
 
 export interface ActivityDto {
   metric: TrendMetric;
-  /** The page range's own first day: the calendar follows `?range=` (D41), it does not pick a window. */
+  /** The page range's own first day: the calendar follows `?range=` (D43), it does not pick a window. */
   from: string;
   to: string;
   /** Calendar columns the days span once the first one is pushed under its weekday: ceil((weekday(from) + days) / 7). */
@@ -31,7 +31,7 @@ export interface ActivityDto {
 
 /**
  * The activity calendar's data: exactly the days of `[from, to]`, in order, no Sunday padding —
- * the component pads its own grid, so this DTO is the page range and nothing more (D41). A day the
+ * the component pads its own grid, so this DTO is the page range and nothing more (D43). A day the
  * data has no row for is `null` in every field, never 0, so the calendar leaves it blank instead of
  * drawing a quiet day. Money metrics come back in cents, like every other DTO.
  */

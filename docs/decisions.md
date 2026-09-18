@@ -337,7 +337,7 @@ range's days, null before the first row, totals by hand);
 `tests/components/website-traffic.test.tsx` (heat levels, month labels, one
 tile per day, click pins, arrow keys move a week, the day band follows).
 
-**Status:** verified 2026-09-17; the span part superseded by D41 the same day.
+**Status:** verified 2026-09-17; the span part superseded by D43 the same day.
 The calendar no longer ends on the last seeded day or carries a per-browser
 span: it draws the page range, like every other panel (owner's ruling). The
 pinning, the blank-not-zero rule and the stretch-to-fit columns stand.
@@ -897,12 +897,12 @@ query does what the table says: at a 900px viewport (column 555px, between
 28rem and 42rem) six months draws 26 day columns and the year draws blocks;
 at 1440px (column 771px) all three draw day tiles, 13, 26 and 54 columns.
 
-**Status:** verified 2026-09-17; the span part superseded by D41 the same day.
+**Status:** verified 2026-09-17; the span part superseded by D43 the same day.
 Blocks are still what a narrow panel draws, but the trigger is the page range
 rather than a span toggle, and the stage is no longer pinned to the 13-week
 grid's height.
 
-### D41. The calendar follows the page range
+### D43. The calendar follows the page range
 
 **We chose:** the activity calendar draws the window `?range=` names, exactly
 as every other panel does, and has no control of its own. One geometry at
